@@ -26,14 +26,14 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("Primary surface  (⇧⌘V)") {
-                Picker("Open with ⇧⌘V", selection: $settings.primarySurface) {
+            Section("⇧⌘V で開くサーフェス") {
+                Picker("⇧⌘V で開く", selection: $settings.primarySurface) {
                     ForEach(SettingsStore.PrimarySurface.allCases) { surface in
-                        Label(surface.label, systemImage: surface.iconName).tag(surface)
+                        Label(surface.jpLabel, systemImage: surface.iconName).tag(surface)
                     }
                 }
                 .pickerStyle(.inline)
-                Text("⌥⇧V will open the other surface. Both surfaces share the same history and selection.")
+                Text("⌥⇧V でもう一方のサーフェスを開きます。どちらも同じ履歴・選択状態を共有します。ノッチホバーは別途、画面上端でいつでも有効です。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

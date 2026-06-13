@@ -431,6 +431,13 @@
     transition: all .25s;
   }
   .surface-tab .label { font-weight: 600; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+  .surface-num {
+    display: inline-grid; place-items: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white; font-size: 13px; font-weight: 700;
+    box-shadow: 0 4px 10px -2px rgba(99,102,241,0.45);
+  }
   .surface-tab .kbd {
     font-family: var(--mono); font-size: 12px; font-weight: 600;
     background: var(--bg-soft); color: var(--text-soft);
@@ -782,6 +789,7 @@
     </a>
     <ul>
       <li><a href="#surfaces">サーフェス</a></li>
+      <li><a href="#folders">倉庫</a></li>
       <li><a href="#multi">複数選択</a></li>
       <li><a href="#search">検索</a></li>
       <li><a href="#privacy">プライバシー</a></li>
@@ -798,10 +806,10 @@
 <header class="hero">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">v0.2.2 · 画像対応・複数選択 · オープンソース · MIT</span>
-      <h1 class="headline">クリップボードを、<br/><span class="accent">もう一度。</span></h1>
+      <span class="eyebrow">v0.3.0 · フォルダ倉庫 · ストリップ主役化 · オープンソース · MIT</span>
+      <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。呼び出す方法は3つ。そのうち1つは、Paste が思いつかなかったやり方です。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Spotlight がサード。同じ履歴を、3 つの呼び方で。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -867,29 +875,29 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">3 つの呼び出し方</span>
-      <h2 class="section-title">ひとつの履歴を、<span class="accent">3 つの方法で。</span></h2>
-      <p class="section-sub">キーボードでも、マウスでも、視界の端でも。Pasty は、あなたの手があるところに現れます。</p>
+      <h2 class="section-title">同じカルーセル。<span class="accent">下から、上から、中央から。</span></h2>
+      <p class="section-sub">下部ストリップが主役。ノッチからは同じカルーセルが上から降りてきます。Spotlight モーダルは検索特化のサード。表示位置と起動方法が違うだけで、中身も操作も同じです。</p>
     </div>
 
     <div class="surfaces-wrap reveal">
       <div class="surface-list" role="tablist">
-        <button class="surface-tab active" data-surface="spotlight" role="tab">
-          <div class="label">Spotlight モーダル <span class="kbd">⇧⌘V</span></div>
-          <div class="desc">中央モーダル。検索 DSL を入力して Return。何をペーストしたいか分かっている時の最短経路。</div>
-        </button>
-        <button class="surface-tab" data-surface="strip" role="tab">
-          <div class="label">下部ストリップ <span class="kbd">⌥⇧V</span></div>
-          <div class="desc">Paste 風のカルーセル。Paste より細身で、見て探して、種類で絞って、⌘1〜9 で一発貼付。</div>
+        <button class="surface-tab active" data-surface="strip" role="tab">
+          <div class="label"><span class="surface-num">1</span>下部ストリップ <span class="kbd">⇧⌘V</span></div>
+          <div class="desc">メイン。下から立ち上がるカルーセル。フォルダ＝倉庫として、定型文・画像・URL を分類して貯めておけます。⌘1〜9 で一発貼付、Shift で複数選択。</div>
         </button>
         <button class="surface-tab" data-surface="notch" role="tab">
-          <div class="label">ノッチホバー <span class="kbd">↑ マウス</span></div>
-          <div class="desc">ノッチにマウスを乗せる（ノッチがない Mac は画面上端中央 20% が代わり）。カードを下にドラッグすればキーボードなしで貼付完了。</div>
+          <div class="label"><span class="surface-num">2</span>ノッチホバー <span class="kbd">↑ マウス</span></div>
+          <div class="desc">サブ。ノッチにマウスを乗せると、同じカルーセルが上から降りてきます (ノッチがない Mac は画面上端中央 20% が代わり)。表示位置だけが違い、中身も操作も下部ストリップと同じ。</div>
+        </button>
+        <button class="surface-tab" data-surface="spotlight" role="tab">
+          <div class="label"><span class="surface-num">3</span>Spotlight モーダル <span class="kbd">⌥⇧V</span></div>
+          <div class="desc">サード。中央モーダル。検索 DSL に強く、何をペーストしたいか分かっている時の最短経路。</div>
         </button>
       </div>
 
       <div class="surface-stage">
         <!-- Spotlight -->
-        <div class="surface-frame show" data-frame="spotlight">
+        <div class="surface-frame" data-frame="spotlight">
           <div class="spotlight-mock">
             <div class="search">
               <span class="magn">🔍</span>
@@ -911,7 +919,7 @@
         </div>
 
         <!-- Strip -->
-        <div class="surface-frame" data-frame="strip">
+        <div class="surface-frame show" data-frame="strip">
           <div class="strip-mock">
             <div class="head">
               <strong style="color:white">Pasty</strong>
@@ -1047,6 +1055,50 @@
   </div>
 </section>
 
+<!-- FOLDERS / SNIPPETS ============================================ -->
+<section id="folders">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">フォルダ＝倉庫 — v0.3 で強化</span>
+      <h2 class="section-title">クリップボードを、<span class="accent">倉庫として持ち歩く。</span></h2>
+      <p class="section-sub">Paste の「ピンボード」を、もう少し深く。色付きフォルダを好きなだけ作って、定型文・画像・URL・JSON・コードを分類して貯めていけます。⌘C で流れてきた一瞬を、ずっと使える資産に。</p>
+    </div>
+
+    <div class="features reveal" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="feature">
+        <div class="ico">📁</div>
+        <h3>フォルダはいくつでも。</h3>
+        <p>「営業の定型文」「請求書テンプレ」「画像倉庫」「ToDo の決まり文句」…。下部ストリップの「+ 新しいフォルダ」から、用途に応じて好きなだけ作れます。色も自分で選べます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">✍️</div>
+        <h3>定型文を Pasty 内で直接書く。</h3>
+        <p>「定型文」ボタン または <code style="font-family:var(--mono);font-size:13px">⌘N</code> から、新しいテキストをその場で作成。クリップボードを経由しなくても、開いたフォルダに直接保存されます。<code style="font-family:var(--mono);font-size:13px">{{date}} {{user}} {{uuid}}</code> といったスニペット変数は貼付時に展開されます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🖼</div>
+        <h3>画像も、文章も、リンクも。</h3>
+        <p>テキストだけでなく、画像 (PNG/TIFF を自動正規化)・ファイルパス・URL・コード・JSON も同じフォルダに混ぜて保存可能。サムネイル付きで、内容を見ながら選べます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🎯</div>
+        <h3>フォルダ単位で一括ペースト。</h3>
+        <p>フォルダタブを右クリック → 「中身を順次貼付」or「中身を結合して貼付」。複数欄のフォームに一気にデータを流し込んだり、定型文セットをまとめて 1 通のメールにしたり。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔁</div>
+        <h3>フォルダ名と色は後から変更可能。</h3>
+        <p>タブを右クリックで「名前を変更」「削除」。フォルダを消してもクリップ本体は履歴に残るので、安心して整理し直せます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">↔︎</div>
+        <h3>ストリップ ⇔ ノッチで同じ倉庫。</h3>
+        <p>下部ストリップで作ったフォルダは、ノッチホバーでもそのまま現れます。同じデータベース、同じカルーセル、同じ選択状態。場所だけ違う。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DSL SEARCH DEMO ============================================ -->
 <section id="search">
   <div class="container">
@@ -1163,12 +1215,12 @@
       <div class="step">
         <div class="num">4</div>
         <h3><code>⇧⌘V</code> を押す</h3>
-        <p>カーソルのいる画面の中央に Spotlight 風のモーダルが現れます。普通に検索しても、DSL を使っても (<code>type:link source:Safari /TODO/</code>)。Return で確定。</p>
+        <p>下から Pasty のストリップがせり上がります。<code>←/→</code> でカードを送る、<code>⌘1〜9</code> で番号指定貼付、<code>⇧↩</code> で書式を捨ててプレーンテキストとして貼付。Return で確定。</p>
       </div>
       <div class="step">
         <div class="num">5</div>
-        <h3><code>⌥⇧V</code> でも呼べます</h3>
-        <p>下からストリップがせり上がります。<code>←/→</code> で送る、<code>⌘1〜9</code> で番号指定貼付、<code>⇧↩</code> で書式を捨ててプレーンテキストとして貼付。</p>
+        <h3><code>⌥⇧V</code> で Spotlight モーダル</h3>
+        <p>検索特化サブモード。中央モーダルで DSL クエリ (<code>type:link source:Safari /TODO/</code>) を打って Return。何を貼りたいか分かっている時の最短経路。</p>
       </div>
       <div class="step">
         <div class="num">6</div>
@@ -1177,13 +1229,13 @@
       </div>
       <div class="step">
         <div class="num">7</div>
-        <h3>Pinboard に振り分ける</h3>
-        <p>クリップを右クリック → 「Pin to 受信 / 仕事 / コード / 参考」。各 Pinboard は色付きタグ。新規作成は 設定 → Pinboards から。</p>
+        <h3>フォルダ＝倉庫に振り分ける</h3>
+        <p>ストリップ上部の「+ 新しいフォルダ」で好きな名前・色のフォルダを作成。クリップを右クリック → 「フォルダに振り分け」で分類。「定型文」ボタン or <code>⌘N</code> で文章を直接書いて保存することも。</p>
       </div>
       <div class="step">
         <div class="num">8</div>
-        <h3>Stack で順番に貼り付ける</h3>
-        <p>複数のクリップを Stack に積んでから、<code>⌘V</code> を繰り返して順に貼り付け。フォーム入力、議事メモ起こし、表のセル単位入力などで便利。</p>
+        <h3>フォルダごと一括ペースト</h3>
+        <p>フォルダタブを右クリック → 「中身を順次貼付」or「中身を結合して貼付」。複数欄のフォーム入力や、定型文セットをまとめてメールにする時に便利。</p>
       </div>
       <div class="step">
         <div class="num">9</div>

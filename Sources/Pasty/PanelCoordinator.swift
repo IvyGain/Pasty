@@ -20,7 +20,13 @@ final class PanelCoordinator: ObservableObject {
         self.pinboards = pinboards
         self.stack = stack
         self.selection = selection
-        self.notch = NotchHoverController(store: store, pinboards: pinboards, stack: stack)
+        let notch = NotchHoverController(
+            store: store, pinboards: pinboards, stack: stack,
+            selection: selection
+        )
+        self.notch = notch
+        // 初期化後に self を参照できるようになるので、ここで設定ハンドラを接続。
+        notch.onOpenSettings = { [weak self] in self?.openSettings() }
     }
 
     func installHotkeys() {

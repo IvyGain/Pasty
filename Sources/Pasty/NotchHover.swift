@@ -12,6 +12,8 @@ final class NotchHoverController: NSObject {
     private let store: ClipStore
     private let pinboards: PinboardStore
     private let stack: PasteStack
+    private let selection: SelectionModel
+    var onOpenSettings: () -> Void = {}
 
     private var triggerPanels: [NSPanel] = []
     private var dropdownPanel: NSPanel?
@@ -30,10 +32,14 @@ final class NotchHoverController: NSObject {
     /// 判断するとアニメーション最中に閉じてしまうので、ガードとして使う。
     private var pointerEnteredOnce: Bool = false
 
-    init(store: ClipStore, pinboards: PinboardStore, stack: PasteStack) {
+    init(store: ClipStore,
+         pinboards: PinboardStore,
+         stack: PasteStack,
+         selection: SelectionModel) {
         self.store = store
         self.pinboards = pinboards
         self.stack = stack
+        self.selection = selection
         super.init()
     }
 
@@ -110,23 +116,29 @@ final class NotchHoverController: NSObject {
     func show(on screen: NSScreen) {
         if dropdownPanel != nil { return }
         let frame = screen.frame
-        let targetWidth: CGFloat = min(frame.width - 32, 1280)
+        let targetWidth: CGFloat = min(frame.width - 32, 1320)
+        let panelHeight: CGFloat = 360
         let collapsed = NSRect(x: frame.midX - targetWidth / 2,
                                y: frame.maxY,
                                width: targetWidth, height: 0)
         let expanded = NSRect(x: collapsed.origin.x,
-                              y: frame.maxY - 220,
-                              width: targetWidth, height: 220)
+                              y: frame.maxY - panelHeight,
+                              width: targetWidth, height: panelHeight)
 
         let panel = NotchPanel(contentRect: collapsed)
-        let hosting = NSHostingController(rootView:
-            NotchDropdownView(
-                store: store,
-                pinboards: pinboards,
-                stack: stack,
-                onDismiss: { [weak self] in self?.dismiss() }
-            )
+        // Strip と同じカルーセル/フォルダ UI を再利用。表示位置が違うだけで、
+        // 操作感は完全に同じ。
+        let view = StripView(
+            store: store,
+            pinboards: pinboards,
+            stack: stack,
+            selection: selection,
+            mode: .notch,
+            onDismiss: { [weak self] in self?.dismiss() },
+            onOpenSettings: { [weak self] in self?.onOpenSettings() }
         )
+        let hosting = NSHostingController(rootView: view)
+        hosting.sizingOptions = [.minSize]
         panel.contentViewController = hosting
         panel.orderFrontRegardless()
         dropdownPanel = panel
@@ -299,94 +311,3 @@ private final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-@MainActor
-private struct NotchDropdownView: View {
-    @ObservedObject var store: ClipStore
-    @ObservedObject var pinboards: PinboardStore
-    @ObservedObject var stack: PasteStack
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "doc.on.clipboard")
-                    .foregroundStyle(.tint)
-                Text("Pasty · drag a clip downward")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                ForEach(pinboards.boards.prefix(4)) { board in
-                    HStack(spacing: 3) {
-                        Circle().fill(Color(hex: board.colorHex)).frame(width: 7, height: 7)
-                        Text(board.name).font(.caption2)
-                    }
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color.primary.opacity(0.06),
-                                in: RoundedRectangle(cornerRadius: 4))
-                }
-            }
-            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(store.recent.prefix(20)) { clip in
-                        NotchCard(clip: clip)
-                            .draggable(clip.content ?? clip.preview) {
-                                NotchCard(clip: clip)
-                                    .frame(width: 120, height: 120)
-                            }
-                            .onTapGesture {
-                                onDismiss()
-                                PasteAutomator.shared.paste(clip)
-                            }
-                    }
-                }
-                .padding(.horizontal, 12).padding(.bottom, 14)
-            }
-        }
-        .background(VisualEffectBackground())
-        .clipShape(.rect(
-            topLeadingRadius: 0,
-            bottomLeadingRadius: PastyTheme.cornerRadius,
-            bottomTrailingRadius: PastyTheme.cornerRadius,
-            topTrailingRadius: 0
-        ))
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: PastyTheme.cornerRadius,
-                bottomTrailingRadius: PastyTheme.cornerRadius,
-                topTrailingRadius: 0
-            )
-            .strokeBorder(Color.white.opacity(PastyTheme.strokeOpacity), lineWidth: 1)
-        )
-    }
-}
-
-private struct NotchCard: View {
-    let clip: ClipItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: clip.kind.iconName)
-                    .foregroundStyle(.tint)
-                Text(clip.sourceAppName ?? "—")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            Text(clip.preview)
-                .font(.caption)
-                .lineLimit(4)
-                .multilineTextAlignment(.leading)
-            Spacer()
-        }
-        .padding(8)
-        .frame(width: 150, height: 130, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.primary.opacity(0.08))
-        )
-    }
-}

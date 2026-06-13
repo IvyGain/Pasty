@@ -52,7 +52,7 @@ final class SettingsStore: ObservableObject {
 
     private init() {
         defaults.register(defaults: [
-            Keys.primarySurface: PrimarySurface.spotlight.rawValue,
+            Keys.primarySurface: PrimarySurface.strip.rawValue,
             Keys.capturingEnabled: true,
             Keys.maxRetentionDays: 30,
             Keys.notchHoverEnabled: true,
@@ -66,8 +66,17 @@ final class SettingsStore: ObservableObject {
                 "com.bitwarden.desktop"
             ]
         ])
-        let rawSurface = defaults.string(forKey: Keys.primarySurface) ?? PrimarySurface.spotlight.rawValue
-        self.primarySurface = PrimarySurface(rawValue: rawSurface) ?? .spotlight
+        // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
+        // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
+        // ユーザーは旧 Spotlight 既定で来ている可能性があるので、強制的に
+        // Strip に揃え直す。以降は自由に切り替え可。
+        let migratedKey = "pasty.primarySurfaceMigratedToStrip.v1"
+        if !defaults.bool(forKey: migratedKey) {
+            defaults.set(PrimarySurface.strip.rawValue, forKey: Keys.primarySurface)
+            defaults.set(true, forKey: migratedKey)
+        }
+        let rawSurface = defaults.string(forKey: Keys.primarySurface) ?? PrimarySurface.strip.rawValue
+        self.primarySurface = PrimarySurface(rawValue: rawSurface) ?? .strip
         self.capturingEnabled = defaults.bool(forKey: Keys.capturingEnabled)
         self.pauseUntil = defaults.object(forKey: Keys.pauseUntil) as? Date
         self.ignoredBundleIds = Set(defaults.array(forKey: Keys.ignoredBundleIds) as? [String] ?? [])
@@ -93,6 +102,13 @@ final class SettingsStore: ObservableObject {
             switch self {
             case .spotlight: return "rectangle.center.inset.filled"
             case .strip:     return "rectangle.bottomthird.inset.filled"
+            }
+        }
+
+        var jpLabel: String {
+            switch self {
+            case .strip:     return "下部ストリップ（メイン）"
+            case .spotlight: return "Spotlight モーダル（検索特化）"
             }
         }
     }

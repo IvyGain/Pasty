@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import Combine
+import CryptoKit
 
 /// SQLite-backed persistence for clipboard items. Local-first by design:
 /// the database lives under `~/Library/Application Support/Pasty/`.
@@ -157,5 +158,68 @@ final class ClipStore: ObservableObject {
             try ClipItem.deleteAll(db)
         }
         try reloadInitial()
+    }
+
+    /// ユーザが Pasty 内で「新しい定型文」を作るときの保存口。
+    /// クリップボードに置いた覚えはなくても、Pasty の中で書いた文は即倉庫に入る。
+    @discardableResult
+    func createTextClip(content: String,
+                        pinTo pinboardId: Int64? = nil,
+                        preview: String? = nil,
+                        sourceAppName: String = "Pasty") async throws -> ClipItem {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let view = preview ?? String(trimmed.split(separator: "\n").first ?? "").prefix(120).description
+        let hash = SHA256Helper.hash(of: trimmed)
+
+        let inserted: ClipItem? = try await dbWriter.write { db in
+            var item = ClipItem(
+                id: nil,
+                createdAt: Date(),
+                kind: .text,
+                preview: view.isEmpty ? "Untitled snippet" : view,
+                content: content,
+                dataPath: nil,
+                byteSize: Int64(content.utf8.count),
+                sourceBundleId: "io.pasty.snippet",
+                sourceAppName: sourceAppName,
+                contentHash: hash
+            )
+            try item.insert(db)
+            return item
+        }
+
+        try reloadInitial()
+        return inserted ?? ClipItem(
+            id: nil, createdAt: Date(), kind: .text,
+            preview: view, content: content, dataPath: nil,
+            byteSize: 0, sourceBundleId: nil, sourceAppName: nil, contentHash: ""
+        )
+    }
+
+    /// 既存クリップの本文を上書き（編集機能のバックエンド）。
+    func update(clipId: Int64, content: String) async throws {
+        _ = try await dbWriter.write { db in
+            let preview = String(content.split(separator: "\n").first ?? "").prefix(120).description
+            try db.execute(
+                sql: "UPDATE clips SET content = ?, preview = ?, byteSize = ? WHERE id = ?",
+                arguments: [content, preview, Int64(content.utf8.count), clipId]
+            )
+        }
+        try reloadInitial()
+    }
+
+    func delete(clipId: Int64) async throws {
+        _ = try await dbWriter.write { db in
+            try db.execute(sql: "DELETE FROM clips WHERE id = ?", arguments: [clipId])
+        }
+        try reloadInitial()
+    }
+}
+
+enum SHA256Helper {
+    static func hash(of string: String) -> String {
+        SHA256.hash(data: Data(string.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }

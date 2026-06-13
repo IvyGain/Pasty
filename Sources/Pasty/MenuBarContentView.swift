@@ -57,17 +57,17 @@ struct MenuBarContentView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 4) {
             let primary = settings.primarySurface
-            row(title: "\(primary == .spotlight ? "Spotlight" : "Strip")…  ⇧⌘V",
+            row(title: "\(primary == .strip ? "ストリップを開く" : "Spotlight を開く")  ⇧⌘V",
                 systemImage: primary.iconName) {
                 coordinator.togglePrimary()
             }
-            row(title: "\(primary == .spotlight ? "Strip" : "Spotlight")…  ⌥⇧V",
-                systemImage: (primary == .spotlight
-                              ? SettingsStore.PrimarySurface.strip.iconName
-                              : SettingsStore.PrimarySurface.spotlight.iconName)) {
+            row(title: "\(primary == .strip ? "Spotlight を開く" : "ストリップを開く")  ⌥⇧V",
+                systemImage: (primary == .strip
+                              ? SettingsStore.PrimarySurface.spotlight.iconName
+                              : SettingsStore.PrimarySurface.strip.iconName)) {
                 coordinator.toggleSecondary()
             }
-            row(title: settings.isPaused ? "Resume capture" : "Pause capture for 60 s",
+            row(title: settings.isPaused ? "キャプチャを再開" : "60 秒間 一時停止",
                 systemImage: settings.isPaused ? "play.circle" : "pause.circle") {
                 if settings.isPaused { settings.resume() }
                 else                  { settings.pause(forSeconds: 60) }
