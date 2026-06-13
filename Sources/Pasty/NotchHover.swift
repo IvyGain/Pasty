@@ -18,6 +18,18 @@ final class NotchHoverController: NSObject {
     private var hoverWorkItem: DispatchWorkItem?
     private var dwellDelay: TimeInterval = 0.22
 
+    /// パネルが開いている間だけ動くマウス位置の見張り役。`NSPanel` の
+    /// `mouseExited` は、プログラマティックに `NSHostingController` を
+    /// 流し込んだケースでは安定して発火しない（`awakeFromNib` が走らない
+    /// ためトラッキング登録のタイミングを逃す）。なので最後の砦として
+    /// グローバルイベントとローカルイベントの両方を観測する。
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
+    private var pendingClose: DispatchWorkItem?
+    /// マウスがパネルの矩形に「最低 1 回入った」フラグ。入る前に範囲外と
+    /// 判断するとアニメーション最中に閉じてしまうので、ガードとして使う。
+    private var pointerEnteredOnce: Bool = false
+
     init(store: ClipStore, pinboards: PinboardStore, stack: PasteStack) {
         self.store = store
         self.pinboards = pinboards
@@ -116,25 +128,24 @@ final class NotchHoverController: NSObject {
             )
         )
         panel.contentViewController = hosting
-        panel.onMouseExit = { [weak self] in
-            // Small grace period so users moving downward can drop onto an
-            // editor without the panel snapping shut beneath them.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self?.dismiss()
-            }
-        }
         panel.orderFrontRegardless()
         dropdownPanel = panel
+        pointerEnteredOnce = false
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(expanded, display: true)
         }
+
+        // パネルが固定矩形になったあとの位置を「閉じる判定」の母集合にする。
+        let activeFrame = expanded
+        installMouseMonitors(activeFrame: activeFrame)
     }
 
     func dismiss() {
         guard let panel = dropdownPanel else { return }
+        removeMouseMonitors()
         let frame = panel.frame
         let collapsed = NSRect(x: frame.origin.x,
                                y: frame.origin.y + frame.size.height,
@@ -147,6 +158,68 @@ final class NotchHoverController: NSObject {
             panel.orderOut(nil)
             Task { @MainActor [weak self] in self?.dropdownPanel = nil }
         })
+    }
+
+    // MARK: - Mouse monitoring
+
+    /// マウスが `activeFrame`（パネルが完全に降りた時の矩形）の外に出たら
+    /// 自動で閉じる。`mouseMoved` をグローバルに観測することで、別アプリ上
+    /// にカーソルがあっても判定が止まらない。
+    private func installMouseMonitors(activeFrame: NSRect) {
+        removeMouseMonitors()
+        let inflate: CGFloat = 12     // 1〜2 px の縁を超えただけで閉じないように
+        let zone = activeFrame.insetBy(dx: -inflate, dy: -inflate)
+
+        let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.evaluatePointer(against: zone) }
+        }
+        let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+            guard let self else { return event }
+            Task { @MainActor in self.evaluatePointer(against: zone) }
+            return event
+        }
+        globalMouseMonitor = global
+        localMouseMonitor = local
+
+        // モニタは move があった時しか発火しないので、マウスがそもそも
+        // 動かない場合の保険として 0.18 s 毎にも判定を回す。
+        scheduleHeartbeat(against: zone)
+    }
+
+    private func scheduleHeartbeat(against zone: NSRect) {
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.evaluatePointer(against: zone)
+            if self.dropdownPanel != nil {
+                self.scheduleHeartbeat(against: zone)
+            }
+        }
+        pendingClose = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+    }
+
+    private func evaluatePointer(against zone: NSRect) {
+        guard dropdownPanel != nil else { return }
+        let p = NSEvent.mouseLocation
+        let inside = NSPointInRect(p, zone)
+        if inside {
+            pointerEnteredOnce = true
+            return
+        }
+        // まだ一度も入っていない場合は猶予。
+        // （スライドダウン中にユーザのカーソルがノッチから少し離れているケース）
+        guard pointerEnteredOnce else { return }
+        dismiss()
+    }
+
+    private func removeMouseMonitors() {
+        if let m = globalMouseMonitor { NSEvent.removeMonitor(m) }
+        if let m = localMouseMonitor  { NSEvent.removeMonitor(m) }
+        globalMouseMonitor = nil
+        localMouseMonitor = nil
+        pendingClose?.cancel()
+        pendingClose = nil
     }
 }
 
@@ -204,9 +277,6 @@ private final class HoverView: NSView {
 }
 
 private final class NotchPanel: NSPanel {
-    var onMouseExit: (() -> Void)?
-    private var tracking: NSTrackingArea?
-
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -225,31 +295,8 @@ private final class NotchPanel: NSPanel {
         isReleasedWhenClosed = false
     }
 
-    override func awakeFromNib() {
-        super.awakeFromNib()
-        addExitTracking()
-    }
-
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
-
-    override func resignKey() {
-        super.resignKey()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        onMouseExit?()
-    }
-
-    private func addExitTracking() {
-        guard let view = contentView else { return }
-        let area = NSTrackingArea(rect: view.bounds,
-                                  options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                  owner: self,
-                                  userInfo: nil)
-        view.addTrackingArea(area)
-        tracking = area
-    }
 }
 
 @MainActor
