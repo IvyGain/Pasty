@@ -1,8 +1,20 @@
-# Pasty
+<p align="center">
+  <img src="docs/assets/icon-256.png" width="180" alt="Pasty app icon" />
+</p>
 
-> A blazing-fast, local-first, open-source clipboard manager for macOS — the upper-compatible successor to [Paste](https://pasteapp.io/), fully free under MIT.
+<h1 align="center">Pasty</h1>
 
-**Status**: v0.1 — P0–P5 shipped (see Roadmap).
+<p align="center">
+  <strong>A blazing-fast, local-first, open-source clipboard manager for macOS — the upper-compatible successor to <a href="https://pasteapp.io/">Paste</a>, fully free under MIT.</strong>
+</p>
+
+<p align="center">
+  <a href="https://ivygain.github.io/Pasty/">Website</a> ·
+  <a href="https://github.com/IvyGain/Pasty/releases/latest">Download</a> ·
+  <a href="docs/research/PASTE-RESEARCH.md">Design dossier</a>
+</p>
+
+**Status**: v0.1.1 — P0–P5 shipped (see Roadmap).
 
 ![mit](https://img.shields.io/badge/license-MIT-blue) ![swift](https://img.shields.io/badge/swift-6.1+-orange) ![macos](https://img.shields.io/badge/macOS-14.0+-black)
 
@@ -41,7 +53,7 @@ Plus the menu-bar icon for quick access to recent clips, pause toggle, and setti
 
 ### Pre-built `.dmg` (recommended)
 
-Download the latest from [Releases](https://github.com/IvyGain/Pasty/releases) and drag `Pasty.app` to `/Applications`. Pasty is ad-hoc signed; the first launch needs **right-click → Open** to bypass Gatekeeper.
+Download the latest [`Pasty.dmg`](https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg) (3.8 MB) and drag `Pasty.app` to `/Applications`. Pasty is ad-hoc signed; the first launch needs **right-click → Open** to bypass Gatekeeper.
 
 ### Build from source
 

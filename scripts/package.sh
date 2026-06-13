@@ -18,7 +18,7 @@ NOTARIZE="${2:-}"
 
 APP_NAME="Pasty"
 BUNDLE_ID="io.pasty.app"
-VERSION="${PASTY_VERSION:-0.1.0}"
+VERSION="${PASTY_VERSION:-0.1.1}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -49,6 +49,15 @@ chmod +x "$APP/Contents/MacOS/${APP_NAME}"
 sed -e "s/__VERSION__/${VERSION}/g" \
     -e "s/__BUNDLE_ID__/${BUNDLE_ID}/g" \
     "scripts/Info.plist.template" > "$APP/Contents/Info.plist"
+
+# Bundle the .icns so Finder/Dock pick up the GPT-Image-2 designed icon.
+ICNS_SRC="${ROOT}/Sources/Pasty/Resources/Assets/Pasty.icns"
+if [ -f "$ICNS_SRC" ]; then
+  cp "$ICNS_SRC" "$APP/Contents/Resources/Pasty.icns"
+  echo "==> Bundled Pasty.icns ($(du -h "$ICNS_SRC" | cut -f1))"
+else
+  echo "warn: no Pasty.icns found at $ICNS_SRC — Finder will show the generic app icon"
+fi
 
 # Ad-hoc sign (or Developer-ID sign if DEV_ID set).
 if [ -n "${DEV_ID:-}" ]; then
