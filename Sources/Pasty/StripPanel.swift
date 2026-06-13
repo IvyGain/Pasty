@@ -79,7 +79,6 @@ struct StripView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            folderBar
             Divider().opacity(0.25)
             if settings.explorerMode {
                 explorerLayout
@@ -100,8 +99,22 @@ struct StripView: View {
         )
         .onAppear {
             selection.clearAll()
-            if folderID == nil { folderID = pinboards.boards.first?.id }
+            // 初期表示は常に履歴 (= folderID == nil) から始める
+            folderID = nil
             reload()
+            // ノッチパネル経由の Tab/Shift+Tab 通知を購読。
+            NotificationCenter.default.addObserver(
+                forName: .pastyNotchCycleFolderForward,
+                object: nil, queue: .main
+            ) { _ in
+                Task { @MainActor in cycleFolder(by: 1) }
+            }
+            NotificationCenter.default.addObserver(
+                forName: .pastyNotchCycleFolderBackward,
+                object: nil, queue: .main
+            ) { _ in
+                Task { @MainActor in cycleFolder(by: -1) }
+            }
         }
         .onChange(of: store.recent) { _, _ in reload() }
         .onChange(of: query) { _, _ in reload() }
@@ -117,152 +130,137 @@ struct StripView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                TextField("クリップを検索…", text: $query)
-                    .textFieldStyle(.plain)
-                    .frame(width: 220)
+        HStack(alignment: .center, spacing: 8) {
+            // 折り畳み式の検索バー (アイコンのみ → クリック/フォーカスで展開)
+            ModernSearchField(text: $query, collapsible: true, expandedWidth: 280)
+
+            // 履歴タブ + フォルダタブを同じ行に統合 (横スクロール)
+            inlineFolderStrip
+
+            Spacer(minLength: 8)
+
+            // 種類フィルタ — コンパクトなセグメント
+            HStack(spacing: 2) {
+                kindChip(nil,    label: "All")
+                kindChip(.text,  label: "Aa", systemImage: "textformat")
+                kindChip(.image, label: "画像", systemImage: "photo")
+                kindChip(.link,  label: "リンク", systemImage: "link")
+                kindChip(.file,  label: "ファイル", systemImage: "doc")
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Color.primary.opacity(0.08),
-                        in: RoundedRectangle(cornerRadius: 8))
+            .padding(2)
+            .background(
+                Capsule(style: .continuous).fill(ModernTokens.surface)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(ModernTokens.hairline, lineWidth: 0.5)
+            )
 
-            Spacer()
-
-            HStack(spacing: 4) {
-                kindChip(nil,      label: "All")
-                kindChip(.text,    label: "Aa")
-                kindChip(.image,   label: "🖼")
-                kindChip(.link,    label: "🔗")
-                kindChip(.file,    label: "📄")
-            }
-            .font(.caption)
-
-            Button {
+            // 「+ 定型文」プライマリ CTA
+            ModernPrimaryButton(action: {
                 showingNewSnippet = true
                 newSnippetText = ""
-            } label: {
-                Label("定型文", systemImage: "text.badge.plus")
-                    .font(.caption.weight(.medium))
-                    .labelStyle(.titleAndIcon)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.14),
-                                in: RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .help("選択中のフォルダに定型文を追加")
-
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("設定…  ⌘,")
-            .accessibilityLabel("設定")
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("閉じる")
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-    }
-
-    private func kindChip(_ kind: ClipKind?, label: String) -> some View {
-        Button {
-            filterKind = (filterKind == kind) ? nil : kind
-        } label: {
-            Text(label)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(
-                    Color.primary.opacity(filterKind == kind ? 0.18 : 0.05),
-                    in: RoundedRectangle(cornerRadius: 4)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Folder tab strip
-
-    private var folderBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                folderTab(id: nil, name: "履歴", colorHex: "#86868b",
-                          systemImage: "clock.arrow.circlepath")
-                ForEach(pinboards.boards) { board in
-                    folderTab(id: board.id, name: board.name, colorHex: board.colorHex,
-                              systemImage: "folder.fill")
-                        .contextMenu {
-                            Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
-                            Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
-                            Divider()
-                            Button("フォルダ名を変更…") { promptRename(board) }
-                            Button("削除", role: .destructive) { promptDelete(board) }
-                        }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("定型文")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .tracking(-0.1)
                 }
+            }
+            .help("選択中のフォルダに定型文を追加  ⌘N")
+
+            ModernIconButton(systemImage: "gearshape",
+                             help: "設定…  ⌘,",
+                             action: onOpenSettings)
+                .accessibilityLabel("設定")
+
+            ModernIconButton(systemImage: "xmark",
+                             help: "閉じる",
+                             action: onDismiss)
+                .accessibilityLabel("閉じる")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 7)
+    }
+
+    // ヘッダー内の横スクロール式フォルダタブストリップ (履歴 + ピンボード + 新規)
+    private var inlineFolderStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .center, spacing: 5) {
+                ModernFolderTab(
+                    name: "履歴",
+                    colorHex: nil,
+                    systemImage: "clock.arrow.circlepath",
+                    count: nil,
+                    isSelected: folderID == nil,
+                    action: { folderID = nil }
+                )
+                .acceptClipReferenceDrop(pinboardId: nil,
+                                         pinboards: pinboards, store: store)
+
+                if !pinboards.boards.isEmpty {
+                    Rectangle()
+                        .fill(ModernTokens.hairlineStrong)
+                        .frame(width: 1, height: 14)
+                        .padding(.horizontal, 1)
+                }
+
+                ForEach(pinboards.boards) { board in
+                    ModernFolderTab(
+                        name: board.name,
+                        colorHex: board.colorHex,
+                        systemImage: nil,
+                        count: nil,
+                        isSelected: folderID == board.id,
+                        action: { folderID = board.id }
+                    )
+                    .contextMenu {
+                        Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
+                        Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
+                        Divider()
+                        Button("フォルダ名を変更…") { promptRename(board) }
+                        Button("削除", role: .destructive) { promptDelete(board) }
+                    }
+                    .acceptClipReferenceDrop(pinboardId: board.id,
+                                             pinboards: pinboards, store: store)
+                }
+
                 Button {
                     showingNewFolder = true
                     newFolderName = ""
                     newFolderColor = randomFolderColor()
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.caption.weight(.bold))
-                        Text("新しいフォルダ").font(.caption)
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Color.accentColor.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.accentColor.opacity(0.5),
-                                          style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    )
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22, height: 22)
+                        .background(
+                            Circle().fill(Color.accentColor.opacity(0.08))
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.accentColor.opacity(0.32),
+                                              style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        )
                 }
                 .buttonStyle(.plain)
+                .help("新しいフォルダ")
             }
-            .padding(.horizontal, 14).padding(.vertical, 6)
         }
+        .scrollClipDisabled()
+        .frame(maxWidth: 360, alignment: .leading)
     }
 
-    private func folderTab(id: Int64?, name: String, colorHex: String, systemImage: String) -> some View {
-        let selected = folderID == id
-        return Button {
-            folderID = id
-        } label: {
-            HStack(spacing: 5) {
-                if id == nil {
-                    Image(systemName: systemImage).foregroundStyle(.secondary).font(.caption)
-                } else {
-                    Circle().fill(Color(hex: colorHex)).frame(width: 8, height: 8)
-                }
-                Text(name)
-                    .font(.callout.weight(selected ? .semibold : .regular))
-            }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(
-                Color.primary.opacity(selected ? 0.18 : 0.06),
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.6) : .clear,
-                                  lineWidth: 1)
-            )
+    /// shadcn セグメント風の種類フィルタチップ。
+    /// アイコンとラベルの両方を表示するが、幅優先でテキストは折り畳まれる。
+    @ViewBuilder
+    private func kindChip(_ kind: ClipKind?, label: String,
+                          systemImage: String? = nil) -> some View {
+        KindChip(label: label, systemImage: systemImage,
+                 isOn: filterKind == kind) {
+            filterKind = (filterKind == kind) ? nil : kind
         }
-        .buttonStyle(.plain)
-        // 1) Pasty 内のクリップカードをドロップ → そのフォルダに pin
-        .acceptClipReferenceDrop(pinboardId: id, pinboards: pinboards, store: store)
-        // 2) 外部アプリのテキスト/URL/ファイルをドロップ → 新規クリップとして登録、
-        //    フォルダが選ばれていればそのまま pin
-        .acceptExternalDropAsClip(pinboardId: id, store: store, pinboards: pinboards)
     }
 
     // MARK: - Carousel
@@ -283,8 +281,15 @@ struct StripView: View {
                         // SwiftUI の onTapGesture は count 大きい方を先に書く。
                         .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
                         .onTapGesture { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
-                        .draggable(ClipReference(clip: clip))
+                        .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                         .contextMenu {
+                            // 「フォルダ内表示中」ならその場で名前変更が可能
+                            if let bid = folderID {
+                                Button("このフォルダでの名前を変更…") {
+                                    promptRenameClipInFolder(clip: clip, pinboardId: bid)
+                                }
+                                Divider()
+                            }
                             Section("フォルダに振り分け") {
                                 ForEach(pinboards.boards) { board in
                                     Button(board.name) {
@@ -365,7 +370,7 @@ struct StripView: View {
                                 .onTapGesture {
                                     handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
                                 }
-                                .draggable(ClipReference(clip: clip))
+                                .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                                 .contextMenu {
                                     Section("フォルダに振り分け") {
                                         ForEach(pinboards.boards) { board in
@@ -635,6 +640,7 @@ struct StripView: View {
             onReturn:       { onReturn(plain: false) },
             onShiftReturn:  { onReturn(plain: true) },
             onOptionReturn: { pasteSelected(join: true) },
+            onCmdReturn:    { pasteSelected(join: true) },
             onEsc:          { onEsc() },
             onNumber:       { n in pasteByIndex(n) },
             onSpace:        { showQuickLook() },
@@ -642,6 +648,9 @@ struct StripView: View {
             onShiftTab:     { cycleFolder(by: -1) },
             onShiftUp:      { selection.extend(by: -1, in: items) },
             onShiftDown:    { selection.extend(by:  1, in: items) },
+            onShiftLeft:    { selection.extend(by: -1, in: items) },
+            onShiftRight:   { selection.extend(by:  1, in: items) },
+            onX:            { selection.toggleCursor(in: items) },
             onCmdA:         { selection.selectAll(in: items) },
             onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
             onCmdI:         { showAIMenu() },
@@ -783,6 +792,29 @@ struct StripView: View {
         }
     }
 
+    /// フォルダ内クリップの「このフォルダでの表示名」をユーザーに入力させて保存。
+    private func promptRenameClipInFolder(clip: ClipItem, pinboardId: Int64) {
+        guard let cid = clip.id else { return }
+        let alert = NSAlert()
+        alert.messageText = "フォルダ内での名前"
+        alert.informativeText = "このフォルダで表示する名前を入力してください。空にすると元のプレビューだけ表示します。"
+        // 既に名前が付いていればそれを初期値に。
+        let initial = clip.pinDisplayTitle ?? ""
+        let field = NSTextField(string: initial)
+        field.placeholderString = "例: 営業挨拶、テンプレート 1 ……"
+        field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "キャンセル")
+        if alert.runModal() == .alertFirstButtonReturn {
+            let newTitle = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            Task {
+                try? await pinboards.renameItem(clipId: cid, in: pinboardId, to: newTitle)
+                reload()
+            }
+        }
+    }
+
     private func promptRename(_ board: Pinboard) {
         let alert = NSAlert()
         alert.messageText = "「\(board.name)」の名前を変更"
@@ -878,24 +910,42 @@ private struct StripCard: View {
     let isCursor: Bool
     let isSelected: Bool
 
-    private static let cardSize = CGSize(width: 220, height: 230)
-    private static let bannerHeight: CGFloat = 38
-    private static let footerHeight: CGFloat = 36
+    // Linear / Things 系の「カード = 240×260, 上下 4pt グリッド」を踏襲。
+    // 上部バンドは少し背を低くしてシャープに、フッタはゆったり余白を取る。
+    private static let cardSize = CGSize(width: 240, height: 264)
+    private static let bannerHeight: CGFloat = 42
+    private static let footerHeight: CGFloat = 38
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // === ベース：マテリアル + わずかな深み ===
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            // === ベース：ガラス + 3 層シャドウ（Apple HIG / Linear / Vercel 系）===
+            // 3 層シャドウで「机に置いた紙」を表現:
+            //   Layer 1: 接地影（縁を引き締める、極めて近い）
+            //   Layer 2: 中距離影（カード本体の "浮き" を作る）
+            //   Layer 3: アンビエント影（遠くに広がる柔らかい光の落ち込み）
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.regularMaterial)
+                // 内側のかすかな天井ハイライト（ガラスの反射）
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [Color.white.opacity(0.06), Color.clear],
-                            startPoint: .top, endPoint: .center
-                        ))
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(LinearGradient(
+                            colors: [Color.white.opacity(0.28),
+                                     Color.white.opacity(0.06),
+                                     Color.white.opacity(0)],
+                            startPoint: .top, endPoint: .bottom
+                        ), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.18), radius: isCursor ? 18 : 8,
+                // Layer 1: 接地影 — 縁の境界を引き締める
+                .shadow(color: .black.opacity(0.16),
+                        radius: 1.5, x: 0, y: 1)
+                // Layer 2: 中距離影 — カードの "浮き" を作る
+                .shadow(color: .black.opacity(isCursor ? 0.22 : 0.14),
+                        radius: isCursor ? 14 : 8,
                         x: 0, y: isCursor ? 8 : 4)
+                // Layer 3: アンビエント影 — 遠くに広がる柔らかい影、空気感
+                .shadow(color: .black.opacity(isCursor ? 0.28 : 0.16),
+                        radius: isCursor ? 36 : 20,
+                        x: 0, y: isCursor ? 18 : 10)
 
             VStack(spacing: 0) {
                 banner
@@ -905,38 +955,56 @@ private struct StripCard: View {
 
             // === 番号バッジ ⌘N（左下）===
             if index <= 9 {
-                Text("⌘\(index)")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(
-                        Capsule(style: .continuous).fill(.thinMaterial)
-                    )
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .bottomLeading)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                HStack(spacing: 2) {
+                    Text("⌘")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    Text("\(index)")
+                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(
+                    Capsule(style: .continuous).fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(ModernTokens.hairline, lineWidth: 0.5)
+                )
+                .padding(10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .bottomLeading)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
 
             // === 選択チェック（右下）===
             if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.white, Color.accentColor)
-                    .font(.system(size: 18))
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .bottomTrailing)
-                    .accessibilityHidden(true)
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 22, height: 22)
+                        .shadow(color: Color.accentColor.opacity(0.4),
+                                radius: 6, x: 0, y: 2)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(.white)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .bottomTrailing)
+                .accessibilityHidden(true)
             }
         }
         .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: isCursor ? 2 : 0.5)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: isCursor ? 1.5 : 0.5)
         )
-        .scaleEffect(isCursor ? 1.035 : 1.0)
-        .animation(.easeOut(duration: 0.18), value: isCursor)
+        // Linear 風スプリング微小モーション
+        .scaleEffect(isCursor ? 1.025 : 1.0)
+        .offset(y: isCursor ? -2 : 0)
+        .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isCursor)
         .onHover { hovering in
             guard SettingsStore.shared.hoverPreviewEnabled else { return }
             if hovering {
@@ -960,41 +1028,87 @@ private struct StripCard: View {
     private var banner: some View {
         let kindColor = KindPalette.detectedColor(for: clip)
         let kindLabel = KindPalette.detectedLabel(for: clip)
+        let displayTitle = clip.pinDisplayTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasTitle = (displayTitle?.isEmpty == false)
         return ZStack(alignment: .leading) {
-            // カラーバンドにわずかなグラデを乗せて高級感
+            // 多層グラデーション: 立体感を出すために左上に光、右下に影
             LinearGradient(
-                colors: [kindColor, kindColor.opacity(0.85)],
+                colors: [
+                    kindColor.opacity(1.0),
+                    kindColor.opacity(0.92),
+                    kindColor.opacity(0.78)
+                ],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
-            HStack(alignment: .center, spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(kindLabel)
-                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                        .tracking(0.6)
-                        .foregroundStyle(.white)
-                    Text(RelativeTimeFormatter.string(from: clip.createdAt))
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.86))
+            // 上端のかすかなハイライト（Linear 風）
+            VStack {
+                LinearGradient(
+                    colors: [Color.white.opacity(0.18), Color.clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 14)
+                Spacer()
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if hasTitle, let t = displayTitle {
+                        // タイトル: 大きく、明瞭に。SF Pro Display 系。
+                        Text(t)
+                            .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                            .tracking(-0.1)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.18), radius: 1, x: 0, y: 0.5)
+                        // サブテキスト: kind ・ time の組み合わせ
+                        HStack(spacing: 5) {
+                            Text(kindLabel)
+                                .font(.system(size: 9.5, weight: .heavy, design: .rounded))
+                                .tracking(0.6)
+                                .foregroundStyle(.white.opacity(0.9))
+                            Circle()
+                                .fill(.white.opacity(0.55))
+                                .frame(width: 2, height: 2)
+                            Text(RelativeTimeFormatter.string(from: clip.createdAt))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                    } else {
+                        // タイトル無しの場合は kind を主役に
+                        Text(kindLabel)
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .tracking(0.7)
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.18), radius: 1, x: 0, y: 0.5)
+                        Text(RelativeTimeFormatter.string(from: clip.createdAt))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.86))
+                    }
                 }
                 Spacer(minLength: 4)
-                if let bid = clip.sourceBundleId,
-                   let icon = SourceAppIconCache.shared.icon(forBundleID: bid) {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 22, height: 22)
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                } else {
-                    Image(systemName: clip.kind.iconName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(.white.opacity(0.18))
-                        )
+                // ソースアプリアイコン: ドロップシャドウ付き
+                Group {
+                    if let bid = clip.sourceBundleId,
+                       let icon = SourceAppIconCache.shared.icon(forBundleID: bid) {
+                        Image(nsImage: icon)
+                            .resizable()
+                    } else {
+                        Image(systemName: clip.kind.iconName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 24, height: 24)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(.white.opacity(0.18))
+                            )
+                    }
                 }
+                .frame(width: 24, height: 24)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1.5)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
         }
         .frame(height: Self.bannerHeight)
     }
@@ -1034,14 +1148,16 @@ private struct StripCard: View {
                     .matches(["CODE", "JSON", "HTML"])
                 Text(clip.preview)
                     .font(isCodeLike
-                          ? .system(size: 11, weight: .medium, design: .monospaced)
-                          : .system(size: 12, weight: .regular))
-                    .foregroundStyle(.primary.opacity(0.92))
-                    .lineLimit(10)
+                          ? .system(size: 11.5, weight: .medium, design: .monospaced)
+                          : .system(size: 12.5, weight: .regular))
+                    .tracking(isCodeLike ? 0 : -0.05)
+                    .lineSpacing(2)
+                    .foregroundStyle(.primary.opacity(0.88))
+                    .lineLimit(9)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .topLeading)
-                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .padding(.horizontal, 14).padding(.vertical, 12)
             }
         }
         .frame(maxHeight: Self.cardSize.height - Self.bannerHeight - Self.footerHeight)
@@ -1050,34 +1166,50 @@ private struct StripCard: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack(alignment: .center, spacing: 6) {
-            // 左：URL ドメイン or ファイル名
+        HStack(alignment: .center, spacing: 8) {
+            // 左：URL ドメイン or ファイル名 (シャドウなしで上品に)
             if let s = DomainShortener.short(for: clip) {
-                Text(s)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 4) {
+                    Image(systemName: "link")
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundStyle(.secondary.opacity(0.7))
+                    Text(s)
+                        .font(.system(size: 11, weight: .medium))
+                        .tracking(-0.05)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             } else if let app = clip.sourceAppName {
                 Text(app)
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
+                    .tracking(-0.05)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            // 右：文字数 or サイズ
+            // 右：文字数 or サイズ — トーキュラフォントで数字を整える
             Text(rightMeta)
-                .font(.system(size: 10, weight: .regular, design: .rounded))
+                .font(.system(size: 10.5, weight: .regular, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .frame(height: Self.footerHeight)
         .background(
-            LinearGradient(
-                colors: [Color.clear, Color.primary.opacity(0.04)],
-                startPoint: .top, endPoint: .bottom
-            )
+            ZStack {
+                // ヘアラインの上枠で区切る (shadcn流)
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.06))
+                        .frame(height: 0.5)
+                    LinearGradient(
+                        colors: [Color.clear, Color.primary.opacity(0.025)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                }
+            }
         )
     }
 

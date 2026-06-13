@@ -27,6 +27,12 @@ final class NotchHoverController: NSObject {
     /// グローバルイベントとローカルイベントの両方を観測する。
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    /// パネル内でカーソルが Tab/Shift+Tab を押した時に、StripView のフォルダ
+    /// 切替を発火させるためのキーイベントモニタ。NotchPanel は key にならない
+    /// ので、通常の KeyHandlingView では拾えない。
+    private var keyEventMonitor: Any?
+    private var localKeyEventMonitor: Any?
+    private var pointerInsidePanel: Bool = false
     private var pendingClose: DispatchWorkItem?
     /// マウスがパネルの矩形に「最低 1 回入った」フラグ。入る前に範囲外と
     /// 判断するとアニメーション最中に閉じてしまうので、ガードとして使う。
@@ -141,6 +147,9 @@ final class NotchHoverController: NSObject {
         hosting.sizingOptions = [.minSize]
         panel.contentViewController = hosting
         panel.orderFrontRegardless()
+        // .nonactivatingPanel なので、makeKey しても直前のフォーカスアプリは
+        // 入れ替わらない (ユーザー視点では元のアプリがアクティブのまま)。
+        panel.makeKey()
         dropdownPanel = panel
         pointerEnteredOnce = false
 
@@ -197,6 +206,51 @@ final class NotchHoverController: NSObject {
         // モニタは move があった時しか発火しないので、マウスがそもそも
         // 動かない場合の保険として 0.18 s 毎にも判定を回す。
         scheduleHeartbeat(against: zone)
+
+        // Tab/Shift+Tab を NSPanel が key になれないまま捕捉するための
+        // グローバル keyDown モニタ。マウスがパネル上にある時だけ反応。
+        installKeyMonitor()
+    }
+
+    /// ノッチパネルは canBecomeKey = false なので、SwiftUI 内の
+    /// `KeyHandlingView` でも keyDown は届かない。グローバル keyDown を
+    /// 監視して、マウスがパネル内にある時の Tab / Shift+Tab だけを横取りし、
+    /// 通知センター経由で StripView のフォルダ循環を発火する。
+    private func installKeyMonitor() {
+        // グローバル (= 他アプリがフォーカス時) と local (= Pasty 自身がフォーカス時)
+        // の両方を仕込んでおく。グローバルは Accessibility 権限がいるので、
+        // 権限が無くても local だけは動く保険にもなる。
+        keyEventMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.keyDown]
+        ) { [weak self] event in
+            guard let self else { return }
+            Task { @MainActor in self.handleNotchKey(event) }
+        }
+        localKeyEventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.keyDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            // Tab だけは Pasty 内でも横取りしてノッチ循環として消費する
+            if event.keyCode == 48 {
+                Task { @MainActor in self.handleNotchKey(event) }
+                if self.pointerInsidePanel && self.dropdownPanel != nil {
+                    return nil
+                }
+            }
+            return event
+        }
+    }
+
+    private func handleNotchKey(_ event: NSEvent) {
+        guard pointerInsidePanel, dropdownPanel != nil else { return }
+        // Tab キーコード = 48
+        guard event.keyCode == 48 else { return }
+        let shift = event.modifierFlags.contains(.shift)
+        NotificationCenter.default.post(
+            name: shift ? .pastyNotchCycleFolderBackward
+                        : .pastyNotchCycleFolderForward,
+            object: nil
+        )
     }
 
     private func scheduleHeartbeat(against zone: NSRect) {
@@ -215,6 +269,7 @@ final class NotchHoverController: NSObject {
         guard dropdownPanel != nil else { return }
         let p = NSEvent.mouseLocation
         let inside = NSPointInRect(p, zone)
+        pointerInsidePanel = inside
         if inside {
             pointerEnteredOnce = true
             return
@@ -228,8 +283,13 @@ final class NotchHoverController: NSObject {
     private func removeMouseMonitors() {
         if let m = globalMouseMonitor { NSEvent.removeMonitor(m) }
         if let m = localMouseMonitor  { NSEvent.removeMonitor(m) }
+        if let m = keyEventMonitor    { NSEvent.removeMonitor(m) }
+        if let m = localKeyEventMonitor { NSEvent.removeMonitor(m) }
         globalMouseMonitor = nil
         localMouseMonitor = nil
+        keyEventMonitor = nil
+        localKeyEventMonitor = nil
+        pointerInsidePanel = false
         pendingClose?.cancel()
         pendingClose = nil
     }
@@ -307,7 +367,9 @@ private final class NotchPanel: NSPanel {
         isReleasedWhenClosed = false
     }
 
-    override var canBecomeKey: Bool { false }
+    // Tab / 矢印 / Enter を直に届けるため key になれる。nonactivatingPanel と
+    // 組み合わせると、見かけ上のフォーカスは元アプリのままになる。
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 

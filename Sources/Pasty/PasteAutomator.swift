@@ -37,8 +37,9 @@ final class PasteAutomator {
     private func _doPaste(_ item: ClipItem, asPlainText: Bool, autoPaste: Bool) {
         // 召喚時のマウス位置は「ここに貼って」の意思表示。クリック有効時は
         // パネル dismiss → 60ms 安定待ち → 合成クリック → 60ms → ⌘V の流れ。
-        // 無効時は dismiss → restoreFocus → ⌘V のシンプル経路。
-        let savedSummon = summonMouseLocation
+        // 召喚位置が未記録の時は、ペースト指示時点でのマウス位置にフォールバック
+        // して、必ずカーソル位置にクリックを撃つ。
+        let savedSummon = summonMouseLocation ?? NSEvent.mouseLocation
         summonMouseLocation = nil
 
         Task { @MainActor in
@@ -55,10 +56,15 @@ final class PasteAutomator {
             // これより短いとクリックが Pasty パネルを叩いて貼付が逃げる。
             try? await Task.sleep(nanoseconds: 60_000_000)
 
-            if SettingsStore.shared.clickBeforePaste, let pt = savedSummon {
+            if SettingsStore.shared.clickBeforePaste {
+                // クリック前に **必ず** 直前アプリにフォーカスを戻しておく。
+                // これをやらないと、Pasty パネルが見えなくなった後も
+                // 一瞬フォーカスが Pasty に残り、続く ⌘V が Pasty に
+                // 送られて消えるケースがある。
+                await PreviousAppTracker.shared.restoreFocus(grace: 0.04)
                 // クリック → 100ms 待機（アプリのキャレット移動 + 場合により
                 // app activation 完了を待つ）→ ⌘V
-                clickAtScreenPoint(pt)
+                clickAtScreenPoint(savedSummon)
                 try? await Task.sleep(nanoseconds: 100_000_000)
             } else {
                 // クリックなしモードでは「直前アプリにフォーカスを戻す」
@@ -223,6 +229,19 @@ final class PasteAutomator {
     }
 
     private func emitCommandV() {
+        // ad-hoc 署名のまま Pasty.app を再ビルドすると Accessibility 権限が
+        // 失効しがち。emit 前に確認して、無ければトーストだけ出す。
+        // (ダイアログ反復防止のため prompt: true は呼ばない。設定ボタンから手動で。)
+        if !AXIsProcessTrusted() {
+            Task { @MainActor in
+                PasteToast.shared.show(
+                    targetApp: nil,
+                    customMessage: "アクセシビリティ権限が無効です。設定で再付与してください",
+                    durationSeconds: 4
+                )
+            }
+            return
+        }
         let src = CGEventSource(stateID: .combinedSessionState)
         let down = CGEvent(keyboardEventSource: src,
                            virtualKey: CGKeyCode(kVK_ANSI_V),

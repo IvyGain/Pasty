@@ -20,9 +20,11 @@ struct PinboardItem: Codable, FetchableRecord, MutablePersistableRecord, Equatab
     var pinboardId: Int64
     var clipId: Int64
     var sortOrder: Int
+    /// フォルダ内での表示名（ユーザ定義）。空ならクリップ本来の preview を使う。
+    var title: String?
 
     static let databaseTableName = "pinboard_items"
-    enum Columns: String, ColumnExpression { case id, pinboardId, clipId, sortOrder }
+    enum Columns: String, ColumnExpression { case id, pinboardId, clipId, sortOrder, title }
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
@@ -94,12 +96,32 @@ final class PinboardStore: ObservableObject {
 
     func items(in pinboardId: Int64) async throws -> [ClipItem] {
         try await dbWriter.read { db in
-            try ClipItem.fetchAll(db, sql: """
-                SELECT c.* FROM clips c
+            // pinboard_items.title が non-NULL なら、それを `pinDisplayTitle` として
+            // メモリ上だけセット。本文 (preview / content) は触らない。
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT c.*, pi.title AS pi_title FROM clips c
                 JOIN pinboard_items pi ON pi.clipId = c.id
                 WHERE pi.pinboardId = ?
                 ORDER BY pi.sortOrder
                 """, arguments: [pinboardId])
+            return rows.compactMap { row -> ClipItem? in
+                guard var clip = try? ClipItem(row: row) else { return nil }
+                if let t: String = row["pi_title"], !t.isEmpty {
+                    clip.pinDisplayTitle = t
+                }
+                return clip
+            }
+        }
+    }
+
+    /// フォルダ内クリップの表示名を変更。空文字を渡すと元の preview に戻る。
+    func renameItem(clipId: Int64, in pinboardId: Int64, to title: String) async throws {
+        _ = try await dbWriter.write { db in
+            let v: DatabaseValueConvertible = title.isEmpty ? DatabaseValue.null : title
+            try db.execute(
+                sql: "UPDATE pinboard_items SET title = ? WHERE pinboardId = ? AND clipId = ?",
+                arguments: [v, pinboardId, clipId]
+            )
         }
     }
 

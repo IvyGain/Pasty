@@ -107,6 +107,11 @@ final class ClipStore: ObservableObject {
             }
         }
 
+        // v0.4.9: フォルダ内クリップに表示名（title）を付けられるように。
+        migrator.registerMigration("v4.pinboardItemTitle") { db in
+            try db.execute(sql: "ALTER TABLE pinboard_items ADD COLUMN title TEXT")
+        }
+
         try migrator.migrate(dbWriter)
     }
 

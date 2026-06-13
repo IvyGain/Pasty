@@ -11,6 +11,7 @@ struct KeyHandlingView: NSViewRepresentable {
     var onReturn: () -> Void = {}
     var onShiftReturn: () -> Void = {}
     var onOptionReturn: () -> Void = {}
+    var onCmdReturn: () -> Void = {}
     var onEsc: () -> Void = {}
     var onNumber: (Int) -> Void = { _ in }
     var onSpace: () -> Void = {}
@@ -18,6 +19,9 @@ struct KeyHandlingView: NSViewRepresentable {
     var onShiftTab: () -> Void = {}
     var onShiftUp: () -> Void = {}
     var onShiftDown: () -> Void = {}
+    var onShiftLeft: () -> Void = {}
+    var onShiftRight: () -> Void = {}
+    var onX: () -> Void = {}
     var onCmdA: () -> Void = {}
     var onCmdE: () -> Void = {}
     var onCmdR: () -> Void = {}
@@ -66,9 +70,10 @@ struct KeyHandlingView: NSViewRepresentable {
             switch event.keyCode {
             case 126: shift ? v.onShiftUp()   : v.onUp(); return
             case 125: shift ? v.onShiftDown() : v.onDown(); return
-            case 123: v.onLeft(); return
-            case 124: v.onRight(); return
+            case 123: shift ? v.onShiftLeft()  : v.onLeft(); return
+            case 124: shift ? v.onShiftRight() : v.onRight(); return
             case 36, 76:
+                if cmd   { v.onCmdReturn(); return }
                 if opt   { v.onOptionReturn(); return }
                 if shift { v.onShiftReturn();  return }
                 v.onReturn(); return
@@ -96,6 +101,10 @@ struct KeyHandlingView: NSViewRepresentable {
                 v.onCmdQuestion(); return
             }
             if let chars = event.charactersIgnoringModifiers {
+                // 単独 `X` / `x` — カーソル位置のクリップを複数選択トグル
+                if !cmd, !ctrl, !opt, chars.lowercased() == "x" {
+                    v.onX(); return
+                }
                 if cmd, chars.count == 1, let digit = Int(chars), (1...9).contains(digit) {
                     v.onNumber(digit); return
                 }

@@ -7,26 +7,79 @@ struct SettingsView: View {
     @ObservedObject var pinboards: PinboardStore
     var store: ClipStore? = nil
 
-    var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label("一般", systemImage: "gear") }
-            captureTab
-                .tabItem { Label("キャプチャ", systemImage: "doc.on.clipboard") }
-            uiTab
-                .tabItem { Label("サーフェス", systemImage: "rectangle.3.group") }
-            pinboardsTab
-                .tabItem { Label("フォルダ", systemImage: "folder") }
-            hotkeysTab
-                .tabItem { Label("ショートカット", systemImage: "command") }
-            insightsTab
-                .tabItem { Label("インサイト", systemImage: "chart.bar") }
-            privacyTab
-                .tabItem { Label("プライバシー", systemImage: "lock.shield") }
-            aboutTab
-                .tabItem { Label("Pastyについて", systemImage: "info.circle") }
+    @State private var selected: SettingsTab = .general
+
+    enum SettingsTab: String, CaseIterable, Identifiable {
+        case general, capture, ui, hotkeys, insights, privacy, about
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .general: return "一般"
+            case .capture: return "キャプチャ"
+            case .ui: return "サーフェス"
+            case .hotkeys: return "ショートカット"
+            case .insights: return "インサイト"
+            case .privacy: return "プライバシー"
+            case .about: return "Pastyについて"
+            }
         }
-        .frame(width: 620, height: 460)
+        var systemImage: String {
+            switch self {
+            case .general: return "gear"
+            case .capture: return "doc.on.clipboard"
+            case .ui: return "rectangle.3.group"
+            case .hotkeys: return "command"
+            case .insights: return "chart.bar"
+            case .privacy: return "lock.shield"
+            case .about: return "info.circle"
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            tabBar
+            Divider()
+            ScrollView(.vertical, showsIndicators: false) {
+                content
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .padding(.top, 4)
+            }
+            .background(Color(NSColor.windowBackgroundColor).opacity(0.5))
+        }
+        .frame(width: 720, height: 520)
+        .background(VisualEffectBackground())
+    }
+
+    // 横並びの NSToolbar 風タブバー (System Settings 12 風)
+    private var tabBar: some View {
+        HStack(spacing: 2) {
+            ForEach(SettingsTab.allCases) { tab in
+                SettingsTabButton(
+                    label: tab.label,
+                    systemImage: tab.systemImage,
+                    isSelected: selected == tab
+                ) {
+                    selected = tab
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch selected {
+        case .general: generalTab
+        case .capture: captureTab
+        case .ui: uiTab
+        case .hotkeys: hotkeysTab
+        case .insights: insightsTab
+        case .privacy: privacyTab
+        case .about: aboutTab
+        }
     }
 
     @ViewBuilder
@@ -58,43 +111,107 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Capture") {
-                Toggle("Capture clipboard automatically", isOn: $settings.capturingEnabled)
-                Toggle("Auto-paste after selecting an item", isOn: $settings.autoPaste)
-                Stepper("Keep history for \(settings.maxRetentionDays) days",
+            Section("キャプチャ") {
+                Toggle("クリップボードを自動キャプチャ", isOn: $settings.capturingEnabled)
+                Toggle("アイテム選択後に自動で貼付", isOn: $settings.autoPaste)
+                Stepper("履歴を \(settings.maxRetentionDays) 日間保持",
                         value: $settings.maxRetentionDays, in: 1...365)
             }
-            Section("Language") {
+            Section("言語") {
                 Picker("", selection: $settings.locale) {
-                    Text("Auto").tag("auto")
-                    Text("English").tag("en")
                     Text("日本語").tag("ja")
+                    Text("English").tag("en")
+                    Text("自動").tag("auto")
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section("アクセシビリティ権限") {
+                accessibilityStatusRow
+                Text("Pasty は ⌘V を送出するためにアクセシビリティ権限が必要です。アプリを再ビルドすると古い権限が無効になる場合があります。その時は「リスト削除→再追加」を行ってください。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Button {
+                        openAccessibilitySettings()
+                    } label: {
+                        Label("システム設定を開く", systemImage: "arrow.up.right.square")
+                    }
+                    Button {
+                        resetAccessibilityPermission()
+                    } label: {
+                        Label("Pasty の権限をリセット", systemImage: "arrow.counterclockwise")
+                    }
+                    .help("ターミナルで `tccutil reset Accessibility io.pasty.app` を実行します (管理者パスワードが必要な場合あり)")
+                }
             }
         }
         .formStyle(.grouped)
         .padding()
     }
 
+    /// 現在の権限ステータスを行で表示
+    @ViewBuilder
+    private var accessibilityStatusRow: some View {
+        let trusted = AXIsProcessTrusted()
+        HStack {
+            Image(systemName: trusted ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                .foregroundStyle(trusted ? .green : .red)
+            Text(trusted ? "許可されています" : "許可されていません")
+                .font(.system(size: 12, weight: .medium))
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        let url = URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        )!
+        NSWorkspace.shared.open(url)
+    }
+
+    private func resetAccessibilityPermission() {
+        // tccutil でこのアプリの Accessibility 許可を削除する。
+        // 古い code signing hash の許可エントリも含めて消えるので、
+        // 次回ペースト時に新規ダイアログが正しく出るようになる。
+        let task = Process()
+        task.launchPath = "/usr/bin/tccutil"
+        task.arguments = ["reset", "Accessibility", "io.pasty.app"]
+        do {
+            try task.run()
+            task.waitUntilExit()
+            // 念のため再起動を促す
+            let alert = NSAlert()
+            alert.messageText = "権限をリセットしました"
+            alert.informativeText = "Pasty を再起動すると次回ペースト時にダイアログが再表示されます。"
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "リセットに失敗しました"
+            alert.informativeText = "ターミナルで以下を実行してください:\ntccutil reset Accessibility io.pasty.app"
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+
     private var captureTab: some View {
         Form {
             if settings.isPaused {
-                Label("Capture is paused", systemImage: "pause.circle.fill")
+                Label("キャプチャは一時停止中", systemImage: "pause.circle.fill")
                     .foregroundStyle(.orange)
-                Button("Resume now") { settings.resume() }
+                Button("すぐに再開") { settings.resume() }
             } else {
-                Button("Pause for 60 s")  { settings.pause(forSeconds: 60) }
-                Button("Pause for 10 min") { settings.pause(forSeconds: 600) }
+                Button("60 秒間一時停止")  { settings.pause(forSeconds: 60) }
+                Button("10 分間一時停止") { settings.pause(forSeconds: 600) }
             }
             Divider()
-            Text("Apps to ignore (bundle id)")
+            Text("除外するアプリ (Bundle ID)")
                 .font(.headline)
             ForEach(Array(settings.ignoredBundleIds).sorted(), id: \.self) { id in
                 HStack {
                     Text(id).font(.system(.body, design: .monospaced))
                     Spacer()
-                    Button("Remove") {
+                    Button("削除") {
                         settings.ignoredBundleIds.remove(id)
                     }
                 }
@@ -102,7 +219,7 @@ struct SettingsView: View {
             HStack {
                 TextField("com.example.app", text: .constant(""))
                     .textFieldStyle(.roundedBorder)
-                Button("Add front app") {
+                Button("最前面のアプリを追加") {
                     if let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
                         settings.ignoredBundleIds.insert(id)
                     }
@@ -198,7 +315,7 @@ struct SettingsView: View {
                         Circle().fill(Color(hex: board.colorHex)).frame(width: 12, height: 12)
                         Text(board.name)
                         Spacer()
-                        Button("Delete") {
+                        Button("削除") {
                             guard let id = board.id else { return }
                             Task { try? await pinboards.delete(id: id) }
                         }
@@ -206,9 +323,9 @@ struct SettingsView: View {
                     }
                 }
             }
-            Button("New pinboard") {
+            Button("新しいフォルダを作成") {
                 Task {
-                    try? await pinboards.create(name: "Untitled", colorHex: "#7C8CF8")
+                    try? await pinboards.create(name: "新しいフォルダ", colorHex: "#7C8CF8")
                 }
             }
         }
@@ -258,16 +375,38 @@ struct SettingsView: View {
     }
 
     private var aboutTab: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             Image(systemName: "doc.on.clipboard.fill")
                 .font(.system(size: 36))
                 .foregroundStyle(.tint)
             Text("Pasty")
                 .font(.title.weight(.semibold))
-            Text("Open-source clipboard manager for macOS")
+            Text("オープンソースの macOS クリップボードマネージャ")
                 .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button {
+                    OnboardingPresenter.shared.presentForce { }
+                } label: {
+                    Label("使い方を見る", systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+
+                Button {
+                    HelpOverlayPresenter.shared.toggle()
+                } label: {
+                    Label("ショートカット一覧 (⌘?)", systemImage: "keyboard")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+            }
+            .padding(.top, 6)
+
             Text("MIT License · github.com/IvyGain/Pasty")
                 .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 4)
             Spacer()
         }
         .padding()
@@ -313,7 +452,56 @@ private struct AutoCategoryMappingRow: View {
     }
 }
 
+@MainActor
+private struct SettingsTabButton: View {
+    let label: String
+    let systemImage: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .regular))
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(height: 22)
+                Text(label)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                    .tracking(-0.05)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.75))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected
+                          ? Color.accentColor.opacity(0.14)
+                          : (hovering ? Color.primary.opacity(0.06) : .clear))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.32) : .clear,
+                                  lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: isSelected)
+        .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
 extension Notification.Name {
+    static let pastyNotchCycleFolderForward  = Notification.Name("pasty.notchCycleFolder.fwd")
+    static let pastyNotchCycleFolderBackward = Notification.Name("pasty.notchCycleFolder.bwd")
+    static let pastyDragTargetHovered        = Notification.Name("pasty.drag.targetHovered")
+    static let pastyDragTargetUnhovered      = Notification.Name("pasty.drag.targetUnhovered")
     static let pastyWipeAll = Notification.Name("pasty.wipeAll")
     static let pastyOpenSettings = Notification.Name("pasty.openSettings")
 }

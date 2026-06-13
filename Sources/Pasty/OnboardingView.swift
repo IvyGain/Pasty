@@ -7,252 +7,412 @@ private enum OnboardingDefaults {
     static let completedKey = "pasty.hasCompletedOnboarding"
 }
 
-// MARK: - OnboardingView
+// MARK: - Step model
+
+@MainActor
+private struct OnboardingStep: Identifiable {
+    let id = UUID()
+    let badge: String        // "01" など
+    let title: String
+    let subtitle: String
+    let body: AnyView
+}
+
+// MARK: - OnboardingView (Raycast-style)
 
 @MainActor
 struct OnboardingView: View {
     let onComplete: () -> Void
 
-    @State private var step: Int = 0
+    @State private var stepIndex: Int = 0
+    @State private var triggeredHotkey: Bool = false
 
-    private let totalSteps = 5
+    private var steps: [OnboardingStep] {
+        [
+            OnboardingStep(
+                badge: "01", title: "ようこそ、Pasty へ",
+                subtitle: "あなたのコピー履歴を、思考のスピードで取り出せるようにします。",
+                body: AnyView(welcomeBody)
+            ),
+            OnboardingStep(
+                badge: "02", title: "⇧⌘V でいつでも呼び出す",
+                subtitle: "どんなアプリでも、ストリップが下から立ち上がります。",
+                body: AnyView(hotkeyBody)
+            ),
+            OnboardingStep(
+                badge: "03", title: "ノッチに乗せれば、降りてくる",
+                subtitle: "M1/M2/M3 のノッチ (なくても画面上端) にカーソルを置くだけ。",
+                body: AnyView(notchBody)
+            ),
+            OnboardingStep(
+                badge: "04", title: "アクセシビリティ権限を許可",
+                subtitle: "選択したクリップを自動で ⌘V するために必要です。Pasty は履歴を外部に送りません。",
+                body: AnyView(accessibilityBody)
+            ),
+            OnboardingStep(
+                badge: "05", title: "フォルダで定型文を倉庫化",
+                subtitle: "履歴 + 色付きフォルダで、繰り返し使う文章をワンクリックで貼付。",
+                body: AnyView(folderBody)
+            ),
+            OnboardingStep(
+                badge: "06", title: "キーボードだけで完結する",
+                subtitle: "マウスを使わずに探す、選ぶ、貼る。生産性は手元から逃げない。",
+                body: AnyView(keyboardBody)
+            ),
+            OnboardingStep(
+                badge: "07", title: "準備完了。",
+                subtitle: "あとは ⇧⌘V でいつでも Pasty を呼んでください。",
+                body: AnyView(completeBody)
+            )
+        ]
+    }
 
     var body: some View {
         ZStack {
-            VisualEffectBackground()
-                .ignoresSafeArea()
+            // === 背景: 多層グラデーション ===
+            backgroundLayer
 
             VStack(spacing: 0) {
+                topBar
                 Spacer(minLength: 0)
-
-                Group {
-                    switch step {
-                    case 0:
-                        welcomeStep
-                    case 1:
-                        shortcutStep
-                    case 2:
-                        folderStep
-                    case 3:
-                        templateStep
-                    default:
-                        aiStep
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity.combined(with: .move(edge: .trailing)))
-
+                content
                 Spacer(minLength: 0)
-
                 progressIndicator
-                    .padding(.bottom, 18)
-
-                controlBar
+                    .padding(.bottom, 14)
+                bottomBar
                     .padding(.horizontal, 36)
                     .padding(.bottom, 28)
             }
         }
-        .frame(width: 640, height: 520)
-        .animation(.easeInOut(duration: 0.22), value: step)
+        .frame(width: 760, height: 600)
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: stepIndex)
     }
 
-    // MARK: - Steps
+    // MARK: - Background
 
-    private var welcomeStep: some View {
-        VStack(spacing: 22) {
-            Image(systemName: "doc.on.clipboard.fill")
-                .font(.system(size: 96, weight: .regular))
-                .foregroundStyle(Color.accentColor)
-                .symbolRenderingMode(.hierarchical)
-                .padding(.bottom, 4)
-
-            Text("ようこそ、Pasty へ")
-                .font(.system(size: 26, weight: .semibold, design: .default))
-                .foregroundStyle(.primary)
-
-            Text("クリップボードを倉庫として持ち歩く、5 つのステップ")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 60)
+    private var backgroundLayer: some View {
+        ZStack {
+            VisualEffectBackground()
+            // Accent グラデーション (左上から右下)
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.18),
+                    Color.accentColor.opacity(0.04),
+                    Color.clear
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            // Soft glow (右下)
+            RadialGradient(
+                colors: [Color.accentColor.opacity(0.20), Color.clear],
+                center: .bottomTrailing,
+                startRadius: 50, endRadius: 360
+            )
         }
-        .padding(.top, 24)
+        .ignoresSafeArea()
     }
 
-    private var shortcutStep: some View {
-        VStack(spacing: 24) {
-            HStack(spacing: 14) {
-                KeyCap(label: "⇧")
-                KeyCap(label: "⌘")
-                KeyCap(label: "V")
+    // MARK: - Top bar (badge + skip)
+
+    private var topBar: some View {
+        HStack {
+            // ステップバッジ
+            HStack(spacing: 8) {
+                Text(steps[stepIndex].badge)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.accentColor.opacity(0.85))
+                    )
+                Text("\(stepIndex + 1) / \(steps.count)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
-            .padding(.bottom, 4)
-
-            Text("⇧⌘V で呼び出す")
-                .font(.system(size: 24, weight: .semibold, design: .default))
-                .foregroundStyle(.primary)
-
-            Text("ストリップが下から立ち上がります。\n⌥⇧V で中央モーダル、ノッチに乗せれば上から降りてきます")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 50)
-        }
-        .padding(.top, 16)
-    }
-
-    private var folderStep: some View {
-        VStack(spacing: 22) {
-            Image(systemName: "folder.fill")
-                .font(.system(size: 96, weight: .regular))
-                .foregroundStyle(Color.accentColor)
-                .symbolRenderingMode(.hierarchical)
-                .padding(.bottom, 4)
-
-            Text("フォルダ＝倉庫で整理")
-                .font(.system(size: 24, weight: .semibold, design: .default))
-                .foregroundStyle(.primary)
-
-            Text("色付きフォルダを好きなだけ作成。\n定型文や画像、リンクを分類して保存できます")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 60)
-        }
-        .padding(.top, 24)
-    }
-
-    private var templateStep: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "text.cursor")
-                .font(.system(size: 76, weight: .regular))
-                .foregroundStyle(Color.accentColor)
-                .symbolRenderingMode(.hierarchical)
-
-            Text("定型文を書こう")
-                .font(.system(size: 24, weight: .semibold, design: .default))
-                .foregroundStyle(.primary)
-
-            Text("⌘N でいつでも新しい定型文を作成。\n[[name]] のようなプレースホルダで使うときに穴埋めできます")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 50)
-
-            sampleBlock("Hi [[name]], thanks for [[topic]].")
-                .padding(.top, 2)
-        }
-        .padding(.top, 8)
-    }
-
-    private var aiStep: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 68, weight: .regular))
-                .foregroundStyle(Color.accentColor)
-                .symbolRenderingMode(.hierarchical)
-
-            Text("AI で書き直し")
-                .font(.system(size: 24, weight: .semibold, design: .default))
-                .foregroundStyle(.primary)
-
-            Text("⌘I のメニュー、または ⌃⇧R / ⌃⇧T / ⌃⇧S で\n書き直し・翻訳・要約。Foundation Models が無い環境でも heuristic で動きます")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 36)
-
-            sampleBlock("AI: ⌃⇧T を押すと自動翻訳")
-
-            VStack(spacing: 8) {
-                Text("最後に、アクセシビリティ権限を許可してください")
+            Spacer()
+            if stepIndex < steps.count - 1 {
+                Button("スキップ", action: skip)
+                    .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
-
-                Button {
-                    _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
-                } label: {
-                    Label("権限ダイアログを開く", systemImage: "lock.shield")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
             }
-            .padding(.top, 4)
         }
-        .padding(.top, 4)
+        .padding(.horizontal, 28).padding(.top, 22)
     }
 
-    // MARK: - Sample block
+    // MARK: - Content
 
-    private func sampleBlock(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .regular, design: .monospaced))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(PastyTheme.strokeOpacity), lineWidth: 1)
-            )
+    private var content: some View {
+        VStack(spacing: 22) {
+            steps[stepIndex].body
+                .frame(maxWidth: .infinity)
+
+            VStack(spacing: 8) {
+                Text(steps[stepIndex].title)
+                    .font(.system(size: 28, weight: .semibold, design: .default))
+                    .tracking(-0.4)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                Text(steps[stepIndex].subtitle)
+                    .font(.system(size: 13.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 56)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 36)
+        .id(stepIndex)
+        .transition(.asymmetric(
+            insertion: .move(edge: .trailing).combined(with: .opacity),
+            removal: .move(edge: .leading).combined(with: .opacity)
+        ))
+    }
+
+    // MARK: - Step bodies
+
+    private var welcomeBody: some View {
+        ZStack {
+            // 後ろの円形グロー
+            Circle()
+                .fill(Color.accentColor.opacity(0.12))
+                .frame(width: 220, height: 220)
+                .blur(radius: 24)
+            Image(systemName: "doc.on.clipboard.fill")
+                .font(.system(size: 110, weight: .regular))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .symbolRenderingMode(.hierarchical)
+                .shadow(color: Color.accentColor.opacity(0.4), radius: 18, x: 0, y: 8)
+        }
+        .frame(height: 220)
+    }
+
+    private var hotkeyBody: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 14) {
+                KeyCap(label: "⇧", size: 72)
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                KeyCap(label: "⌘", size: 72)
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                KeyCap(label: "V", size: 72)
+            }
+            if triggeredHotkey {
+                Label("ナイス! ストリップが立ち上がりました", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.green)
+            } else {
+                Text("今すぐ試してみよう")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(height: 220)
+    }
+
+    private var notchBody: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.regularMaterial)
+                    .frame(width: 260, height: 110)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 10)
+
+                // ノッチ風の凹み
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.black)
+                    .frame(width: 140, height: 26)
+                    .offset(y: -55)
+            }
+            Image(systemName: "arrow.down")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Color.accentColor)
+            Text("マウスを乗せると、ここから降りてきます")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(height: 220)
+    }
+
+    private var accessibilityBody: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.12))
+                    .frame(width: 150, height: 150)
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 78, weight: .regular))
+                    .foregroundStyle(Color.accentColor)
+                    .symbolRenderingMode(.hierarchical)
+            }
+            Button {
+                _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
+            } label: {
+                Label("システム設定を開く", systemImage: "arrow.up.right.square")
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+        .frame(height: 220)
+    }
+
+    private var folderBody: some View {
+        HStack(spacing: 12) {
+            ForEach(["7C8CF8", "F8AA7C", "7CF88C", "F87CE0"], id: \.self) { hex in
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(hex: "#\(hex)").opacity(0.18))
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 36, weight: .regular))
+                        .foregroundStyle(Color(hex: "#\(hex)"))
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .frame(width: 80, height: 80)
+                .shadow(color: Color(hex: "#\(hex)").opacity(0.3), radius: 8, x: 0, y: 4)
+            }
+        }
+        .frame(height: 220)
+    }
+
+    private var keyboardBody: some View {
+        // 2 列に分けて 220pt 程度に収める
+        let leftRows: [(String, String)] = [
+            ("⇧⌘V", "Pasty を呼び出す"),
+            ("← / →", "前後のクリップへ移動"),
+            ("Tab / ⇧Tab", "フォルダを切り替える"),
+            ("Space", "プレビュー"),
+            ("Return", "貼付"),
+            ("⌘?", "ショートカット早見表")
+        ]
+        let rightRows: [(String, String)] = [
+            ("⇧← / ⇧→", "範囲選択"),
+            ("X", "選択トグル"),
+            ("⌘A", "全選択"),
+            ("⌘1〜9", "番号で即貼付"),
+            ("⌘Return", "結合して貼付")
+        ]
+        return HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(leftRows, id: \.0) { kbRow($0.0, $0.1) }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(rightRows, id: \.0) { kbRow($0.0, $0.1) }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 36)
+        .frame(height: 220)
+    }
+
+    private var completeBody: some View {
+        ZStack {
+            Circle()
+                .fill(LinearGradient(
+                    colors: [Color.green.opacity(0.25), Color.accentColor.opacity(0.15)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ))
+                .frame(width: 180, height: 180)
+                .blur(radius: 10)
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 120, weight: .regular))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.green, Color.green.opacity(0.7)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .symbolRenderingMode(.hierarchical)
+                .shadow(color: Color.green.opacity(0.4), radius: 18, x: 0, y: 8)
+        }
+        .frame(height: 220)
+    }
+
+    private func kbRow(_ key: String, _ label: String) -> some View {
+        HStack(spacing: 8) {
+            Text(key)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(Color.primary.opacity(0.14), lineWidth: 0.5)
+                )
+                .frame(width: 84, alignment: .leading)
+            Text(label)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 
     // MARK: - Progress
 
     private var progressIndicator: some View {
-        HStack(spacing: 10) {
-            ForEach(0..<totalSteps, id: \.self) { index in
-                Circle()
-                    .fill(index == step ? Color.accentColor : Color.secondary.opacity(0.25))
-                    .frame(width: 8, height: 8)
-                    .animation(.easeInOut(duration: 0.18), value: step)
+        HStack(spacing: 6) {
+            ForEach(0..<steps.count, id: \.self) { i in
+                Capsule(style: .continuous)
+                    .fill(i == stepIndex
+                          ? Color.accentColor
+                          : Color.secondary.opacity(0.25))
+                    .frame(width: i == stepIndex ? 28 : 8, height: 8)
+                    .animation(.spring(response: 0.32, dampingFraction: 0.8), value: stepIndex)
             }
         }
     }
 
-    // MARK: - Controls
+    // MARK: - Bottom bar
 
-    private var controlBar: some View {
+    private var bottomBar: some View {
         HStack {
-            if step > 0 {
-                Button("戻る") {
-                    if step > 0 { step -= 1 }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+            if stepIndex > 0 {
+                Button("戻る") { stepIndex -= 1 }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
             } else {
-                // Keep symmetry
                 Color.clear.frame(width: 80, height: 1)
             }
-
             Spacer()
-
-            Button(primaryButtonTitle) {
-                advance()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
+            Button(primaryTitle) { advance() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
         }
     }
 
-    private var primaryButtonTitle: String {
-        step == totalSteps - 1 ? "はじめる" : "次へ"
+    private var primaryTitle: String {
+        stepIndex == steps.count - 1 ? "Pasty を始める" : "次へ"
     }
 
     private func advance() {
-        if step < totalSteps - 1 {
-            step += 1
+        if stepIndex < steps.count - 1 {
+            stepIndex += 1
         } else {
             onComplete()
         }
+    }
+
+    private func skip() {
+        onComplete()
     }
 }
 
@@ -260,21 +420,31 @@ struct OnboardingView: View {
 
 private struct KeyCap: View {
     let label: String
+    var size: CGFloat = 72
 
     var body: some View {
         Text(label)
-            .font(.system(size: 36, weight: .semibold, design: .rounded))
+            .font(.system(size: size * 0.46, weight: .semibold, design: .rounded))
             .foregroundStyle(.primary)
-            .frame(width: 78, height: 78)
+            .frame(width: size, height: size)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.primary.opacity(0.06))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(.regularMaterial)
+                    // 上端ハイライト
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(LinearGradient(
+                            colors: [Color.white.opacity(0.3), Color.clear],
+                            startPoint: .top, endPoint: .center
+                        ), lineWidth: 0.5)
+                }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(PastyTheme.strokeOpacity), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
             )
-            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.14), radius: 8, x: 0, y: 4)
     }
 }
 
@@ -319,8 +489,8 @@ final class OnboardingPresenter {
         let hosting = NSHostingController(rootView: rootView)
 
         let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 520),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 600),
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -329,12 +499,25 @@ final class OnboardingPresenter {
         newWindow.isReleasedWhenClosed = false
         newWindow.titlebarAppearsTransparent = true
         newWindow.titleVisibility = .hidden
+        newWindow.isMovableByWindowBackground = true
+        newWindow.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        newWindow.standardWindowButton(.zoomButton)?.isHidden = true
         newWindow.center()
 
         self.window = newWindow
 
+        // accessory モードのままだと前面に出てこないので一時的に regular へ
+        NSApp.setActivationPolicy(.regular)
         newWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // 閉じたら accessory に戻す
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: newWindow, queue: .main
+        ) { _ in
+            Task { @MainActor in NSApp.setActivationPolicy(.accessory) }
+        }
     }
 
     private func close() {

@@ -23,6 +23,7 @@ struct PastyApp: App {
         ClipStoreContainer.shared.store = store
 
         let pinboards = PinboardStore(dbWriter: store.dbWriter)
+        PinboardStoreContainer.shared.pinboards = pinboards
         let stack = PasteStack()
         let selection = SelectionModel()
         let coordinator = PanelCoordinator(store: store, pinboards: pinboards,
@@ -105,47 +106,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// accessory app では設定画面を **複数の経路** で粘り強く呼ばないと
-/// 単発で開かないことがあるので、堅牢に開くヘルパ。
+/// 設定画面は SwiftUI の `Settings { }` シーンが accessory アプリだと
+/// 信頼性低く開かない/閉じても残骸が残るので、自前で NSWindow を管理する。
 @MainActor
-func openSettingsWindowRobustly() {
-    // accessory のままだとフォーカスが安定しない時があるので、一時的に
-    // regular に切り替えてから設定を呼び、Dock アイコンが出るタイミングを
-    // 与える。最後に accessory に戻す（Dock から消える）。
-    NSApp.setActivationPolicy(.regular)
-    NSApp.activate(ignoringOtherApps: true)
+final class SettingsWindowManager {
+    static let shared = SettingsWindowManager()
+    private var window: NSWindow?
+    private var policyObserver: NSObjectProtocol?
 
-    let selectors = [
-        Selector(("showSettingsWindow:")),
-        Selector(("showPreferencesWindow:")),
-        Selector(("orderFrontPreferencesPanel:"))
-    ]
-    var fired = false
-    for sel in selectors {
-        if NSApp.sendAction(sel, to: nil, from: nil) {
-            fired = true
-            break
-        }
-    }
-    if !fired {
-        // それでもダメな場合、既に開かれている Settings ウィンドウを探して前面化。
-        for w in NSApp.windows where w.title.localizedCaseInsensitiveContains("settings")
-            || w.title.localizedCaseInsensitiveContains("preferences")
-            || w.title.localizedCaseInsensitiveContains("設定") {
-            w.makeKeyAndOrderFront(nil)
-            fired = true
-            break
-        }
-    }
-    // 500ms 後に accessory に戻して Dock アイコンを片付ける。
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        if NSApp.windows.contains(where: { $0.isVisible
-            && ($0.title.localizedCaseInsensitiveContains("settings")
-            || $0.title.localizedCaseInsensitiveContains("preferences")
-            || $0.title.localizedCaseInsensitiveContains("設定")) }) {
-            // 設定が見えているなら、その間は regular のままにしておく
+    private init() {}
+
+    func show() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let existing = window, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
             return
         }
-        NSApp.setActivationPolicy(.accessory)
+
+        // SettingsView を NSHostingController でラップ
+        let view = SettingsView(
+            settings: .shared,
+            pinboards: PinboardStoreContainer.shared.pinboards
+                ?? PinboardStore(dbWriter: ClipStoreContainer.shared.store!.dbWriter),
+            store: ClipStoreContainer.shared.store
+        )
+        let host = NSHostingController(rootView: view)
+
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        w.title = "Pasty 設定"
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.isMovableByWindowBackground = true
+        w.contentViewController = host
+        w.isReleasedWhenClosed = false
+        w.center()
+        w.makeKeyAndOrderFront(nil)
+
+        // 閉じたら accessory に戻す
+        policyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: w, queue: .main
+        ) { _ in
+            Task { @MainActor in
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+
+        self.window = w
     }
+}
+
+/// 互換ヘルパ。既存呼び出し箇所はこの関数を通る。
+@MainActor
+func openSettingsWindowRobustly() {
+    SettingsWindowManager.shared.show()
+}
+
+/// PinboardStore を SettingsWindowManager から取得できるようにするコンテナ。
+@MainActor
+final class PinboardStoreContainer {
+    static let shared = PinboardStoreContainer()
+    var pinboards: PinboardStore?
 }

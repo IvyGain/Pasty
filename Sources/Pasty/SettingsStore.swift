@@ -90,7 +90,7 @@ final class SettingsStore: ObservableObject {
             Keys.notchHoverEnabled: true,
             Keys.stripPanelEnabled: true,
             Keys.autoPaste: true,
-            Keys.locale: "auto",
+            Keys.locale: "ja",
             Keys.ignoredBundleIds: [
                 "com.apple.keychainaccess",
                 "com.agilebits.onepassword7",
@@ -123,7 +123,7 @@ final class SettingsStore: ObservableObject {
         self.notchHoverEnabled = defaults.bool(forKey: Keys.notchHoverEnabled)
         self.stripPanelEnabled = defaults.bool(forKey: Keys.stripPanelEnabled)
         self.autoPaste = defaults.bool(forKey: Keys.autoPaste)
-        self.locale = defaults.string(forKey: Keys.locale) ?? "auto"
+        self.locale = defaults.string(forKey: Keys.locale) ?? "ja"
         self.toastEnabled = defaults.bool(forKey: Keys.toastEnabled)
         self.explorerMode = defaults.bool(forKey: Keys.explorerMode)
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
