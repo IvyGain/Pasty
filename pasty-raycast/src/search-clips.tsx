@@ -2,7 +2,14 @@ import { List, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipActions } from "./lib/actions";
 import { recentClips, searchClips, pinboards, clipsInFolder, dbExists, dbFile } from "./lib/db";
-import { kindIcon, relativeTime, shortBytes, detailMarkdown, parseCreatedAt } from "./lib/format";
+import {
+  kindIcon,
+  relativeTime,
+  shortBytes,
+  detailMarkdown,
+  parseCreatedAt,
+  GUIDE_LINES,
+} from "./lib/format";
 import type { ClipRow, PinboardRow } from "./lib/types";
 
 export default function Command() {
@@ -80,7 +87,7 @@ export default function Command() {
     <List
       isShowingDetail
       isLoading={loading}
-      searchBarPlaceholder="クリップを検索…"
+      searchBarPlaceholder="クリップを検索 — Space で複数選択 / ⌘[ ⌘] でフォルダ切替"
       onSearchTextChange={setQuery}
       throttle
       searchBarAccessory={
@@ -141,6 +148,11 @@ export default function Command() {
                         />
                       </List.Item.Detail.Metadata.TagList>
                     )}
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="操作ガイド" text="" />
+                    {GUIDE_LINES.map((line) => (
+                      <List.Item.Detail.Metadata.Label key={line} title="" text={line} />
+                    ))}
                   </List.Item.Detail.Metadata>
                 }
               />
@@ -152,6 +164,9 @@ export default function Command() {
                 onToggleSelect={toggle}
                 onSelectAll={selectAll}
                 onClearSelection={clearSelection}
+                folders={folders}
+                currentFolderId={folderId}
+                onChangeFolder={setFolderId}
               />
             }
           />

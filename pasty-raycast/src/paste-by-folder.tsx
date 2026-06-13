@@ -2,7 +2,7 @@ import { List, Icon, Color, Action, ActionPanel, useNavigation } from "@raycast/
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipActions } from "./lib/actions";
 import { pinboards, clipsInFolder, dbExists, dbFile } from "./lib/db";
-import { kindIcon, relativeTime, shortBytes, detailMarkdown } from "./lib/format";
+import { kindIcon, relativeTime, shortBytes, detailMarkdown, GUIDE_LINES } from "./lib/format";
 import type { ClipRow, PinboardRow } from "./lib/types";
 
 export default function Command() {
@@ -131,6 +131,11 @@ function FolderClips({ folder }: { folder: PinboardRow }) {
                       title="サイズ"
                       text={shortBytes(clip.byteSize)}
                     />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="操作ガイド" text="" />
+                    {GUIDE_LINES.map((line) => (
+                      <List.Item.Detail.Metadata.Label key={line} title="" text={line} />
+                    ))}
                   </List.Item.Detail.Metadata>
                 }
               />

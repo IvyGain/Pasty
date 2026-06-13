@@ -87,3 +87,17 @@ export function detailMarkdown(clip: ClipRow): string {
   if (clip.kind === "code" || looksLikeCode(text)) return "```\n" + text + "\n```";
   return text;
 }
+
+/**
+ * Human-readable shortcut guide rendered as a string. Embed it into
+ * `List.Item.Detail.Metadata.Label` so the user always sees how to drive the
+ * extension without opening the action panel.
+ */
+export const GUIDE_LINES = [
+  "Enter — 貼付 (複数選択は結合貼付)",
+  "Space — 複数選択トグル",
+  "⌘A / ⌘D — 全選択 / 解除",
+  "⌥Enter — 連続貼付 (閉じない)",
+  "⌘[ / ⌘] — フォルダ切替",
+  "⌘K — 全アクション一覧",
+];

@@ -41,7 +41,7 @@ export default function Command() {
       columns={4}
       aspectRatio="4/3"
       fit={Grid.Fit.Fill}
-      searchBarPlaceholder="画像を検索 (ファイル名 / ソースアプリ)…"
+      searchBarPlaceholder="画像を検索 — Enter で貼付 / ⌥Enter で連続貼付 / ⌘K で全アクション"
       onSearchTextChange={setQuery}
       throttle
     >

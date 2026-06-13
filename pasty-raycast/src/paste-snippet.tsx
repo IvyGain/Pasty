@@ -2,7 +2,7 @@ import { List, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipActions } from "./lib/actions";
 import { pinboards, clipsInFolder, dbExists, dbFile } from "./lib/db";
-import { kindIcon, relativeTime, shortBytes, detailMarkdown } from "./lib/format";
+import { kindIcon, relativeTime, shortBytes, detailMarkdown, GUIDE_LINES } from "./lib/format";
 import type { ClipRow, PinboardRow } from "./lib/types";
 
 function isSnippetFolder(name: string): boolean {
@@ -80,7 +80,7 @@ export default function Command() {
     <List
       isShowingDetail
       isLoading={loading}
-      searchBarPlaceholder="定型文を検索…"
+      searchBarPlaceholder="定型文を検索 — Space で複数選択 / Enter で結合貼付"
       onSearchTextChange={setQuery}
       throttle
       searchBarAccessory={
@@ -128,6 +128,11 @@ export default function Command() {
                       title="サイズ"
                       text={shortBytes(clip.byteSize)}
                     />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="操作ガイド" text="" />
+                    {GUIDE_LINES.map((line) => (
+                      <List.Item.Detail.Metadata.Label key={line} title="" text={line} />
+                    ))}
                   </List.Item.Detail.Metadata>
                 }
               />
@@ -139,6 +144,9 @@ export default function Command() {
                 onToggleSelect={toggle}
                 onSelectAll={selectAll}
                 onClearSelection={clearSelection}
+                folders={folders}
+                currentFolderId={folderId}
+                onChangeFolder={setFolderId}
               />
             }
           />
