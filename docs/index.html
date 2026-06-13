@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#000000" />
 <meta name="color-scheme" content="light dark" />
 <title>Pasty — クリップボードを、もう一度。</title>
-<meta name="description" content="macOS のための、超軽量・ローカルファースト・オープンソースなクリップボードマネージャ。Spotlight モーダル、下部ストリップ、そして世界初のノッチ・ホバー・ドロップダウン。MITで完全無料。" />
+<meta name="description" content="macOS のための、超軽量・ローカルファースト・オープンソースなクリップボードマネージャ。下部ストリップ、世界初のノッチ・ホバー・ドロップダウン、そして Raycast 拡張。MITで完全無料。" />
 
 <meta property="og:title" content="Pasty — クリップボードを、もう一度。" />
-<meta property="og:description" content="Spotlight モーダル、下部ストリップ、ノッチ・ホバー。ローカルファースト。オープンソース。無料。" />
+<meta property="og:description" content="下部ストリップ、ノッチ・ホバー、Raycast 拡張。ローカルファースト。オープンソース。無料。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://ivygain.github.io/Pasty/" />
 <meta property="og:locale" content="ja_JP" />
@@ -411,14 +411,146 @@
     margin-bottom: 64px;
   }
 
-  /* ---- Three surfaces ---- */
+  /* ---- Three surfaces (scroll-driven) ---- */
   .surfaces-wrap {
-    display: grid; grid-template-columns: 320px 1fr;
+    display: grid; grid-template-columns: 1fr 1fr;
     gap: 56px;
     align-items: start;
   }
   @media (max-width: 880px) {
     .surfaces-wrap { grid-template-columns: 1fr; gap: 32px; }
+  }
+  .surface-scroll-list { display: flex; flex-direction: column; gap: 24px; }
+  .section-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s, opacity .3s, border-color .3s;
+    opacity: 0.55;
+  }
+  .section-card[data-in-view="true"] {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+  .section-card .label-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .section-card .label-row .surface-num {
+    display: inline-grid; place-items: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white; font-size: 13px; font-weight: 700;
+    box-shadow: 0 4px 10px -2px rgba(99,102,241,0.45);
+  }
+  .section-card h3 {
+    font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+  }
+  .section-card .kbd {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    background: var(--bg-soft); color: var(--text-soft);
+    padding: 3px 10px; border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+  .section-card p { color: var(--text-soft); font-size: 15px; line-height: 1.6; }
+
+  .sticky-preview-wrap {
+    position: sticky; top: 80px;
+    aspect-ratio: 16 / 10;
+  }
+  .sticky-preview-wrap .preview-stage {
+    position: relative; width: 100%; height: 100%;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, #131418, #0a0b0e);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .sticky-preview-wrap .preview-label {
+    position: absolute; top: 18px; right: 18px; z-index: 10;
+    background: rgba(20,22,28,0.7);
+    backdrop-filter: blur(20px);
+    color: rgba(255,255,255,0.85);
+    font-family: var(--mono); font-size: 11px;
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .surface-frame { position: absolute; inset: 0; opacity: 0; transition: opacity .5s; pointer-events: none; }
+  .surface-frame.show { opacity: 1; pointer-events: auto; }
+
+  /* ---- Raycast preview mock ---- */
+  .raycast-mock {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 80%; max-width: 640px;
+    border-radius: 12px;
+    background: rgba(20,22,28,0.85);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 30px 80px -10px rgba(0,0,0,0.6);
+    color: white;
+    padding: 0;
+    overflow: hidden;
+  }
+  .raycast-mock .head {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 13px;
+  }
+  .raycast-mock .head .ray-icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, #FF6363, #FF3D3D);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 800; color: white;
+  }
+  .raycast-mock .head input {
+    flex: 1; background: transparent; border: 0; outline: 0; color: white;
+    font: inherit; font-size: 14px;
+  }
+  .raycast-mock ul { list-style: none; padding: 6px 0; }
+  .raycast-mock li {
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 14px;
+    font-size: 12px;
+    transition: background .2s;
+  }
+  .raycast-mock li.selected,
+  .raycast-mock li:hover { background: rgba(255,99,99,0.16); }
+  .raycast-mock li .badge {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: rgba(255,99,99,0.25); color: #FFB4B4;
+    display: grid; place-items: center; font-size: 10px; font-weight: 700;
+  }
+  .raycast-mock li .check {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1.5px solid rgba(255,255,255,0.4);
+    display: grid; place-items: center; font-size: 10px;
+  }
+  .raycast-mock li.checked .check {
+    background: #FF6363; border-color: #FF6363; color: white;
+  }
+  .raycast-mock li .row-main { flex: 1; min-width: 0; }
+  .raycast-mock li .row-main .title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .raycast-mock li .row-main .meta {
+    font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px;
+  }
+  .raycast-mock .foot {
+    display: flex; gap: 12px;
+    padding: 8px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.55);
+    font-size: 10px;
+  }
+  .raycast-mock .foot .kbdr {
+    background: rgba(255,255,255,0.08);
+    padding: 2px 6px; border-radius: 4px;
+    font-family: var(--mono); font-size: 9px; margin-right: 4px;
   }
   .surface-list { display: flex; flex-direction: column; gap: 8px; }
   .surface-tab {
@@ -466,7 +598,7 @@
   .surface-frame { position: absolute; inset: 0; opacity: 0; transition: opacity .4s; pointer-events: none; }
   .surface-frame.show { opacity: 1; pointer-events: auto; }
 
-  /* ---- Spotlight modal mock ---- */
+  /* ---- Legacy modal mock (kept for reference) ---- */
   .spotlight-mock {
     position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
     width: 78%; max-width: 640px;
@@ -671,6 +803,69 @@
   .dsl-stage .result-row .info .m { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
   .dsl-stage .empty { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
 
+  /* ---- Download grid (2-column) ---- */
+  .download-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  @media (max-width: 880px) { .download-grid { grid-template-columns: 1fr; } }
+  .download-card.split {
+    padding: 36px;
+    text-align: left;
+  }
+  .download-card.split h3 {
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .download-card.split .lede {
+    font-size: 15px;
+    color: var(--text-soft);
+    margin-bottom: 22px;
+    max-width: none;
+  }
+  .download-card.split .ctas {
+    justify-content: flex-start;
+    margin-bottom: 18px;
+  }
+  .download-card.split details {
+    margin-top: 14px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .download-card.split details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-soft);
+    user-select: none;
+    list-style: none;
+  }
+  .download-card.split details summary::-webkit-details-marker { display: none; }
+  .download-card.split details summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform .2s;
+  }
+  .download-card.split details[open] summary::before { transform: rotate(90deg); }
+  .download-card.split details pre {
+    margin-top: 10px;
+    background: #0b0d12;
+    color: #e5e7eb;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-x: auto;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .download-card.split .badge-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;
+    color: var(--text-dim); font-size: 12px;
+  }
+  .download-card.split .badge-row span::before { content: "•"; margin-right: 6px; opacity: 0.4; }
+  .download-card.split .badge-row span:first-child::before { content: ""; margin: 0; }
+
   /* ---- Download ---- */
   .download-card {
     background: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(168,85,247,0.10));
@@ -789,9 +984,9 @@
     </a>
     <ul>
       <li><a href="#surfaces">サーフェス</a></li>
+      <li><a href="#whatsnew">v0.4.12</a></li>
       <li><a href="#folders">倉庫</a></li>
       <li><a href="#ai">AI</a></li>
-      <li><a href="#multi">複数選択</a></li>
       <li><a href="#search">検索</a></li>
       <li><a href="#privacy">プライバシー</a></li>
       <li><a href="#download">ダウンロード</a></li>
@@ -807,18 +1002,19 @@
 <header class="hero">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">v0.4.1 · AI · テンプレート · プレビュー · オープンソース · MIT</span>
+      <span class="eyebrow">v0.4.12 · オンボーディング · 3層シャドウ · Raycast 拡張 · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Spotlight がサード。v0.4 ではプレビュー全画面、テンプレ差し込み、オンデバイス AI、スマートフォルダ、自動カテゴリ分類を新搭載。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.4.12 では 7 ステップオンボーディング、3 層シャドウ + ガラス感、設定タブ刷新、⌘Enter 一括貼付、X キーで複数選択を新搭載。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
-          macOS 用をダウンロード
+          Pasty.dmg をダウンロード
           <small>· 4.0 MB · macOS 14 以降</small>
         </a>
-        <a class="btn ghost" href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">
-          GitHub で見る
+        <a class="btn ghost" href="https://www.raycast.com/ivygain/pasty" target="_blank" rel="noopener">
+          Raycast 拡張をインストール
+          <small>· or sideload from GitHub</small>
         </a>
       </div>
 
@@ -876,88 +1072,109 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">3 つの呼び出し方</span>
-      <h2 class="section-title">同じカルーセル。<span class="accent">下から、上から、中央から。</span></h2>
-      <p class="section-sub">下部ストリップが主役。ノッチからは同じカルーセルが上から降りてきます。Spotlight モーダルは検索特化のサード。表示位置と起動方法が違うだけで、中身も操作も同じです。</p>
+      <h2 class="section-title">同じ履歴。<span class="accent">下から、上から、Raycast から。</span></h2>
+      <p class="section-sub">下部ストリップが主役。ノッチからは同じカルーセルが上から降りてきます。Raycast 拡張はサード。表示位置と起動方法が違うだけで、履歴・フォルダ・定型文はすべて同じデータベースを共有します。</p>
     </div>
 
-    <div class="surfaces-wrap reveal">
-      <div class="surface-list" role="tablist">
-        <button class="surface-tab active" data-surface="strip" role="tab">
-          <div class="label"><span class="surface-num">1</span>下部ストリップ <span class="kbd">⇧⌘V</span></div>
-          <div class="desc">メイン。下から立ち上がるカルーセル。フォルダ＝倉庫として、定型文・画像・URL を分類して貯めておけます。⌘1〜9 で一発貼付、Shift で複数選択。</div>
-        </button>
-        <button class="surface-tab" data-surface="notch" role="tab">
-          <div class="label"><span class="surface-num">2</span>ノッチホバー <span class="kbd">↑ マウス</span></div>
-          <div class="desc">サブ。ノッチにマウスを乗せると、同じカルーセルが上から降りてきます (ノッチがない Mac は画面上端中央 20% が代わり)。表示位置だけが違い、中身も操作も下部ストリップと同じ。</div>
-        </button>
-        <button class="surface-tab" data-surface="spotlight" role="tab">
-          <div class="label"><span class="surface-num">3</span>Spotlight モーダル <span class="kbd">⌥⇧V</span></div>
-          <div class="desc">サード。中央モーダル。検索 DSL に強く、何をペーストしたいか分かっている時の最短経路。</div>
-        </button>
+    <div class="surfaces-wrap reveal" id="surfaceScroll">
+      <div class="surface-scroll-list">
+        <article class="section-card" data-surface="strip" data-in-view="true">
+          <div class="label-row">
+            <span class="surface-num">1</span>
+            <h3>下部ストリップ</h3>
+            <span class="kbd">⇧⌘V</span>
+          </div>
+          <p>メイン。下から立ち上がるカルーセル。フォルダ＝倉庫として、定型文・画像・URL を分類して貯めておけます。⌘1〜9 で一発貼付、X キーで複数選択、⌘Enter で一括貼付。</p>
+        </article>
+
+        <article class="section-card" data-surface="notch">
+          <div class="label-row">
+            <span class="surface-num">2</span>
+            <h3>ノッチホバー</h3>
+            <span class="kbd">↑ マウス</span>
+          </div>
+          <p>サブ。ノッチにマウスを乗せると、同じカルーセルが上から降りてきます (ノッチがない Mac は画面上端中央 20% が代わり)。表示位置だけが違い、中身も操作も下部ストリップと同じ。</p>
+        </article>
+
+        <article class="section-card" data-surface="raycast">
+          <div class="label-row">
+            <span class="surface-num">3</span>
+            <h3>Raycast 拡張</h3>
+            <span class="kbd">Raycast 起動 → Pasty</span>
+          </div>
+          <p>サード。Raycast 内で履歴検索・複数選択・連続貼付ができる拡張。Pasty 本体と同じ履歴・フォルダ・定型文を共有します。</p>
+        </article>
       </div>
 
-      <div class="surface-stage">
-        <!-- Spotlight -->
-        <div class="surface-frame" data-frame="spotlight">
-          <div class="spotlight-mock">
-            <div class="search">
-              <span class="magn">🔍</span>
-              <input value="type:link safari" readonly aria-label="検索デモ" />
-            </div>
-            <ul>
-              <li class="selected"><span class="badge">1</span><div class="row-main"><div class="title">https://github.com/IvyGain/Pasty</div><div class="meta">リンク · Safari · たった今</div></div></li>
-              <li><span class="badge">2</span><div class="row-main"><div class="title">https://maccy.app</div><div class="meta">リンク · Safari · 2 分前</div></div></li>
-              <li><span class="badge">3</span><div class="row-main"><div class="title">https://pasteapp.io/pricing</div><div class="meta">リンク · Safari · 14 分前</div></div></li>
-              <li><span class="badge">4</span><div class="row-main"><div class="title">https://developer.apple.com/foundation-models</div><div class="meta">リンク · Safari · 28 分前</div></div></li>
-            </ul>
-            <div class="foot">
-              <span><span class="kbdr">↩</span>貼付</span>
-              <span><span class="kbdr">⇧↩</span>プレーン</span>
-              <span><span class="kbdr">⌘1-9</span>クイック</span>
-              <span><span class="kbdr">␣</span>プレビュー</span>
-            </div>
-          </div>
-        </div>
+      <div class="sticky-preview-wrap">
+        <div class="preview-stage" id="previewStage" data-active="strip">
+          <div class="preview-label" id="previewLabel">STRIP</div>
 
-        <!-- Strip -->
-        <div class="surface-frame show" data-frame="strip">
-          <div class="strip-mock">
-            <div class="head">
-              <strong style="color:white">Pasty</strong>
-              <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>受信</span>
-              <span class="chip"><span class="pinclr" style="background:#34C759"></span>仕事</span>
-              <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>コード</span>
-              <span class="chip"><span class="pinclr" style="background:#BF5AF2"></span>参考</span>
-              <span style="margin-left:auto">すべて Aa 🖼 🔗 📄</span>
-            </div>
-            <div class="row">
-              <div class="card active"><div><strong>def hello():</strong><br><span style="color:#fda4af">    return "pasty"</span></div><div class="meta"><span>コード</span><span>⌘1</span></div></div>
-              <div class="card"><div>https://github.com/<br>IvyGain/Pasty</div><div class="meta"><span>リンク</span><span>⌘2</span></div></div>
-              <div class="card"><div>{<br>&nbsp;"version": "0.2.2",<br>&nbsp;"license": "MIT"<br>}</div><div class="meta"><span>JSON</span><span>⌘3</span></div></div>
-              <div class="card"><div>議事メモ —<br>今日 v0.2 出荷</div><div class="meta"><span>テキスト</span><span>⌘4</span></div></div>
-              <div class="card"><div>Pasty — Paste の代わりに</div><div class="meta"><span>テキスト</span><span>⌘5</span></div></div>
-              <div class="card"><div>screenshot.png<br>(2.3 MB)</div><div class="meta"><span>画像</span><span>⌘6</span></div></div>
-              <div class="card"><div>/usr/local/bin/pasty</div><div class="meta"><span>ファイル</span><span>⌘7</span></div></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Notch -->
-        <div class="surface-frame notch-frame" data-frame="notch">
-          <div class="mini-mac">
-            <div class="mini-screen">
-              <div class="mini-drop">
-                <div style="display:flex;gap:6px;align-items:center;color:rgba(255,255,255,0.7);font-size:10px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7)"></span>Pasty · 下にドラッグ</div>
-                <div class="row">
-                  <div class="card">こんにちは</div>
-                  <div class="card">https://github.com</div>
-                  <div class="card">def hi(): …</div>
-                  <div class="card">{ "ok": true }</div>
-                </div>
+          <!-- Strip -->
+          <div class="surface-frame show" data-frame="strip">
+            <div class="strip-mock">
+              <div class="head">
+                <strong style="color:white">Pasty</strong>
+                <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>受信</span>
+                <span class="chip"><span class="pinclr" style="background:#34C759"></span>仕事</span>
+                <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>コード</span>
+                <span class="chip"><span class="pinclr" style="background:#BF5AF2"></span>参考</span>
+                <span style="margin-left:auto">すべて Aa 🖼 🔗 📄</span>
               </div>
-              <div class="mini-notch"></div>
+              <div class="row">
+                <div class="card active"><div><strong>def hello():</strong><br><span style="color:#fda4af">    return "pasty"</span></div><div class="meta"><span>コード</span><span>⌘1</span></div></div>
+                <div class="card"><div>https://github.com/<br>IvyGain/Pasty</div><div class="meta"><span>リンク</span><span>⌘2</span></div></div>
+                <div class="card"><div>{<br>&nbsp;"version": "0.4.12",<br>&nbsp;"license": "MIT"<br>}</div><div class="meta"><span>JSON</span><span>⌘3</span></div></div>
+                <div class="card"><div>議事メモ —<br>今日 v0.4.12 出荷</div><div class="meta"><span>テキスト</span><span>⌘4</span></div></div>
+                <div class="card"><div>Pasty — Paste の代わりに</div><div class="meta"><span>テキスト</span><span>⌘5</span></div></div>
+                <div class="card"><div>screenshot.png<br>(2.3 MB)</div><div class="meta"><span>画像</span><span>⌘6</span></div></div>
+                <div class="card"><div>/usr/local/bin/pasty</div><div class="meta"><span>ファイル</span><span>⌘7</span></div></div>
+              </div>
             </div>
           </div>
+
+          <!-- Notch -->
+          <div class="surface-frame notch-frame" data-frame="notch">
+            <div class="mini-mac">
+              <div class="mini-screen">
+                <div class="mini-drop">
+                  <div style="display:flex;gap:6px;align-items:center;color:rgba(255,255,255,0.7);font-size:10px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7)"></span>Pasty · 下にドラッグ</div>
+                  <div class="row">
+                    <div class="card">こんにちは</div>
+                    <div class="card">https://github.com</div>
+                    <div class="card">def hi(): …</div>
+                    <div class="card">{ "ok": true }</div>
+                  </div>
+                </div>
+                <div class="mini-notch"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Raycast -->
+          <div class="surface-frame" data-frame="raycast">
+            <div class="raycast-mock">
+              <div class="head">
+                <span class="ray-icon">R</span>
+                <input value="Search Clipboard…" readonly aria-label="Raycast 検索デモ" />
+                <span style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.4)">Pasty</span>
+              </div>
+              <ul>
+                <li class="selected checked"><span class="check">✓</span><div class="row-main"><div class="title">def hello(): return "pasty"</div><div class="meta">Code · VSCode · たった今</div></div><span class="badge">1</span></li>
+                <li class="checked"><span class="check">✓</span><div class="row-main"><div class="title">https://github.com/IvyGain/Pasty</div><div class="meta">Link · Safari · 2 分前</div></div><span class="badge">2</span></li>
+                <li class="checked"><span class="check">✓</span><div class="row-main"><div class="title">{ "version": "0.4.12", "license": "MIT" }</div><div class="meta">JSON · ターミナル · 5 分前</div></div><span class="badge">3</span></li>
+                <li><span class="check"></span><div class="row-main"><div class="title">Pasty — Paste の代わりに</div><div class="meta">Text · Things · 12 分前</div></div><span class="badge">4</span></li>
+                <li><span class="check"></span><div class="row-main"><div class="title">https://www.raycast.com/ivygain/pasty</div><div class="meta">Link · Safari · 20 分前</div></div><span class="badge">5</span></li>
+              </ul>
+              <div class="foot">
+                <span><span class="kbdr">↩</span>Paste</span>
+                <span><span class="kbdr">⌘↩</span>Paste All</span>
+                <span><span class="kbdr">⇥</span>Toggle Select</span>
+                <span><span class="kbdr">⌘K</span>Actions</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1047,7 +1264,7 @@
         <span style="opacity:0.6">— ↩ それぞれ順に貼付 · ⌥↩ まとめて 1 ブロック</span>
       </div>
       <div style="padding:6px 12px 14px;color:#e5e7eb;font-family:var(--mono);font-size:13px;line-height:1.9">
-        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18)"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>Pasty v0.2 — 複数選択をリリース</span><span style="margin-left:auto;color:#86868b;font-size:11px">テキスト · メモ</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18)"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>Pasty v0.4.12 — オンボーディング & Raycast 拡張</span><span style="margin-left:auto;color:#86868b;font-size:11px">テキスト · メモ</span></div>
         <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>https://ivygain.github.io/Pasty/</span><span style="margin-left:auto;color:#86868b;font-size:11px">リンク · Safari</span></div>
         <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>def shipIt(): return True</span><span style="margin-left:auto;color:#86868b;font-size:11px">コード · VSCode</span></div>
         <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;opacity:0.6;margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.1);color:#86868b;text-align:center;font-size:11px;line-height:18px">4</span><span>スクリーンショット 2026-06-13 — 2.3 MB</span><span style="margin-left:auto;color:#86868b;font-size:11px">画像 · Screenshot</span></div>
@@ -1258,26 +1475,119 @@
   </div>
 </section>
 
+<!-- WHAT'S NEW v0.4.12 ============================================ -->
+<section id="whatsnew">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">v0.4.12 — 最新リリース</span>
+      <h2 class="section-title">体験を、<span class="accent">もう一段、磨き込みました。</span></h2>
+      <p class="section-sub">v0.4.12 は、Pasty を「初めて触る人にも、毎日使う人にも」気持ちのいい道具にするための更新です。オンボーディング、ガラス感のあるシャドウ、設定タブ、複数選択フロー、そして Raycast 拡張による連続貼付。</p>
+    </div>
+
+    <div class="features reveal">
+      <div class="feature">
+        <div class="ico">🎯</div>
+        <h3>7 ステップオンボーディング</h3>
+        <p>初回起動時、コピー → 呼び出し → フォルダ → 複数選択 → 貼付 を 7 ステップで体験。手を動かしながら覚えられるので、説明書を読む時間が要りません。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🌊</div>
+        <h3>3 層シャドウ + ガラス感</h3>
+        <p>ストリップ・ノッチドロップダウン・ダイアログのすべてに、Liquid Glass 風の 3 層シャドウを再設計。背景となじみつつ、浮いて見える物理感が戻ってきました。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🗂</div>
+        <h3>設定タブ刷新</h3>
+        <p>一般 / ホットキー / フォルダ / AI / プライバシー / インサイト / 詳細 / Raycast の 8 タブに整理。初心者向けの説明文と、上級者向けの細かいトグルが両立しました。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">⌘↩</div>
+        <h3>⌘Enter 一括貼付</h3>
+        <p>複数選択した状態で <code style="font-family:var(--mono);font-size:13px">⌘Enter</code>。すべてのクリップを順番に、または 1 ブロックにまとめて貼付。フォーム入力もメール本文も、これ 1 つで埋まります。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🅧</div>
+        <h3>X キーで複数選択</h3>
+        <p>カードにフォーカスして <code style="font-family:var(--mono);font-size:13px">X</code> を押すと、その場で選択にトグル。Shift クリックも併用可。キーボードだけで「集める→まとめて貼る」が完結します。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔍</div>
+        <h3>Raycast 拡張で連続貼付</h3>
+        <p>Pasty 本体と同じ履歴を Raycast 内で検索 → タブで複数選択 → <code style="font-family:var(--mono);font-size:13px">⌘↩</code> で連続貼付。Raycast 派の人もそのまま Pasty の倉庫を使えます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DOWNLOAD ============================================ -->
 <section id="download">
   <div class="container">
-    <div class="download-card reveal">
-      <h2>Pasty を、はじめる。</h2>
-      <p>ダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
-      <div class="ctas">
-        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
-          Pasty.dmg をダウンロード
-          <small>· 4.0 MB</small>
-        </a>
-        <a class="btn ghost" href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">
-          すべてのリリース
-        </a>
+    <div class="reveal" style="text-align:center;margin-bottom:48px">
+      <span class="eyebrow">ダウンロード</span>
+      <h2 class="section-title" style="margin:0 auto 18px;text-align:center">Pasty を、<span class="accent">はじめる。</span></h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center">macOS アプリ本体と、Raycast 拡張。両方ともローカルファースト、両方とも無料、同じ履歴を共有します。</p>
+    </div>
+
+    <div class="download-grid reveal">
+      <!-- macOS App -->
+      <div class="download-card split">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+          <div style="width:48px;height:48px;border-radius:12px;background:url('assets/icon-128.png') center/contain no-repeat;filter:drop-shadow(0 6px 14px rgba(99,102,241,0.4))"></div>
+          <div>
+            <h3>macOS アプリ</h3>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.4.12</div>
+          </div>
+        </div>
+        <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
+        <div class="ctas">
+          <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
+            Pasty.dmg をダウンロード
+            <small>· 4.0 MB</small>
+          </a>
+        </div>
+        <div class="badge-row">
+          <span>macOS 14 Sonoma 以降</span>
+          <span>Apple Silicon &amp; Intel</span>
+          <span>MIT</span>
+        </div>
+        <details>
+          <summary>すべてのリリース・ソースコード</summary>
+          <pre>$ git clone https://github.com/IvyGain/Pasty.git
+$ cd Pasty
+$ swift build -c release
+$ open .build/release/Pasty.app</pre>
+        </details>
       </div>
-      <div class="meta-row">
-        <span>macOS 14 Sonoma 以降</span>
-        <span>Apple Silicon &amp; Intel 対応</span>
-        <span>MIT ライセンス</span>
-        <span>インストール時 約 7 MB</span>
+
+      <!-- Raycast Extension -->
+      <div class="download-card split">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#FF6363,#FF3D3D);display:grid;place-items:center;color:white;font-weight:800;font-size:22px;box-shadow:0 6px 14px -2px rgba(255,99,99,0.5)">R</div>
+          <div>
+            <h3>Raycast 拡張</h3>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">Pasty for Raycast</div>
+          </div>
+        </div>
+        <p class="lede">Raycast 内で履歴検索 → タブで複数選択 → <code style="font-family:var(--mono);font-size:0.9em">⌘↩</code> で連続貼付。Pasty 本体と同じ履歴・フォルダ・定型文を共有します。</p>
+        <div class="ctas">
+          <a class="btn primary" href="https://www.raycast.com/ivygain/pasty" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#FF6363,#FF3D3D);box-shadow:0 12px 30px -8px rgba(255,99,99,0.55)">
+            Raycast Store で開く
+            <small>· ワンクリック</small>
+          </a>
+        </div>
+        <div class="badge-row">
+          <span>Raycast 1.60 以降</span>
+          <span>Pasty v0.4.12+ 必須</span>
+          <span>MIT</span>
+        </div>
+        <details>
+          <summary>GitHub からサイドロード</summary>
+          <pre>$ git clone https://github.com/IvyGain/Pasty.git
+$ cd Pasty/raycast-extension
+$ npm install
+$ npx ray develop
+# Raycast Preferences → Extensions に登場します</pre>
+        </details>
       </div>
     </div>
   </div>
@@ -1315,8 +1625,8 @@
       </div>
       <div class="step">
         <div class="num">5</div>
-        <h3><code>⌥⇧V</code> で Spotlight モーダル</h3>
-        <p>検索特化サブモード。中央モーダルで DSL クエリ (<code>type:link source:Safari /TODO/</code>) を打って Return。何を貼りたいか分かっている時の最短経路。</p>
+        <h3>Raycast 拡張で連続貼付</h3>
+        <p>Raycast を起動して <code>Pasty</code> と入力 → Pasty の履歴がそのまま検索可能。<code>⇥</code> で複数選択、<code>⌘↩</code> で連続貼付。Raycast 派の人もそのまま Pasty の倉庫を使えます。</p>
       </div>
       <div class="step">
         <div class="num">6</div>
@@ -1347,8 +1657,10 @@
 
     <h3 style="margin:64px 0 18px;font-size:22px;letter-spacing:-0.01em">キーボードショートカット早見表</h3>
     <div class="shortcut-grid reveal">
-      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">プライマリサーフェス（Spotlight / Strip）の表示・非表示。</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">もう一方のサーフェスの表示・非表示。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">下部ストリップの表示・非表示。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">代替サーフェス（プレビューモード等）の表示・非表示。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">↩</span></div><div class="desc">複数選択中のクリップを一括貼付（順次 / 連結）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">X</span></div><div class="desc">フォーカス中のカードを選択にトグル（複数選択）。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">P</span></div><div class="desc">キャプチャを 60 秒間一時停止。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">選択中のクリップを貼付（複数選択中は順次貼付）。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">書式を捨ててプレーンテキストとして貼付。</div></div>
@@ -1397,10 +1709,12 @@
         <h4>Pasty</h4>
         <ul>
           <li><a href="#surfaces">サーフェス</a></li>
+          <li><a href="#whatsnew">v0.4.12 の新機能</a></li>
           <li><a href="#ai">v0.4 の革命</a></li>
           <li><a href="#search">検索 DSL</a></li>
           <li><a href="#privacy">プライバシー</a></li>
           <li><a href="#download">ダウンロード</a></li>
+          <li><a href="https://www.raycast.com/ivygain/pasty" target="_blank" rel="noopener">Raycast 拡張</a></li>
         </ul>
       </div>
       <div>
@@ -1440,10 +1754,10 @@
     const hot = document.getElementById('notchHot');
 
     const clips = [
-      { kind: 'text', body: 'Pasty v0.2 — 出荷', meta: 'メモ · たった今' },
+      { kind: 'text', body: 'Pasty v0.4.12 — 出荷', meta: 'メモ · たった今' },
       { kind: 'link', body: 'https://github.com/IvyGain/Pasty', meta: 'Safari · 1分' },
       { kind: 'code', body: "def hello():\n  return 'pasty'", meta: 'VSCode · 3分' },
-      { kind: 'text', body: '{"version":"0.2.2","license":"MIT"}', meta: 'ターミナル · 5分' },
+      { kind: 'text', body: '{"version":"0.4.12","license":"MIT"}', meta: 'ターミナル · 5分' },
       { kind: 'text', body: 'TODO: 次回リリース前に公証', meta: 'Things · 8分' },
       { kind: 'link', body: 'https://maccy.app', meta: 'Safari · 12分' },
       { kind: 'code', body: 'swift run Pasty', meta: 'ターミナル · 17分' },
@@ -1486,17 +1800,42 @@
     render();
   })();
 
-  // ---- Surface switcher --------------------------------------------------
+  // ---- Surface scroll-driven switcher -----------------------------------
   (function () {
-    const tabs = document.querySelectorAll('.surface-tab');
+    const cards = document.querySelectorAll('.section-card[data-surface]');
+    const stage = document.getElementById('previewStage');
+    const label = document.getElementById('previewLabel');
+    if (!cards.length || !stage) return;
+
     const frames = document.querySelectorAll('.surface-frame');
-    tabs.forEach(t => t.addEventListener('click', () => {
-      tabs.forEach(x => x.classList.remove('active'));
-      frames.forEach(f => f.classList.remove('show'));
-      t.classList.add('active');
-      const s = t.dataset.surface;
-      document.querySelector(`.surface-frame[data-frame="${s}"]`).classList.add('show');
-    }));
+    const labelMap = { strip: 'STRIP', notch: 'NOTCH', raycast: 'RAYCAST' };
+
+    function activate(surface) {
+      if (stage.dataset.active === surface) return;
+      stage.dataset.active = surface;
+      cards.forEach(c => c.setAttribute('data-in-view', c.dataset.surface === surface ? 'true' : 'false'));
+      frames.forEach(f => f.classList.toggle('show', f.dataset.frame === surface));
+      if (label) label.textContent = labelMap[surface] || surface.toUpperCase();
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      // Pick the entry with the highest intersection ratio that's currently above threshold
+      let best = null;
+      entries.forEach(e => {
+        if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) {
+          best = e;
+        }
+      });
+      if (best) activate(best.target.dataset.surface);
+    }, {
+      threshold: [0.5, 0.75],
+      rootMargin: '-20% 0px -20% 0px'
+    });
+
+    cards.forEach(c => io.observe(c));
+
+    // Click for tap-friendly fallback (mobile sticky doesn't stick when stacked)
+    cards.forEach(c => c.addEventListener('click', () => activate(c.dataset.surface)));
   })();
 
   // ---- DSL live search demo ---------------------------------------------
@@ -1513,7 +1852,7 @@
       { kind: 'code',  text: '// FIXME: 大きな blob を扱う', source: 'Cursor', age: 2.2 },
       { kind: 'text',  text: '会議: 15時にクリップボード UX レビュー', source: 'メモ', age: 0.3 },
       { kind: 'text',  text: 'Pasty — Paste の代わりに · 出荷!', source: 'Things', age: 0.9 },
-      { kind: 'text',  text: '{"version":"0.2.2","license":"MIT"}', source: 'ターミナル', age: 0.05 },
+      { kind: 'text',  text: '{"version":"0.4.12","license":"MIT"}', source: 'ターミナル', age: 0.05 },
       { kind: 'image', text: 'スクリーンショット 2026-06-13 11.55 — 2.3 MB', source: 'Screenshot', age: 0.02 },
       { kind: 'file',  text: 'Pasty.dmg', source: 'Finder', age: 0.01 },
       { kind: 'text',  text: 'TODO: リファクタ Hello pasty rocks!', source: 'メモ', age: 1.5 },

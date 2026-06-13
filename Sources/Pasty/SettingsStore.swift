@@ -157,29 +157,12 @@ final class SettingsStore: ObservableObject {
     }
 
     enum PrimarySurface: String, CaseIterable, Identifiable {
-        case spotlight
         case strip
 
         var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .spotlight: return "Spotlight modal (centred)"
-            case .strip:     return "Bottom strip (carousel)"
-            }
-        }
-        var iconName: String {
-            switch self {
-            case .spotlight: return "rectangle.center.inset.filled"
-            case .strip:     return "rectangle.bottomthird.inset.filled"
-            }
-        }
-
-        var jpLabel: String {
-            switch self {
-            case .strip:     return "下部ストリップ（メイン）"
-            case .spotlight: return "Spotlight モーダル（検索特化）"
-            }
-        }
+        var label: String { "Bottom strip (carousel)" }
+        var iconName: String { "rectangle.bottomthird.inset.filled" }
+        var jpLabel: String { "下部ストリップ（メイン）" }
     }
 
     var isPaused: Bool {

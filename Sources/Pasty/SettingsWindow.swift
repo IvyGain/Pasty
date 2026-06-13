@@ -100,16 +100,37 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("⇧⌘V で開くサーフェス") {
-                Picker("⇧⌘V で開く", selection: $settings.primarySurface) {
-                    ForEach(SettingsStore.PrimarySurface.allCases) { surface in
-                        Label(surface.jpLabel, systemImage: surface.iconName).tag(surface)
+            Section("呼び出し方") {
+                HStack(spacing: 12) {
+                    Image(systemName: "rectangle.bottomthird.inset.filled")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(.tint)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("下部ストリップ").font(.system(size: 13, weight: .semibold))
+                        Text("⇧⌘V / ⌥⇧V でいつでも呼び出せるメインサーフェス")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                .pickerStyle(.inline)
-                Text("⌥⇧V でもう一方のサーフェスを開きます。どちらも同じ履歴・選択状態を共有します。ノッチホバーは別途、画面上端でいつでも有効です。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(.tint)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Raycast 拡張で検索 (オプション)")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Raycast から「Pasty」を呼ぶと、検索・連続貼付・複数選択ができます。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Raycast Store を開く") {
+                            if let url = URL(string: "https://www.raycast.com/ivygain/pasty") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .controlSize(.small)
+                        .padding(.top, 4)
+                    }
+                }
             }
             Section("キャプチャ") {
                 Toggle("クリップボードを自動キャプチャ", isOn: $settings.capturingEnabled)

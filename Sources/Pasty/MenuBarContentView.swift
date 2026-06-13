@@ -74,16 +74,15 @@ struct MenuBarContentView: View {
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            let primary = settings.primarySurface
-            row(title: "\(primary == .strip ? "ストリップを開く" : "Spotlight を開く")  ⇧⌘V",
-                systemImage: primary.iconName) {
+            row(title: "ストリップを開く  ⇧⌘V",
+                systemImage: SettingsStore.PrimarySurface.strip.iconName) {
                 coordinator.togglePrimary()
             }
-            row(title: "\(primary == .strip ? "Spotlight を開く" : "ストリップを開く")  ⌥⇧V",
-                systemImage: (primary == .strip
-                              ? SettingsStore.PrimarySurface.spotlight.iconName
-                              : SettingsStore.PrimarySurface.strip.iconName)) {
-                coordinator.toggleSecondary()
+            row(title: "Raycast で検索…",
+                systemImage: "magnifyingglass") {
+                if let url = URL(string: "raycast://extensions/ivygain/pasty/search-clips") {
+                    NSWorkspace.shared.open(url)
+                }
             }
             row(title: settings.isPaused ? "キャプチャを再開" : "60 秒間 一時停止",
                 systemImage: settings.isPaused ? "play.circle" : "pause.circle") {

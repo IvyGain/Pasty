@@ -150,6 +150,9 @@ final class NotchHoverController: NSObject {
         // .nonactivatingPanel なので、makeKey しても直前のフォーカスアプリは
         // 入れ替わらない (ユーザー視点では元のアプリがアクティブのまま)。
         panel.makeKey()
+        // ドロップダウン中は trigger panel が statusBar レベルで
+        // ヘッダー上の操作 (フォルダタブクリック等) を奪うので一旦退避させる。
+        for tp in triggerPanels { tp.orderOut(nil) }
         dropdownPanel = panel
         pointerEnteredOnce = false
 
@@ -177,7 +180,13 @@ final class NotchHoverController: NSObject {
             panel.animator().setFrame(collapsed, display: true)
         }, completionHandler: { [weak self] in
             panel.orderOut(nil)
-            Task { @MainActor [weak self] in self?.dropdownPanel = nil }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.dropdownPanel = nil
+                // ドロップダウン終了後に trigger panel を復活させて
+                // 次のホバー検出を再開できるようにする。
+                for tp in self.triggerPanels { tp.orderFrontRegardless() }
+            }
         })
     }
 

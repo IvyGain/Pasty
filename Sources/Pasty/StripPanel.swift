@@ -134,8 +134,11 @@ struct StripView: View {
             // 折り畳み式の検索バー (アイコンのみ → クリック/フォーカスで展開)
             ModernSearchField(text: $query, collapsible: true, expandedWidth: 280)
 
-            // 履歴タブ + フォルダタブを同じ行に統合 (横スクロール)
+            // 履歴タブ + フォルダタブを同じ行に統合 (横スクロール可能)
+            // 右側の他要素を押し出さないよう layoutPriority 0 + frame(minWidth) で柔軟に縮める。
             inlineFolderStrip
+                .layoutPriority(0)
+                .frame(minWidth: 0)
 
             Spacer(minLength: 8)
 
@@ -247,9 +250,10 @@ struct StripView: View {
                 .buttonStyle(.plain)
                 .help("新しいフォルダ")
             }
+            .padding(.horizontal, 2)
         }
-        .scrollClipDisabled()
-        .frame(maxWidth: 360, alignment: .leading)
+        // scrollClipDisabled() / maxWidth は撤去。ScrollView の clip 内に
+        // 全タブが収まり、HStack の親フレーム内でヒットテストされる。
     }
 
     /// shadcn セグメント風の種類フィルタチップ。
@@ -1120,6 +1124,15 @@ private struct StripCard: View {
         Group {
             if clip.kind == .image, let p = clip.dataPath,
                let img = ImageBlobCache.shared.image(for: p) {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
+            } else if clip.kind == .file,
+                      let img = FileImageThumbnailCache.shared.image(for: clip) {
+                // 画像ファイル (CleanShot 等のスクショ、png/jpg/heic 等) を実プレビュー表示
                 Image(nsImage: img)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

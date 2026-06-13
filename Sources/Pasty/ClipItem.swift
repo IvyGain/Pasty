@@ -45,3 +45,34 @@ struct ClipItem: Identifiable, Codable, FetchableRecord, MutablePersistableRecor
         id = inserted.rowID
     }
 }
+
+// MARK: - Shared utilities (kept here after SpotlightPanel.swift was removed)
+
+import AppKit
+
+enum CurrentInput {
+    @MainActor static var modifierFlags: NSEvent.ModifierFlags {
+        NSApp.currentEvent?.modifierFlags ?? []
+    }
+}
+
+extension ClipKind {
+    /// SF Symbol name used wherever a clip needs an icon fallback.
+    var iconName: String {
+        switch self {
+        case .text: return "text.alignleft"
+        case .richText: return "textformat"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .link: return "link"
+        case .color: return "paintpalette"
+        case .other: return "questionmark.square"
+        }
+    }
+}
+
+extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
+    }
+}

@@ -9,7 +9,7 @@ final class PanelCoordinator: ObservableObject {
     private let stack: PasteStack
     private let selection: SelectionModel
 
-    private var spotlight: SpotlightPanel?
+    // SpotlightPanel は Raycast 拡張に責務移譲済み。Pasty 本体には残らない。
     private var strip: StripPanel?
     let notch: NotchHoverController
 
@@ -116,7 +116,7 @@ final class PanelCoordinator: ObservableObject {
     /// surface a toast asking the user to open Pasty first.
     func runAIActionFromGlobalHotkey(_ action: AIAction) {
         let items = store.recent
-        let panelOpen = (strip?.isVisible == true) || (spotlight?.isVisible == true)
+        let panelOpen = (strip?.isVisible == true)
 
         let target: ClipItem?
         if panelOpen, items.indices.contains(selection.cursorIndex) {
@@ -140,17 +140,13 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func togglePrimary() {
-        switch SettingsStore.shared.primarySurface {
-        case .spotlight: toggleSpotlight()
-        case .strip:     toggleStrip()
-        }
+        toggleStrip()
     }
 
+    /// `⌥⇧V` 用のセカンダリ。Spotlight モーダルが Raycast 拡張に移ったため、
+    /// セカンダリも Strip トグルにする (ユーザーが既存のキーを温存しても困らない)。
     func toggleSecondary() {
-        switch SettingsStore.shared.primarySurface {
-        case .spotlight: toggleStrip()
-        case .strip:     toggleSpotlight()
-        }
+        toggleStrip()
     }
 
     func installNotchHover() {
@@ -159,44 +155,11 @@ final class PanelCoordinator: ObservableObject {
         }
     }
 
-    // MARK: - Spotlight
-
-    func toggleSpotlight() {
-        if let s = spotlight, s.isVisible { dismissSpotlight() }
-        else { showSpotlight() }
-    }
-
-    func showSpotlight() {
-        recordSummonPoint()
-        let panel = spotlight ?? makeSpotlight()
-        spotlight = panel
-        positionAtCursorScreen(panel: panel, fractionFromTop: 0.30)
-        // NSApp.activate(...) は呼ばない。直前アプリのフォーカスを温存することで
-        // 「Pastyに戻ってから貼付」の遷移時に元アプリのキャレット位置が消えない。
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    func dismissSpotlight() {
-        spotlight?.orderOut(nil)
-    }
-
-    private func makeSpotlight() -> SpotlightPanel {
-        let panel = SpotlightPanel()
-        let view = SpotlightView(
-            store: store,
-            pinboards: pinboards,
-            stack: stack,
-            selection: selection,
-            onDismiss: { [weak self] in self?.dismissSpotlight() },
-            onOpenSettings: { [weak self] in self?.openSettings() }
-        )
-        let hosting = NSHostingController(rootView: view)
-        // パネルのサイズに追随させる。明示サイズなしだと SwiftUI の intrinsic
-        // が極端に細長くなり日本語で縦書きのように崩れる。
-        hosting.sizingOptions = [.minSize, .intrinsicContentSize]
-        hosting.view.translatesAutoresizingMaskIntoConstraints = false
-        panel.contentViewController = hosting
-        return panel
+    /// Esc 時の共通ハンドラ。Strip / Notch ドロップダウンを全部畳んで、
+    /// フォーカスを直前アプリに返す。Spotlight は Raycast 拡張に移行済み。
+    func dismissAll() {
+        strip?.orderOut(nil)
+        notch.dismiss()
     }
 
     // MARK: - Strip
@@ -236,7 +199,7 @@ final class PanelCoordinator: ObservableObject {
             pinboards: pinboards,
             stack: stack,
             selection: selection,
-            onDismiss: { [weak self] in self?.dismissStrip() },
+            onDismiss: { [weak self] in self?.dismissAll() },
             onOpenSettings: { [weak self] in self?.openSettings() }
         )
         let hosting = NSHostingController(rootView: view)
@@ -250,7 +213,6 @@ final class PanelCoordinator: ObservableObject {
     /// メニューバーの "Settings…" と同じ振る舞いをパネルから呼べる。
     func openSettings() {
         // パネルを片付けてから設定画面を出す（重なり防止）
-        dismissSpotlight()
         dismissStrip()
         NotificationCenter.default.post(name: .pastyOpenSettings, object: nil)
     }
