@@ -2,7 +2,7 @@ import { Grid, Icon, Color, Action, ActionPanel } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { recentImages, dbExists, dbFile } from "./lib/db";
 import { imageFilePath, relativeTime, shortBytes } from "./lib/format";
-import { pasteAndClose, pasteAndStay, copyAndClose } from "./lib/multipaste";
+import { pasteAndClose, pasteAndKeepState, copyAndClose } from "./lib/multipaste";
 import type { ClipRow } from "./lib/types";
 
 export default function Command() {
@@ -67,7 +67,7 @@ export default function Command() {
                   title="Paste & Stay"
                   icon={Icon.Repeat}
                   shortcut={{ modifiers: ["opt"], key: "return" }}
-                  onAction={() => pasteAndStay(clip)}
+                  onAction={() => pasteAndKeepState(clip)}
                 />
                 <Action
                   title="Copy & Close"

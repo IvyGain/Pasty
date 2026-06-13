@@ -647,20 +647,20 @@ struct StripView: View {
             onCmdReturn:    { pasteSelected(join: true) },
             onEsc:          { onEsc() },
             onNumber:       { n in pasteByIndex(n) },
-            onSpace:        { showQuickLook() },
+            onSpace:        { selection.toggleCursor(in: items) },
             onTab:          { cycleFolder(by: 1) },
             onShiftTab:     { cycleFolder(by: -1) },
             onShiftUp:      { selection.extend(by: -1, in: items) },
             onShiftDown:    { selection.extend(by:  1, in: items) },
             onShiftLeft:    { selection.extend(by: -1, in: items) },
             onShiftRight:   { selection.extend(by:  1, in: items) },
-            onX:            { selection.toggleCursor(in: items) },
             onCmdA:         { selection.selectAll(in: items) },
             onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
+            onCmdD:         { selection.clearAll() },
             onCmdI:         { showAIMenu() },
             onCmdComma:     { onOpenSettings() },
             onCmdP:         { SettingsStore.shared.explorerMode.toggle() },
-            onCmdSpace:     { selection.toggleCursor(in: items) },
+            onCmdY:         { showQuickLook() },
             onCmdQuestion:  { HelpOverlayPresenter.shared.toggle() },
             onCtrlShiftR:   { runAI(.rewrite(tone: .formal)) },
             onCtrlShiftT:   { runAI(.translate(target: .auto)) },
@@ -728,7 +728,10 @@ struct StripView: View {
     }
 
     private func onReturn(plain: Bool) {
-        if selection.hasSelection { pasteSelected(join: false, plain: plain) }
+        // 動的 Enter: 選択が 2 件以上なら結合貼付 (改行で繋いで末尾改行)、
+        // 0 または 1 件なら通常の単体貼付。Raycast 拡張側と挙動を揃える。
+        if selection.count >= 2 { pasteSelected(join: true, plain: plain) }
+        else if selection.hasSelection { pasteSelected(join: false, plain: plain) }
         else                       { pasteCurrent(plain: plain) }
     }
 

@@ -94,10 +94,11 @@ export function detailMarkdown(clip: ClipRow): string {
  * extension without opening the action panel.
  */
 export const GUIDE_LINES = [
-  "Enter — 貼付 (複数選択は結合貼付)",
-  "Space — 複数選択トグル",
+  "Enter — 貼付 (複数選択は改行で結合)",
+  "⌥Enter — 貼付 + 状態維持 (⌘Space で続行)",
+  "⇧Enter — 貼付 + 末尾改行 (Slack 送信)",
+  "Space — 選択トグル",
   "⌘A / ⌘D — 全選択 / 解除",
-  "⌥Enter — 連続貼付 (閉じない)",
-  "⌘[ / ⌘] — フォルダ切替",
+  "Tab / ⇧Tab (or ⌘[ ⌘]) — フォルダ切替",
   "⌘K — 全アクション一覧",
 ];

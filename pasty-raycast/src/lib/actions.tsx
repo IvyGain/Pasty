@@ -1,6 +1,14 @@
 import { Action, ActionPanel, Icon, Keyboard } from "@raycast/api";
 import type { ClipRow, PinboardRow } from "./types";
-import { pasteAndClose, pasteAndStay, copyAndClose, pasteJoined } from "./multipaste";
+import {
+  pasteAndClose,
+  pasteAndKeepState,
+  pasteAndSubmit,
+  pasteSubmitAndKeepState,
+  pasteJoined,
+  pasteJoinedAndKeepState,
+  copyAndClose,
+} from "./multipaste";
 
 interface Props {
   clip: ClipRow;
@@ -8,7 +16,6 @@ interface Props {
   onToggleSelect: (id: number) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
-  /** Optional folder cycling — only render if both supplied. */
   folders?: PinboardRow[];
   currentFolderId?: string;
   onChangeFolder?: (folderId: string) => void;
@@ -17,13 +24,24 @@ interface Props {
 /**
  * Shared action panel.
  *
- * Behavior summary:
- * - Enter: 選択が 2 件以上なら全て改行で繋いで貼付、それ以外は単一クリップを貼付
- * - ⌥Enter: 単一クリップを貼付して **画面を閉じない** (連続貼付モード)
- * - Space: 現在の項目を複数選択トグル (検索バーが空の時のみ反応)
- * - ⌘A / ⌘D: 全選択 / 解除
- * - ⌘C: クリップボードに置くだけ (貼付しない)
- * - ⌘[ / ⌘]: フォルダを前後に切替 (folders 引数がある場合のみ)
+ * Keys (single clip):
+ *  - Enter      : 貼付 + 閉じる
+ *  - ⌥Enter     : 貼付 + 状態維持 (次回 ⌘Space で続行)
+ *  - ⇧Enter     : 貼付 + 末尾 Enter (Slack/Discord で送信)
+ *  - ⌥⇧Enter    : 貼付 + 末尾 Enter + 状態維持
+ *  - ⌘C         : クリップボードに置くだけ
+ *
+ * Keys (multi-select, ≥ 2 件):
+ *  - Enter      : 改行で結合 + 末尾改行 → 1 度に貼付
+ *  - ⌥Enter     : 同上 + 状態維持
+ *  - ⌘Enter     : 同上 (selection 強制)
+ *
+ * Keys (selection):
+ *  - Space      : 選択トグル
+ *  - ⌘A / ⌘D    : 全選択 / 解除
+ *
+ * Keys (folder):
+ *  - Tab / ⇧Tab : フォルダ前後切替 (Tab が動かない場合 ⌘] / ⌘[ にフォールバック)
  */
 export function ClipActions({
   clip,
@@ -36,29 +54,41 @@ export function ClipActions({
   onChangeFolder,
 }: Props) {
   const count = selectedClips.length;
-  const multiMode = count >= 2;
-
-  const defaultTitle = multiMode ? `Paste ${count} Clips (joined)` : "Paste";
+  const multi = count >= 2;
 
   return (
     <ActionPanel>
       <ActionPanel.Section title="Paste">
         <Action
-          title={defaultTitle}
-          icon={multiMode ? Icon.Stack : Icon.ArrowDownCircle}
-          onAction={() => (multiMode ? pasteJoined(selectedClips) : pasteAndClose(clip))}
+          title={multi ? `Paste ${count} Clips (joined)` : "Paste"}
+          icon={multi ? Icon.Stack : Icon.ArrowDownCircle}
+          onAction={() => (multi ? pasteJoined(selectedClips) : pasteAndClose(clip))}
         />
         <Action
-          title="Paste & Stay (continuous)"
+          title={multi ? `Paste ${count} & Keep State` : "Paste & Keep State"}
           icon={Icon.Repeat}
           shortcut={{ modifiers: ["opt"], key: "return" } as Keyboard.Shortcut}
-          onAction={() => pasteAndStay(clip)}
+          onAction={() =>
+            multi ? pasteJoinedAndKeepState(selectedClips) : pasteAndKeepState(clip)
+          }
         />
-        {multiMode && (
+        <Action
+          title="Paste & Submit (append Enter)"
+          icon={Icon.Reply}
+          shortcut={{ modifiers: ["shift"], key: "return" } as Keyboard.Shortcut}
+          onAction={() => pasteAndSubmit(clip)}
+        />
+        <Action
+          title="Paste, Submit & Keep State"
+          icon={Icon.Forward}
+          shortcut={{ modifiers: ["opt", "shift"], key: "return" } as Keyboard.Shortcut}
+          onAction={() => pasteSubmitAndKeepState(clip)}
+        />
+        {multi && (
           <Action
-            title={`Paste ${count} in Sequence`}
-            icon={Icon.List}
-            shortcut={{ modifiers: ["cmd", "opt"], key: "return" } as Keyboard.Shortcut}
+            title={`Paste ${count} as a Single Block`}
+            icon={Icon.Stack}
+            shortcut={{ modifiers: ["cmd"], key: "return" } as Keyboard.Shortcut}
             onAction={() => pasteJoined(selectedClips)}
           />
         )}
@@ -106,6 +136,18 @@ export function ClipActions({
             title="Next Folder"
             icon={Icon.ArrowRight}
             shortcut={{ modifiers: ["cmd"], key: "]" } as Keyboard.Shortcut}
+            onAction={() => onChangeFolder(nextFolderId(folders, currentFolderId))}
+          />
+          <Action
+            title="Previous Folder (tab)"
+            icon={Icon.ArrowLeft}
+            shortcut={{ modifiers: ["shift"], key: "tab" } as Keyboard.Shortcut}
+            onAction={() => onChangeFolder(prevFolderId(folders, currentFolderId))}
+          />
+          <Action
+            title="Next Folder (tab)"
+            icon={Icon.ArrowRight}
+            shortcut={{ modifiers: [], key: "tab" } as Keyboard.Shortcut}
             onAction={() => onChangeFolder(nextFolderId(folders, currentFolderId))}
           />
         </ActionPanel.Section>

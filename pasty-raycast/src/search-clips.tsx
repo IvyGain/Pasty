@@ -87,7 +87,7 @@ export default function Command() {
     <List
       isShowingDetail
       isLoading={loading}
-      searchBarPlaceholder="クリップを検索 — Space で複数選択 / ⌘[ ⌘] でフォルダ切替"
+      searchBarPlaceholder="検索 — ↑↓ 移動 / Space 選択 / Enter 貼付 / ⌥Enter 状態維持"
       onSearchTextChange={setQuery}
       throttle
       searchBarAccessory={

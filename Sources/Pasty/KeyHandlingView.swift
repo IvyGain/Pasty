@@ -21,7 +21,6 @@ struct KeyHandlingView: NSViewRepresentable {
     var onShiftDown: () -> Void = {}
     var onShiftLeft: () -> Void = {}
     var onShiftRight: () -> Void = {}
-    var onX: () -> Void = {}
     var onCmdA: () -> Void = {}
     var onCmdE: () -> Void = {}
     var onCmdR: () -> Void = {}
@@ -32,7 +31,7 @@ struct KeyHandlingView: NSViewRepresentable {
     var onCmdM: () -> Void = {}
     var onCmdComma: () -> Void = {}
     var onCmdP: () -> Void = {}
-    var onCmdSpace: () -> Void = {}
+    var onCmdY: () -> Void = {}
     var onCmdQuestion: () -> Void = {}
     var onCtrlShiftR: () -> Void = {}
     var onCtrlShiftT: () -> Void = {}
@@ -79,8 +78,8 @@ struct KeyHandlingView: NSViewRepresentable {
                 v.onReturn(); return
             case 53: v.onEsc(); return
             case 49:
-                // ⌘Space は複数選択トグル、Space 単独は Quick Look
-                if cmd { v.onCmdSpace() } else { v.onSpace() }
+                // Space は選択トグル (Raycast 互換 UX)。Quick Look は ⌘Y。
+                if !cmd, !opt, !ctrl { v.onSpace() }
                 return
             case 48: shift ? v.onShiftTab() : v.onTab(); return
             case 51, 117: v.onDelete(); return
@@ -101,10 +100,6 @@ struct KeyHandlingView: NSViewRepresentable {
                 v.onCmdQuestion(); return
             }
             if let chars = event.charactersIgnoringModifiers {
-                // 単独 `X` / `x` — カーソル位置のクリップを複数選択トグル
-                if !cmd, !ctrl, !opt, chars.lowercased() == "x" {
-                    v.onX(); return
-                }
                 if cmd, chars.count == 1, let digit = Int(chars), (1...9).contains(digit) {
                     v.onNumber(digit); return
                 }
@@ -119,6 +114,7 @@ struct KeyHandlingView: NSViewRepresentable {
                     case "i": v.onCmdI(); return
                     case "m": v.onCmdM(); return
                     case "p": v.onCmdP(); return
+                    case "y": v.onCmdY(); return
                     case ",": v.onCmdComma(); return
                     default: break
                     }

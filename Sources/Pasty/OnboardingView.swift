@@ -50,17 +50,22 @@ struct OnboardingView: View {
                 body: AnyView(accessibilityBody)
             ),
             OnboardingStep(
-                badge: "05", title: "フォルダで定型文を倉庫化",
-                subtitle: "履歴 + 色付きフォルダで、繰り返し使う文章をワンクリックで貼付。",
+                badge: "05", title: "フォルダで分類する",
+                subtitle: "ヘッダー右の「+」ボタンで新しいフォルダを作成。Tab / ⇧Tab でフォルダを順に切り替えられます。",
                 body: AnyView(folderBody)
             ),
             OnboardingStep(
-                badge: "06", title: "キーボードだけで完結する",
+                badge: "06", title: "クリップをフォルダに入れる 3 つの方法",
+                subtitle: "履歴のクリップは、ドラッグ・右クリック・複数選択 → 一括移動 のいずれかでフォルダに振り分けられます。",
+                body: AnyView(clipToFolderBody)
+            ),
+            OnboardingStep(
+                badge: "07", title: "キーボードだけで完結する",
                 subtitle: "マウスを使わずに探す、選ぶ、貼る。生産性は手元から逃げない。",
                 body: AnyView(keyboardBody)
             ),
             OnboardingStep(
-                badge: "07", title: "準備完了。",
+                badge: "08", title: "準備完了。",
                 subtitle: "あとは ⇧⌘V でいつでも Pasty を呼んでください。",
                 body: AnyView(completeBody)
             )
@@ -273,39 +278,183 @@ struct OnboardingView: View {
     }
 
     private var folderBody: some View {
-        HStack(spacing: 12) {
-            ForEach(["7C8CF8", "F8AA7C", "7CF88C", "F87CE0"], id: \.self) { hex in
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(hex: "#\(hex)").opacity(0.18))
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 36, weight: .regular))
-                        .foregroundStyle(Color(hex: "#\(hex)"))
-                        .symbolRenderingMode(.hierarchical)
+        // フォルダタブ + 「+ 新しいフォルダ」 のヘッダー風モック
+        let samples: [(String, String, Int, Bool)] = [
+            ("Inbox", "7C8CF8", 24, true),
+            ("Work",  "F8AA7C", 12, false),
+            ("Code",  "7CF88C",  7, false),
+            ("Refs",  "F87CE0",  3, false)
+        ]
+        return VStack(spacing: 18) {
+            // 上段: ヘッダー風タブ + 新規作成ボタン
+            HStack(spacing: 8) {
+                ForEach(samples, id: \.0) { sample in
+                    ModernFolderTab(
+                        name: sample.0,
+                        colorHex: sample.1,
+                        systemImage: nil,
+                        count: sample.2,
+                        isSelected: sample.3,
+                        action: {}
+                    )
                 }
-                .frame(width: 80, height: 80)
-                .shadow(color: Color(hex: "#\(hex)").opacity(0.3), radius: 8, x: 0, y: 4)
+                Spacer(minLength: 8)
+                // ダッシュド「+ 新しいフォルダ」 pill
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("新しいフォルダ")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule(style: .continuous)
+                        .stroke(
+                            Color.primary.opacity(0.22),
+                            style: StrokeStyle(lineWidth: 1, dash: [3.5, 3])
+                        )
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 24)
+
+            // 下段: ヒント "Tab / ⇧Tab で切替"
+            HStack(spacing: 10) {
+                kbInlineCap("Tab")
+                Text("/")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                kbInlineCap("⇧Tab")
+                Text("でフォルダを順に切り替え")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(height: 220)
     }
 
+    private var clipToFolderBody: some View {
+        HStack(spacing: 16) {
+            clipToFolderCard(
+                number: "1",
+                icon: "rectangle.and.hand.point.up.left.fill",
+                tint: Color(hex: "#7C8CF8"),
+                title: "ドラッグ",
+                description: "履歴のクリップカードを\nフォルダタブに直接ドラッグ"
+            )
+            clipToFolderCard(
+                number: "2",
+                icon: "contextualmenu.and.cursorarrow",
+                tint: Color(hex: "#F8AA7C"),
+                title: "右クリック",
+                description: "クリップを右クリック →\n「○○ へ移動」を選ぶ"
+            )
+            clipToFolderCard(
+                number: "3",
+                icon: "checklist",
+                tint: Color(hex: "#7CF88C"),
+                title: "複数選択",
+                description: "Space で複数選んで\n右クリック → 一括移動"
+            )
+        }
+        .frame(height: 220)
+    }
+
+    private func clipToFolderCard(
+        number: String,
+        icon: String,
+        tint: Color,
+        title: String,
+        description: String
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            // カード本体
+            VStack(spacing: 10) {
+                Spacer(minLength: 0)
+                Image(systemName: icon)
+                    .font(.system(size: 36, weight: .regular))
+                    .foregroundStyle(tint)
+                    .symbolRenderingMode(.hierarchical)
+                Text(title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(description)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .lineSpacing(2)
+                    .padding(.horizontal, 8)
+                Spacer(minLength: 0)
+            }
+            .frame(width: 200, height: 160)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(tint.opacity(0.25), lineWidth: 1)
+            )
+            .shadow(color: tint.opacity(0.18), radius: 12, x: 0, y: 6)
+
+            // 番号バッジ
+            Text(number)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.85))
+                )
+                .offset(x: 10, y: 10)
+        }
+        .frame(width: 200, height: 160)
+    }
+
+    private func kbInlineCap(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(Color.primary.opacity(0.14), lineWidth: 0.5)
+            )
+    }
+
     private var keyboardBody: some View {
         // 2 列に分けて 220pt 程度に収める
         let leftRows: [(String, String)] = [
-            ("⇧⌘V", "Pasty を呼び出す"),
+            ("⇧⌘V", "Pasty を呼ぶ"),
             ("← / →", "前後のクリップへ移動"),
-            ("Tab / ⇧Tab", "フォルダを切り替える"),
-            ("Space", "プレビュー"),
-            ("Return", "貼付"),
-            ("⌘?", "ショートカット早見表")
+            ("Tab / ⇧Tab", "フォルダ切替"),
+            ("Enter", "貼付"),
+            ("⌘Enter", "結合貼付"),
+            ("⌘?", "ヘルプ")
         ]
         let rightRows: [(String, String)] = [
+            ("Space", "選択トグル"),
+            ("⌘A / ⌘D", "全選択 / 解除"),
             ("⇧← / ⇧→", "範囲選択"),
-            ("X", "選択トグル"),
-            ("⌘A", "全選択"),
-            ("⌘1〜9", "番号で即貼付"),
-            ("⌘Return", "結合して貼付")
+            ("⌘Y", "Quick Look"),
+            ("⌘⇧V", "再呼出")
         ]
         return HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
