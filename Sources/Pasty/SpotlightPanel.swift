@@ -1,12 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// Spotlight / Raycast-style center modal. Owned by `PanelCoordinator`,
-/// shown by ⇧⌘V, dismissed by Esc or by pasting an item.
+/// Spotlight / Raycast 風の中央モーダル。
 @MainActor
 final class SpotlightPanel: NSPanel {
     init() {
-        let rect = NSRect(x: 0, y: 0, width: 720, height: 460)
+        let rect = NSRect(x: 0, y: 0, width: 720, height: 480)
         super.init(
             contentRect: rect,
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -23,6 +22,7 @@ final class SpotlightPanel: NSPanel {
         animationBehavior = .utilityWindow
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isReleasedWhenClosed = false
+        becomesKeyOnlyIfNeeded = false
     }
 
     override var canBecomeKey: Bool { true }
@@ -34,20 +34,26 @@ struct SpotlightView: View {
     @ObservedObject var store: ClipStore
     @ObservedObject var pinboards: PinboardStore
     @ObservedObject var stack: PasteStack
+    @ObservedObject var selection: SelectionModel
     @State private var query: String = ""
     @State private var results: [ClipItem] = []
-    @State private var selectedIndex: Int = 0
     @FocusState private var searchFocused: Bool
     let onDismiss: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             searchBar
             Divider().opacity(0.3)
             content
+            if selection.hasSelection {
+                Divider().opacity(0.3)
+                multiSelectBar
+            }
             Divider().opacity(0.3)
             footer
         }
+        .frame(width: 720, alignment: .topLeading)
         .background(VisualEffectBackground())
         .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
         .overlay(
@@ -56,22 +62,25 @@ struct SpotlightView: View {
         )
         .onAppear {
             searchFocused = true
+            selection.clearAll()
             reload(initial: true)
         }
         .onChange(of: query) { _, _ in reload() }
         .onChange(of: store.recent) { _, _ in reload() }
     }
 
+    // MARK: - Search
+
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            TextField("Search clipboard…  try type:link  source:Safari  /regex/", text: $query)
+            TextField("Search clipboard…  type:link  source:Safari  /regex/", text: $query)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($searchFocused)
-                .onSubmit { paste(plain: false) }
+                .onSubmit { pasteCurrent(plain: false) }
             if !query.isEmpty {
                 Button(action: { query = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -79,6 +88,13 @@ struct SpotlightView: View {
                 }
                 .buttonStyle(.plain)
             }
+            Button(action: onOpenSettings) {
+                Image(systemName: "gearshape")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Settings…  ⌘,")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -94,34 +110,72 @@ struct SpotlightView: View {
                         ForEach(Array(results.enumerated()), id: \.element.id) { idx, clip in
                             SpotlightRow(
                                 clip: clip,
-                                isSelected: idx == selectedIndex,
-                                index: idx + 1
+                                isCursor: idx == selection.cursorIndex,
+                                isSelected: selection.isSelected(clip.id ?? -1),
+                                index: idx + 1,
+                                onTap: { mods in handleTap(at: idx, modifiers: mods) }
                             )
                             .id(idx)
-                            .onTapGesture { selectedIndex = idx; paste(plain: false) }
                         }
                     }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
-            .frame(height: 340)
-            .onChange(of: selectedIndex) { _, new in
+            .frame(height: 320)
+            .onChange(of: selection.cursorIndex) { _, new in
                 withAnimation(.easeOut(duration: 0.12)) {
                     proxy.scrollTo(new, anchor: .center)
                 }
             }
             .background(KeyHandlingView(
-                onUp: { move(-1) },
-                onDown: { move(1) },
-                onReturn: { paste(plain: false) },
-                onShiftReturn: { paste(plain: true) },
-                onEsc: { onDismiss() },
-                onNumber: { n in pasteByIndex(n) },
-                onTab: { /* form-switch hook – P2 */ },
-                onCmdE: { /* edit hook – P3 */ }
+                onUp:           { selection.moveCursor(by: -1, in: results) },
+                onDown:         { selection.moveCursor(by:  1, in: results) },
+                onReturn:       { onReturn(plain: false) },
+                onShiftReturn:  { onReturn(plain: true) },
+                onOptionReturn: { pasteSelected(join: true) },
+                onEsc:          { onEsc() },
+                onNumber:       { n in pasteByIndex(n) },
+                onSpace:        { selection.toggleCursor(in: results) },
+                onShiftUp:      { selection.extend(by: -1, in: results) },
+                onShiftDown:    { selection.extend(by:  1, in: results) },
+                onCmdA:         { selection.selectAll(in: results) },
+                onCmdComma:     { onOpenSettings() }
             ))
         }
+    }
+
+    private var multiSelectBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.tint)
+            Text("\(selection.count) selected")
+                .font(.callout.weight(.medium))
+            Spacer()
+            Button("Clear") { selection.clearAll() }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+            Button {
+                pasteSelected(join: false)
+            } label: {
+                Label("Paste each (⌘V × N)", systemImage: "doc.on.doc")
+                    .font(.callout)
+            }
+            .buttonStyle(.borderless)
+            Button {
+                pasteSelected(join: true)
+            } label: {
+                Label("Paste joined (⌥↩)", systemImage: "arrow.down.doc")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.accentColor.opacity(0.18))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
     private var emptyState: some View {
@@ -139,18 +193,18 @@ struct SpotlightView: View {
 
     private var footer: some View {
         HStack(spacing: 14) {
-            shortcutLabel("↩", "Paste")
-            shortcutLabel("⇧↩", "Plain")
-            shortcutLabel("⌘1-9", "Quick")
-            shortcutLabel("␣", "Preview")
-            shortcutLabel("⌘E", "Edit")
+            shortcutLabel("↩",    selection.hasSelection ? "Paste each" : "Paste")
+            shortcutLabel("⌥↩",   "Joined")
+            shortcutLabel("⇧↩",  "Plain")
+            shortcutLabel("␣",   "Select")
+            shortcutLabel("⇧↑↓", "Range")
+            shortcutLabel("⌘A",  "All")
+            shortcutLabel("⌘1-9","Quick")
             Spacer()
             Text("\(results.count) shown · \(store.totalCount) total")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
     private func shortcutLabel(_ key: String, _ label: String) -> some View {
@@ -159,9 +213,7 @@ struct SpotlightView: View {
                 .font(.system(.caption, design: .monospaced).weight(.semibold))
                 .padding(.horizontal, 5).padding(.vertical, 1)
                 .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(label).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -170,12 +222,12 @@ struct SpotlightView: View {
     private func reload(initial: Bool = false) {
         let q = query
         Task { @MainActor in
+            let parsed = SearchQuery.parse(q)
             do {
-                let parsed = SearchQuery.parse(q)
                 let items = try await SearchEngine.run(parsed, store: store)
                 self.results = items
-                if initial || selectedIndex >= items.count {
-                    self.selectedIndex = items.isEmpty ? 0 : 0
+                if initial || selection.cursorIndex >= items.count {
+                    selection.cursorIndex = items.isEmpty ? 0 : 0
                 }
             } catch {
                 NSLog("Search failed: \(error)")
@@ -183,15 +235,44 @@ struct SpotlightView: View {
         }
     }
 
-    private func move(_ delta: Int) {
-        guard !results.isEmpty else { return }
-        let next = (selectedIndex + delta).clamped(to: 0...(results.count - 1))
-        selectedIndex = next
+    private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.shift) {
+            selection.shiftTap(at: index, in: results)
+            return
+        }
+        if modifiers.contains(.command) {
+            selection.commandTap(at: index, in: results)
+            return
+        }
+        let result = selection.tap(at: index, in: results)
+        switch result {
+        case .pasteSingle(let clip):
+            onDismiss()
+            PasteAutomator.shared.paste(clip)
+        case .toggled, .noop:
+            break
+        }
     }
 
-    private func paste(plain: Bool) {
-        guard !results.isEmpty else { return }
-        let clip = results[selectedIndex]
+    private func onReturn(plain: Bool) {
+        if selection.hasSelection {
+            pasteSelected(join: false, plain: plain)
+        } else {
+            pasteCurrent(plain: plain)
+        }
+    }
+
+    private func onEsc() {
+        if selection.hasSelection {
+            selection.clearAll()
+        } else {
+            onDismiss()
+        }
+    }
+
+    private func pasteCurrent(plain: Bool) {
+        guard results.indices.contains(selection.cursorIndex) else { return }
+        let clip = results[selection.cursorIndex]
         onDismiss()
         PasteAutomator.shared.paste(clip, asPlainText: plain)
     }
@@ -199,30 +280,57 @@ struct SpotlightView: View {
     private func pasteByIndex(_ n: Int) {
         let idx = n - 1
         guard results.indices.contains(idx) else { return }
-        selectedIndex = idx
-        paste(plain: false)
+        selection.cursorIndex = idx
+        pasteCurrent(plain: false)
+    }
+
+    private func pasteSelected(join: Bool, plain: Bool = false) {
+        let items = selection.selectedItems(from: results)
+        guard !items.isEmpty else { return }
+        onDismiss()
+        if join {
+            PasteAutomator.shared.pasteSequence(
+                items, asPlainText: plain,
+                strategy: .join(separator: "\n")
+            )
+        } else {
+            PasteAutomator.shared.pasteSequence(
+                items, asPlainText: plain,
+                strategy: .sequence(delayBetween: 0.12)
+            )
+        }
     }
 }
 
 @MainActor
 private struct SpotlightRow: View {
     let clip: ClipItem
+    let isCursor: Bool
     let isSelected: Bool
     let index: Int
+    let onTap: (NSEvent.ModifierFlags) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
+            // 選択チェック or 番号
             ZStack {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color.accentColor.opacity(isSelected ? 0.25 : 0.12))
-                    .frame(width: 22, height: 22)
-                Text(index <= 9 ? "\(index)" : "•")
-                    .font(.caption2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.primary)
+                if isSelected {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                } else {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.opacity(isCursor ? 0.25 : 0.10))
+                        .frame(width: 22, height: 22)
+                    Text(index <= 9 ? "\(index)" : "•")
+                        .font(.caption2.monospacedDigit().weight(.semibold))
+                }
             }
             Image(systemName: clip.kind.iconName)
-                .foregroundStyle(.tint)
-                .frame(width: 18)
+                .foregroundStyle(.tint).frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(clip.preview)
                     .font(PastyTheme.titleFont)
@@ -243,13 +351,29 @@ private struct SpotlightRow: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10).padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
-                .fill(Color.accentColor.opacity(isSelected ? 0.2 : 0))
+                .fill(rowBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
+                .strokeBorder(isCursor ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
+        .onTapGesture { onTap(CurrentInput.modifierFlags) }
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return Color.accentColor.opacity(0.22) }
+        if isCursor   { return Color.accentColor.opacity(0.10) }
+        return .clear
+    }
+}
+
+enum CurrentInput {
+    @MainActor static var modifierFlags: NSEvent.ModifierFlags {
+        NSApp.currentEvent?.modifierFlags ?? []
     }
 }
 

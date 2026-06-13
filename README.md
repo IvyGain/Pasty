@@ -14,7 +14,7 @@
   <a href="docs/research/PASTE-RESEARCH.md">Design dossier</a>
 </p>
 
-**Status**: v0.1.1 — P0–P5 shipped (see Roadmap).
+**Status**: v0.2.0 — multi-select &amp; bulk paste landed on top of P0–P5.
 
 ![mit](https://img.shields.io/badge/license-MIT-blue) ![swift](https://img.shields.io/badge/swift-6.1+-orange) ![macos](https://img.shields.io/badge/macOS-14.0+-black)
 
@@ -53,7 +53,14 @@ Plus the menu-bar icon for quick access to recent clips, pause toggle, and setti
 
 ### Pre-built `.dmg` (recommended)
 
-Download the latest [`Pasty.dmg`](https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg) (3.8 MB) and drag `Pasty.app` to `/Applications`. Pasty is ad-hoc signed; the first launch needs **right-click → Open** to bypass Gatekeeper.
+Download the latest [`Pasty.dmg`](https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg) (3.3 MB) and drag `Pasty.app` to `/Applications`. Pasty is ad-hoc signed; the first launch needs **right-click → Open** to bypass Gatekeeper.
+
+### Multi-select &amp; bulk paste (new in v0.2)
+
+- **Shift-click** a range, **⌘-click** to add/remove individual clips — same idiom as Finder.
+- **Space** toggles the highlighted clip, **⇧↑/↓** extends the selection from the keyboard, **⌘A** selects every visible clip.
+- **↩** pastes each selected clip in order with a tiny pause between, **⌥↩** pastes them joined into one block (newline-separated).
+- Selection works identically in the Spotlight modal, the bottom strip, and the menu-bar list.
 
 ### Build from source
 

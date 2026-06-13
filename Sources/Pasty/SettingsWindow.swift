@@ -26,22 +26,33 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Toggle("Capture clipboard automatically", isOn: $settings.capturingEnabled)
-            Toggle("Auto-paste after selecting an item", isOn: $settings.autoPaste)
-            Stepper("Keep history for \(settings.maxRetentionDays) days",
-                    value: $settings.maxRetentionDays, in: 1...365)
-            HStack {
-                Text("Language")
-                Spacer()
+            Section("Primary surface  (⇧⌘V)") {
+                Picker("Open with ⇧⌘V", selection: $settings.primarySurface) {
+                    ForEach(SettingsStore.PrimarySurface.allCases) { surface in
+                        Label(surface.label, systemImage: surface.iconName).tag(surface)
+                    }
+                }
+                .pickerStyle(.inline)
+                Text("⌥⇧V will open the other surface. Both surfaces share the same history and selection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Capture") {
+                Toggle("Capture clipboard automatically", isOn: $settings.capturingEnabled)
+                Toggle("Auto-paste after selecting an item", isOn: $settings.autoPaste)
+                Stepper("Keep history for \(settings.maxRetentionDays) days",
+                        value: $settings.maxRetentionDays, in: 1...365)
+            }
+            Section("Language") {
                 Picker("", selection: $settings.locale) {
                     Text("Auto").tag("auto")
                     Text("English").tag("en")
                     Text("日本語").tag("ja")
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
             }
         }
+        .formStyle(.grouped)
         .padding()
     }
 

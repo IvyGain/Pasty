@@ -10,6 +10,9 @@ final class SettingsStore: ObservableObject {
 
     private let defaults = UserDefaults.standard
 
+    @Published var primarySurface: PrimarySurface {
+        didSet { defaults.set(primarySurface.rawValue, forKey: Keys.primarySurface) }
+    }
     @Published var capturingEnabled: Bool {
         didSet { defaults.set(capturingEnabled, forKey: Keys.capturingEnabled) }
     }
@@ -36,6 +39,7 @@ final class SettingsStore: ObservableObject {
     }
 
     private enum Keys {
+        static let primarySurface     = "pasty.primarySurface"
         static let capturingEnabled   = "pasty.capturing"
         static let pauseUntil         = "pasty.pauseUntil"
         static let ignoredBundleIds   = "pasty.ignoredBundleIds"
@@ -48,6 +52,7 @@ final class SettingsStore: ObservableObject {
 
     private init() {
         defaults.register(defaults: [
+            Keys.primarySurface: PrimarySurface.spotlight.rawValue,
             Keys.capturingEnabled: true,
             Keys.maxRetentionDays: 30,
             Keys.notchHoverEnabled: true,
@@ -61,6 +66,8 @@ final class SettingsStore: ObservableObject {
                 "com.bitwarden.desktop"
             ]
         ])
+        let rawSurface = defaults.string(forKey: Keys.primarySurface) ?? PrimarySurface.spotlight.rawValue
+        self.primarySurface = PrimarySurface(rawValue: rawSurface) ?? .spotlight
         self.capturingEnabled = defaults.bool(forKey: Keys.capturingEnabled)
         self.pauseUntil = defaults.object(forKey: Keys.pauseUntil) as? Date
         self.ignoredBundleIds = Set(defaults.array(forKey: Keys.ignoredBundleIds) as? [String] ?? [])
@@ -69,6 +76,25 @@ final class SettingsStore: ObservableObject {
         self.stripPanelEnabled = defaults.bool(forKey: Keys.stripPanelEnabled)
         self.autoPaste = defaults.bool(forKey: Keys.autoPaste)
         self.locale = defaults.string(forKey: Keys.locale) ?? "auto"
+    }
+
+    enum PrimarySurface: String, CaseIterable, Identifiable {
+        case spotlight
+        case strip
+
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .spotlight: return "Spotlight modal (centred)"
+            case .strip:     return "Bottom strip (carousel)"
+            }
+        }
+        var iconName: String {
+            switch self {
+            case .spotlight: return "rectangle.center.inset.filled"
+            case .strip:     return "rectangle.bottomthird.inset.filled"
+            }
+        }
     }
 
     var isPaused: Bool {

@@ -781,6 +781,7 @@
     </a>
     <ul>
       <li><a href="#surfaces">Surfaces</a></li>
+      <li><a href="#multi">Multi-select</a></li>
       <li><a href="#search">Search</a></li>
       <li><a href="#privacy">Privacy</a></li>
       <li><a href="#download">Download</a></li>
@@ -796,7 +797,7 @@
 <header class="hero">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">v0.1.1 · open source · MIT</span>
+      <span class="eyebrow">v0.2.0 · multi-select · open source · MIT</span>
       <h1 class="headline">Your clipboard,<br/><span class="accent">reimagined.</span></h1>
       <p class="subtitle">
         A blazing-fast, local-first clipboard manager for macOS. Three ways to summon it — including one Paste never thought of.
@@ -804,7 +805,7 @@
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Download for macOS
-          <small>· 3.8 MB · macOS 14+</small>
+          <small>· 3.3 MB · macOS 14+</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">
           View on GitHub
@@ -997,6 +998,54 @@
   </div>
 </section>
 
+<!-- MULTI-SELECT ============================================ -->
+<section id="multi">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">multi-select &amp; bulk paste — new in v0.2</span>
+      <h2 class="section-title">Click. <span class="accent">Shift-click. Paste them all.</span></h2>
+      <p class="section-sub">Sometimes you copied five things to paste into five fields. Sometimes you want them merged into a single block. Pasty now does both — with the exact mouse and keyboard idioms you already know from Finder.</p>
+    </div>
+
+    <div class="features reveal" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="feature">
+        <div class="ico">⇧</div>
+        <h3>Shift-click a range.</h3>
+        <p>Tap one clip, hold <code style="font-family:var(--mono);font-size:13px">⇧</code>, tap another. Everything between gets selected — same model as Finder, Mail, your editor. Or hold <code style="font-family:var(--mono);font-size:13px">⌘</code> to add and remove individual clips.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">␣</div>
+        <h3>Or do it from the keyboard.</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">␣</code> toggles the highlighted clip. <code style="font-family:var(--mono);font-size:13px">⇧↑/↓</code> extends the range. <code style="font-family:var(--mono);font-size:13px">⌘A</code> selects everything in view. The mouse and keyboard share the same selection — switch fluidly.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">↩</div>
+        <h3>Return pastes each, in order.</h3>
+        <p>With a selection, <code style="font-family:var(--mono);font-size:13px">↩</code> sends <code style="font-family:var(--mono);font-size:13px">⌘V</code> for each clip with a tiny pause between. Perfect for filling a multi-field form in one go.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">⌥↩</div>
+        <h3>Option+Return joins them.</h3>
+        <p>One paste, one block. Pasty stitches the selected clips together with a newline (configurable) and sends them as a single insertion. Ideal for meeting notes assembled from scattered Slack snippets.</p>
+      </div>
+    </div>
+
+    <div class="dsl-stage reveal" style="margin-top:32px;padding:0;overflow:hidden;background:#0b0d12;border:1px solid rgba(255,255,255,0.06)">
+      <div style="padding:18px 22px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);color:#c7c7cc;font-size:13px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#6ee7b7"></span>
+        <span style="font-weight:600;color:#e5e7eb">3 selected</span>
+        <span style="opacity:0.6">— ↩ paste each · ⌥↩ paste joined</span>
+      </div>
+      <div style="padding:6px 12px 14px;color:#e5e7eb;font-family:var(--mono);font-size:13px;line-height:1.9">
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18)"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>Pasty v0.2 — multi-select shipped</span><span style="margin-left:auto;color:#86868b;font-size:11px">TEXT · Notes</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>https://ivygain.github.io/Pasty/</span><span style="margin-left:auto;color:#86868b;font-size:11px">LINK · Safari</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>def shipIt(): return True</span><span style="margin-left:auto;color:#86868b;font-size:11px">CODE · VSCode</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;opacity:0.6;margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.1);color:#86868b;text-align:center;font-size:11px;line-height:18px">4</span><span>screenshot 2026-06-13 — 2.3 MB</span><span style="margin-left:auto;color:#86868b;font-size:11px">IMAGE · Screenshot</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DSL SEARCH DEMO ============================================ -->
 <section id="search">
   <div class="container">
@@ -1069,7 +1118,7 @@
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Download Pasty.dmg
-          <small>· 3.8 MB</small>
+          <small>· 3.3 MB</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">
           All releases
@@ -1147,10 +1196,16 @@
       <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">Toggle the Spotlight-style modal.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">Toggle the bottom strip.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">P</span></div><div class="desc">Pause capture for 60 seconds.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">Paste the selected clip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">Paste the selected clip (or each, when multi-selected).</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">Paste as plain text.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">↩</span></div><div class="desc">Paste the selection joined into one block.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Toggle selection on the highlighted clip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↑</span><span class="k">↓</span></div><div class="desc">Extend selection up / down.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">A</span></div><div class="desc">Select every visible clip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">click</span></div><div class="desc">Toggle a single clip into the selection.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">click</span></div><div class="desc">Extend the selection to the clicked clip.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">1</span><span style="opacity:0.5">…</span><span class="k">9</span></div><div class="desc">Paste the Nth visible clip directly.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div><div class="desc">Navigate within a panel.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div><div class="desc">Move the keyboard cursor.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">F</span></div><div class="desc">Focus the search field.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">E</span></div><div class="desc">Edit the selected clip inline.</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">N</span></div><div class="desc">Create a new text clip from scratch.</div></div>

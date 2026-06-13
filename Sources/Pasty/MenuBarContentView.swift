@@ -6,6 +6,7 @@ struct MenuBarContentView: View {
     @ObservedObject var observer: PasteboardObserver
     @ObservedObject var coordinator: PanelCoordinator
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var selection: SelectionModel
     @Environment(\.openSettings) private var openSettings
 
     private static let timeFormatter: DateFormatter = {
@@ -14,6 +15,8 @@ struct MenuBarContentView: View {
         f.dateStyle = .none
         return f
     }()
+
+    private var visibleClips: [ClipItem] { Array(store.recent.prefix(10)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,11 +29,16 @@ struct MenuBarContentView: View {
             } else {
                 clipList
             }
+            if selection.hasSelection {
+                Divider()
+                multiSelectBar
+            }
             Divider()
             footer
         }
-        .frame(width: 360)
+        .frame(width: 380)
         .padding(.vertical, 6)
+        .onAppear { selection.clearAll() }
     }
 
     private var header: some View {
@@ -48,19 +56,21 @@ struct MenuBarContentView: View {
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            row(title: "Search…  ⇧⌘V", systemImage: "magnifyingglass") {
-                coordinator.showSpotlight()
+            let primary = settings.primarySurface
+            row(title: "\(primary == .spotlight ? "Spotlight" : "Strip")…  ⇧⌘V",
+                systemImage: primary.iconName) {
+                coordinator.togglePrimary()
             }
-            row(title: "Strip…  ⌥⇧V", systemImage: "rectangle.bottomthird.inset.filled") {
-                coordinator.showStrip()
+            row(title: "\(primary == .spotlight ? "Strip" : "Spotlight")…  ⌥⇧V",
+                systemImage: (primary == .spotlight
+                              ? SettingsStore.PrimarySurface.strip.iconName
+                              : SettingsStore.PrimarySurface.spotlight.iconName)) {
+                coordinator.toggleSecondary()
             }
             row(title: settings.isPaused ? "Resume capture" : "Pause capture for 60 s",
                 systemImage: settings.isPaused ? "play.circle" : "pause.circle") {
-                if settings.isPaused {
-                    settings.resume()
-                } else {
-                    settings.pause(forSeconds: 60)
-                }
+                if settings.isPaused { settings.resume() }
+                else                  { settings.pause(forSeconds: 60) }
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
@@ -95,20 +105,57 @@ struct MenuBarContentView: View {
     }
 
     private var clipList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(store.recent.prefix(10)) { clip in
-                    Button(action: { paste(clip) }) {
-                        ClipRow(clip: clip, timeFormatter: Self.timeFormatter)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: 0) {
+            if selection.multiMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(.tint).font(.caption)
+                    Text("Multi-select: click to toggle · ⇧-click for range")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 4)
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(visibleClips.enumerated()), id: \.element.id) { idx, clip in
+                        ClipRow(
+                            clip: clip,
+                            timeFormatter: Self.timeFormatter,
+                            isSelected: selection.isSelected(clip.id ?? -1),
+                            multiMode: selection.multiMode
+                        )
+                        .onTapGesture {
+                            handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
+                        }
+                        Divider().opacity(0.4)
                     }
-                    .buttonStyle(.plain)
-                    Divider().opacity(0.4)
                 }
             }
+            .frame(maxHeight: 280)
         }
-        .frame(maxHeight: 280)
+    }
+
+    private var multiSelectBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
+            Text("\(selection.count) selected").font(.callout.weight(.medium))
+            Spacer()
+            Button("Each") { pasteSelected(join: false) }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+            Button("Joined") { pasteSelected(join: true) }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            Button {
+                selection.clearAll()
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
     }
 
     private var footer: some View {
@@ -136,20 +183,59 @@ struct MenuBarContentView: View {
         .padding(.horizontal, 12).padding(.top, 6)
     }
 
-    private func paste(_ clip: ClipItem) {
-        PasteAutomator.shared.paste(clip, autoPaste: settings.autoPaste)
+    // MARK: - Tap routing
+
+    private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
+        // Shift-click：範囲選択
+        if modifiers.contains(.shift) {
+            selection.shiftTap(at: index, in: visibleClips)
+            return
+        }
+        // ⌘-click：個別トグル
+        if modifiers.contains(.command) {
+            selection.commandTap(at: index, in: visibleClips)
+            return
+        }
+        // 通常クリック
+        let result = selection.tap(at: index, in: visibleClips)
+        switch result {
+        case .pasteSingle(let clip):
+            PasteAutomator.shared.paste(clip, autoPaste: settings.autoPaste)
+        case .toggled, .noop: break
+        }
+    }
+
+    private func pasteSelected(join: Bool) {
+        let items = selection.selectedItems(from: visibleClips)
+        guard !items.isEmpty else { return }
+        selection.clearAll()
+        if join {
+            PasteAutomator.shared.pasteSequence(
+                items, strategy: .join(separator: "\n"))
+        } else {
+            PasteAutomator.shared.pasteSequence(
+                items, strategy: .sequence(delayBetween: 0.12))
+        }
     }
 }
 
 private struct ClipRow: View {
     let clip: ClipItem
     let timeFormatter: DateFormatter
+    let isSelected: Bool
+    let multiMode: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: clip.kind.iconName)
-                .foregroundStyle(.tint)
-                .frame(width: 16)
+            if multiMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .frame(width: 18)
+            } else {
+                Image(systemName: clip.kind.iconName)
+                    .foregroundStyle(.tint)
+                    .frame(width: 18)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(clip.preview)
                     .font(.callout)
@@ -170,5 +256,13 @@ private struct ClipRow: View {
                 }
             }
         }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .background(
+            isSelected
+                ? Color.accentColor.opacity(0.12)
+                : Color.clear
+        )
     }
 }
+

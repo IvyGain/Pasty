@@ -1,9 +1,8 @@
 import SwiftUI
 import AppKit
 
-/// Invisible NSView shim that lets SwiftUI panels handle the key events
-/// they care about (↑/↓/Return/Esc/⌘1-9) without colliding with TextField
-/// editing. Designed for global popups, not for in-document use.
+/// SwiftUI パネル用の不可視 NSView。⌥↩、⇧↑/↓、⌘A など、SwiftUI 標準では
+/// 拾いにくいキーイベントをここで横取りして閉じたクロージャに渡す。
 struct KeyHandlingView: NSViewRepresentable {
     var onUp: () -> Void = {}
     var onDown: () -> Void = {}
@@ -11,10 +10,14 @@ struct KeyHandlingView: NSViewRepresentable {
     var onRight: () -> Void = {}
     var onReturn: () -> Void = {}
     var onShiftReturn: () -> Void = {}
+    var onOptionReturn: () -> Void = {}
     var onEsc: () -> Void = {}
     var onNumber: (Int) -> Void = { _ in }
     var onSpace: () -> Void = {}
     var onTab: () -> Void = {}
+    var onShiftUp: () -> Void = {}
+    var onShiftDown: () -> Void = {}
+    var onCmdA: () -> Void = {}
     var onCmdE: () -> Void = {}
     var onCmdR: () -> Void = {}
     var onCmdF: () -> Void = {}
@@ -22,6 +25,7 @@ struct KeyHandlingView: NSViewRepresentable {
     var onCmdD: () -> Void = {}
     var onCmdI: () -> Void = {}
     var onCmdM: () -> Void = {}
+    var onCmdComma: () -> Void = {}
     var onDelete: () -> Void = {}
 
     func makeNSView(context: Context) -> KeyCatcher {
@@ -29,11 +33,7 @@ struct KeyHandlingView: NSViewRepresentable {
         v.coordinator = context.coordinator
         return v
     }
-
-    func updateNSView(_ nsView: KeyCatcher, context: Context) {
-        nsView.coordinator = context.coordinator
-    }
-
+    func updateNSView(_ nsView: KeyCatcher, context: Context) { nsView.coordinator = context.coordinator }
     func makeCoordinator() -> Coordinator { Coordinator(view: self) }
 
     final class Coordinator {
@@ -52,13 +52,16 @@ struct KeyHandlingView: NSViewRepresentable {
             guard let v = coordinator?.view else { super.keyDown(with: event); return }
             let cmd = event.modifierFlags.contains(.command)
             let shift = event.modifierFlags.contains(.shift)
+            let opt = event.modifierFlags.contains(.option)
             switch event.keyCode {
-            case 126: v.onUp(); return
-            case 125: v.onDown(); return
+            case 126: shift ? v.onShiftUp()   : v.onUp(); return
+            case 125: shift ? v.onShiftDown() : v.onDown(); return
             case 123: v.onLeft(); return
             case 124: v.onRight(); return
             case 36, 76:
-                shift ? v.onShiftReturn() : v.onReturn(); return
+                if opt   { v.onOptionReturn(); return }
+                if shift { v.onShiftReturn();  return }
+                v.onReturn(); return
             case 53: v.onEsc(); return
             case 49: v.onSpace(); return
             case 48: v.onTab(); return
@@ -71,6 +74,7 @@ struct KeyHandlingView: NSViewRepresentable {
                 }
                 if cmd {
                     switch chars.lowercased() {
+                    case "a": v.onCmdA(); return
                     case "e": v.onCmdE(); return
                     case "r": v.onCmdR(); return
                     case "f": v.onCmdF(); return
@@ -78,6 +82,7 @@ struct KeyHandlingView: NSViewRepresentable {
                     case "d": v.onCmdD(); return
                     case "i": v.onCmdI(); return
                     case "m": v.onCmdM(); return
+                    case ",": v.onCmdComma(); return
                     default: break
                     }
                 }
