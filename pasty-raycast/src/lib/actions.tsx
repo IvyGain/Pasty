@@ -16,9 +16,8 @@ interface Props {
   onToggleSelect: (id: number) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
-  folders?: PinboardRow[];
-  currentFolderId?: string;
-  onChangeFolder?: (folderId: string) => void;
+  /** Cycle to the next / previous filter (all → kinds → folders → all). */
+  onCycleFilter?: (direction: 1 | -1) => void;
 }
 
 /**
@@ -49,9 +48,7 @@ export function ClipActions({
   onToggleSelect,
   onSelectAll,
   onClearSelection,
-  folders,
-  currentFolderId,
-  onChangeFolder,
+  onCycleFilter,
 }: Props) {
   const count = selectedClips.length;
   const multi = count >= 2;
@@ -149,19 +146,19 @@ export function ClipActions({
         />
       </ActionPanel.Section>
 
-      {folders && onChangeFolder && currentFolderId !== undefined && (
+      {onCycleFilter && (
         <ActionPanel.Section title="Filter">
           <Action
             title="Previous Filter"
             icon={Icon.ArrowLeft}
             shortcut={{ modifiers: ["cmd"], key: "[" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(prevFilterId(folders, currentFolderId))}
+            onAction={() => onCycleFilter(-1)}
           />
           <Action
             title="Next Filter"
             icon={Icon.ArrowRight}
             shortcut={{ modifiers: ["cmd"], key: "]" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(nextFilterId(folders, currentFolderId))}
+            onAction={() => onCycleFilter(1)}
           />
         </ActionPanel.Section>
       )}
@@ -172,8 +169,11 @@ export function ClipActions({
 /**
  * Filter ids in cycle order:
  *   "all" → kind:text → kind:image → kind:link → kind:file → folder:<id1> → folder:<id2> ...
+ *
+ * Exported so the parent List can compute the next id from its own state
+ * (avoiding stale-closure pitfalls when the user mashes ⌘[ / ⌘]).
  */
-function allFilterIds(folders: PinboardRow[]): string[] {
+export function allFilterIds(folders: PinboardRow[]): string[] {
   return [
     "all",
     "kind:text",
@@ -184,14 +184,9 @@ function allFilterIds(folders: PinboardRow[]): string[] {
   ];
 }
 
-function nextFilterId(folders: PinboardRow[], current: string): string {
+export function cycleFilter(folders: PinboardRow[], current: string, direction: 1 | -1): string {
   const ids = allFilterIds(folders);
   const idx = ids.indexOf(current);
-  return ids[(idx + 1 + ids.length) % ids.length];
-}
-
-function prevFilterId(folders: PinboardRow[], current: string): string {
-  const ids = allFilterIds(folders);
-  const idx = ids.indexOf(current);
-  return ids[(idx - 1 + ids.length) % ids.length];
+  // 一周したら戻る (履歴 → text → image → link → file → 各フォルダ → 履歴 …)
+  return ids[(idx + direction + ids.length) % ids.length];
 }

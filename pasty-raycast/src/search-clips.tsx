@@ -1,6 +1,6 @@
 import { List, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { ClipActions } from "./lib/actions";
+import { ClipActions, cycleFilter } from "./lib/actions";
 import {
   recentClips,
   searchClips,
@@ -82,6 +82,18 @@ export default function Command() {
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
   }, []);
+
+  /**
+   * Cycle filter through "all" → kinds → folders → "all" forever.
+   * Uses `setFilter((prev) => …)` so we always operate on the latest state
+   * even when the user mashes ⌘[ / ⌘] rapidly.
+   */
+  const onCycleFilter = useCallback(
+    (direction: 1 | -1) => {
+      setFilter((prev) => cycleFilter(folders, prev, direction));
+    },
+    [folders],
+  );
 
   // Empty state when DB is missing
   if (!dbExists()) {
@@ -192,9 +204,7 @@ export default function Command() {
                 onToggleSelect={toggle}
                 onSelectAll={selectAll}
                 onClearSelection={clearSelection}
-                folders={folders}
-                currentFolderId={filter}
-                onChangeFolder={setFilter}
+                onCycleFilter={onCycleFilter}
               />
             }
           />

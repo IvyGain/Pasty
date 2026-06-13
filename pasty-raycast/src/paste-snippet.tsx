@@ -141,9 +141,13 @@ export default function Command() {
                 onToggleSelect={toggle}
                 onSelectAll={selectAll}
                 onClearSelection={clearSelection}
-                folders={folders}
-                currentFolderId={folderId}
-                onChangeFolder={setFolderId}
+                onCycleFilter={(dir) => {
+                  // 単純な巡回: 現在の folderId から次/前の folders.id へ
+                  const ids = folders.map((f) => String(f.id));
+                  const idx = ids.indexOf(folderId);
+                  const next = (idx + dir + ids.length) % ids.length;
+                  setFolderId(ids[next]);
+                }}
               />
             }
           />
