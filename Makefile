@@ -35,5 +35,11 @@ dmg: package
 release:
 	./scripts/package.sh release
 
+# release + /Applications/Pasty.app への上書きインストール + 起動を一気通貫。
+# 開発中は毎ビルドこれを叩けば最新版が手元で動く。
+install: release-install
+release-install:
+	./scripts/package.sh release install
+
 clean:
 	rm -rf .build dist

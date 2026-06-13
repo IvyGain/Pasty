@@ -176,6 +176,7 @@ struct SpotlightView: View {
                                 onTap: { mods in handleTap(at: idx, modifiers: mods) }
                             )
                             .id(idx)
+                            .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
                             .contextMenu {
                                 ForEach(pinboards.boards) { board in
                                     Button("Move to \(board.name)") {
@@ -266,13 +267,14 @@ struct SpotlightView: View {
 
     private var footer: some View {
         HStack(spacing: 14) {
-            shortcutLabel("↩",    selection.hasSelection ? "Paste each" : "Paste")
-            shortcutLabel("⌥↩",   "Joined")
-            shortcutLabel("⇧↩",  "Plain")
-            shortcutLabel("␣",   "Select")
-            shortcutLabel("⇧↑↓", "Range")
-            shortcutLabel("⌘A",  "All")
-            shortcutLabel("⌘1-9","Quick")
+            shortcutLabel("↩",     selection.hasSelection ? "選択を貼付" : "貼付")
+            shortcutLabel("ダブル", "貼付")
+            shortcutLabel("⌥↩",    "結合貼付")
+            shortcutLabel("⇧↩",   "プレーン")
+            shortcutLabel("⌘␣",   "選択トグル")
+            shortcutLabel("⇧↑↓",  "範囲")
+            shortcutLabel("⌘A",   "全選択")
+            shortcutLabel("⌘1-9", "番号で貼付")
             Spacer()
             Text("\(results.count) shown · \(store.totalCount) total")
                 .font(.caption).foregroundStyle(.secondary)
@@ -333,6 +335,8 @@ struct SpotlightView: View {
         return out
     }
 
+    /// シングルクリック: カーソル移動 / 選択トグルのみ（貼付しない）。
+    /// AI アクションや Quick Look を使う前段なので「クリック ≠ 即貼付」に統一。
     private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
         if modifiers.contains(.shift) {
             selection.shiftTap(at: index, in: results)
@@ -342,14 +346,19 @@ struct SpotlightView: View {
             selection.commandTap(at: index, in: results)
             return
         }
-        let result = selection.tap(at: index, in: results)
-        switch result {
-        case .pasteSingle(let clip):
-            onDismiss()
-            PasteAutomator.shared.paste(clip)
-        case .toggled, .noop:
-            break
+        if selection.multiMode {
+            _ = selection.tap(at: index, in: results)
+        } else {
+            selection.cursorIndex = index
         }
+    }
+
+    /// ダブルクリック: 即時貼付。
+    private func handleDoubleTap(at index: Int) {
+        guard results.indices.contains(index) else { return }
+        let clip = results[index]
+        onDismiss()
+        PasteAutomator.shared.paste(clip)
     }
 
     private func showQuickLook() {

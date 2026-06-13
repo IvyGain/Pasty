@@ -15,7 +15,12 @@ final class PasteToast {
 
     /// `targetApp` には `PreviousAppTracker.shared.previous?.localizedName` を渡す想定。
     /// `customMessage` を指定するとそれが優先される。
-    func show(targetApp: String?, customMessage: String? = nil, durationSeconds: TimeInterval = 0.8) {
+    /// `near` を指定するとそのスクリーン座標 (左下原点) の近くにトーストを表示する。
+    /// 省略時は従来通りメインスクリーンの右下。
+    func show(targetApp: String?,
+              customMessage: String? = nil,
+              durationSeconds: TimeInterval = 0.8,
+              near anchor: NSPoint? = nil) {
         let message: String
         if let customMessage, !customMessage.isEmpty {
             message = customMessage
@@ -34,16 +39,32 @@ final class PasteToast {
         let width = min(max(fitting.width, 220), 320)
         let height: CGFloat = 44
 
-        if let screen = NSScreen.main {
+        // 位置決め: anchor が与えられていればその近く (ちょっと上 + 中央寄せ)。
+        // なければアンカーがあるカーソル位置のスクリーン or メインスクリーンの
+        // 右下フォールバック。
+        let origin: CGPoint
+        if let anchor = anchor {
+            // anchor を含むスクリーンを優先
+            let targetScreen = NSScreen.screens.first(where: { NSPointInRect(anchor, $0.frame) })
+                ?? NSScreen.main
+            let visible = targetScreen?.visibleFrame ?? NSScreen.main!.visibleFrame
+            // アンカー位置のちょっと上、横方向は中央寄せ、画面端でクランプ
+            var x = anchor.x - width / 2
+            var y = anchor.y + 28
+            x = max(visible.minX + 8, min(visible.maxX - width - 8, x))
+            y = max(visible.minY + 8, min(visible.maxY - height - 8, y))
+            origin = CGPoint(x: x, y: y)
+        } else if let screen = NSScreen.main {
             let visible = screen.visibleFrame
-            let origin = CGPoint(
+            origin = CGPoint(
                 x: visible.maxX - 24 - width,
                 y: visible.minY + 24
             )
-            panel.setFrame(NSRect(origin: origin, size: CGSize(width: width, height: height)), display: false)
         } else {
-            panel.setContentSize(CGSize(width: width, height: height))
+            origin = .zero
         }
+        panel.setFrame(NSRect(origin: origin, size: CGSize(width: width, height: height)),
+                       display: false)
 
         // 連続呼び出し時は古いタイマーを破棄し、フェードを最新化。
         hideWorkItem?.cancel()

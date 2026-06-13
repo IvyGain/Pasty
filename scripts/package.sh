@@ -18,7 +18,7 @@ NOTARIZE="${2:-}"
 
 APP_NAME="Pasty"
 BUNDLE_ID="io.pasty.app"
-VERSION="${PASTY_VERSION:-0.4.2}"
+VERSION="${PASTY_VERSION:-0.4.3}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -83,3 +83,19 @@ fi
 
 du -h "$APP" "$DMG" 2>/dev/null | tail -2
 echo "✓ Done: $DMG"
+
+# `install` を末尾に渡すと `/Applications/Pasty.app` を上書き＋アイコン
+# キャッシュ refresh ＋ 起動まで一気通貫。`make release-install` から呼ばれる。
+if [ "$NOTARIZE" = "install" ] || [ "${3:-}" = "install" ]; then
+  echo "==> /Applications/Pasty.app を上書き中…"
+  pkill -9 Pasty 2>/dev/null || true
+  sleep 1
+  rm -rf /Applications/Pasty.app
+  ditto "$APP" /Applications/Pasty.app
+  touch /Applications/Pasty.app
+  # Dock アイコンのキャッシュを強制 refresh
+  killall Dock 2>/dev/null || true
+  sleep 1
+  open /Applications/Pasty.app
+  echo "==> 起動完了: $(defaults read /Applications/Pasty.app/Contents/Info.plist CFBundleShortVersionString)"
+fi

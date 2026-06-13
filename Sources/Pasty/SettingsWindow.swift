@@ -152,9 +152,19 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
+            Section("貼付") {
+                Toggle("マウス位置に自動でクリック→貼付", isOn: $settings.clickBeforePaste)
+                Text("ON にすると、⇧⌘V で Pasty を呼んだ時にマウスがあった位置にキャレットを移してから貼り付けます。OFF だと従来通り、フォーカス中のテキスト入力欄の既存キャレット位置に貼ります。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("フィードバック") {
                 Toggle("貼付完了トースト", isOn: $settings.toastEnabled)
                 Toggle("Stack ピル表示", isOn: $settings.stackPillEnabled)
+                Text("トーストはマウスカーソル付近に表示されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("AI") {

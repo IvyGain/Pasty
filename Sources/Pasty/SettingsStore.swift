@@ -52,6 +52,13 @@ final class SettingsStore: ObservableObject {
     @Published var hoverPreviewEnabled: Bool {
         didSet { defaults.set(hoverPreviewEnabled, forKey: Keys.hoverPreviewEnabled) }
     }
+    /// 貼付直前に、Pasty が召喚された瞬間のマウス位置へ合成クリックを送る。
+    /// ON にすると「⇧⌘V を押した時にカーソルがあった場所にキャレットが
+    /// 移り、そこに貼り付く」体験になる。OFF だと従来通り、フォーカス中の
+    /// テキストキャレット位置に貼り付く。
+    @Published var clickBeforePaste: Bool {
+        didSet { defaults.set(clickBeforePaste, forKey: Keys.clickBeforePaste) }
+    }
     @Published var previewFontSize: PreviewFontSize {
         didSet { defaults.set(previewFontSize.rawValue, forKey: Keys.previewFontSize) }
     }
@@ -72,6 +79,7 @@ final class SettingsStore: ObservableObject {
         static let stackPillEnabled       = "pasty.stackPillEnabled"
         static let hoverPreviewEnabled    = "pasty.hoverPreviewEnabled"
         static let previewFontSize        = "pasty.previewFontSize"
+        static let clickBeforePaste       = "pasty.clickBeforePaste"
     }
 
     private init() {
@@ -95,6 +103,7 @@ final class SettingsStore: ObservableObject {
             Keys.stackPillEnabled: true,
             Keys.hoverPreviewEnabled: true,
             Keys.previewFontSize: PreviewFontSize.medium.rawValue,
+            Keys.clickBeforePaste: true,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -122,6 +131,7 @@ final class SettingsStore: ObservableObject {
         self.hoverPreviewEnabled = defaults.bool(forKey: Keys.hoverPreviewEnabled)
         let rawFontSize = defaults.string(forKey: Keys.previewFontSize) ?? PreviewFontSize.medium.rawValue
         self.previewFontSize = PreviewFontSize(rawValue: rawFontSize) ?? .medium
+        self.clickBeforePaste = defaults.bool(forKey: Keys.clickBeforePaste)
     }
 
     enum PreviewFontSize: String, CaseIterable, Identifiable {

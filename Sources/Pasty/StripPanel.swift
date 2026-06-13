@@ -279,6 +279,9 @@ struct StripView: View {
                             isSelected: selection.isSelected(clip.id ?? -1)
                         )
                         .id(idx)
+                        // ダブルクリック = 貼付 / シングルクリック = 選択。
+                        // SwiftUI の onTapGesture は count 大きい方を先に書く。
+                        .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
                         .onTapGesture { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
                         .draggable(ClipReference(clip: clip))
                         .contextMenu {
@@ -358,6 +361,7 @@ struct StripView: View {
                         ForEach(Array(items.enumerated()), id: \.element.id) { idx, clip in
                             explorerRow(clip: clip, index: idx)
                                 .id(idx)
+                                .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
                                 .onTapGesture {
                                     handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
                                 }
@@ -668,6 +672,9 @@ struct StripView: View {
         QuickLookPreview.shared.show(items: items, at: selection.cursorIndex)
     }
 
+    /// シングルクリック: 単にカーソルを移動 / 選択（貼付はしない）。
+    /// AI アクションやプレビューを使う前段なので、誤って貼付しないように
+    /// 「クリック ≠ 即貼付」のメンタルモデルに揃える。
     private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
         if modifiers.contains(.shift) {
             selection.shiftTap(at: index, in: items); return
@@ -675,13 +682,20 @@ struct StripView: View {
         if modifiers.contains(.command) {
             selection.commandTap(at: index, in: items); return
         }
-        let result = selection.tap(at: index, in: items)
-        switch result {
-        case .pasteSingle(let clip):
-            onDismiss()
-            PasteAutomator.shared.paste(clip)
-        case .toggled, .noop: break
+        // 通常クリック: カーソル位置を移すだけ、複数選択モード時はトグル。
+        if selection.multiMode {
+            _ = selection.tap(at: index, in: items)
+        } else {
+            selection.cursorIndex = index
         }
+    }
+
+    /// ダブルクリック: 即時貼付（従来のシングルクリックの挙動）。
+    private func handleDoubleTap(at index: Int) {
+        guard items.indices.contains(index) else { return }
+        let clip = items[index]
+        onDismiss()
+        PasteAutomator.shared.paste(clip)
     }
 
     private func onReturn(plain: Bool) {

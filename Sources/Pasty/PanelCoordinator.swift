@@ -20,6 +20,11 @@ final class PanelCoordinator: ObservableObject {
     /// pipeline lives as long as the coordinator does.
     private var hotkeyBindingsCancellable: AnyCancellable?
 
+    /// パネルが召喚された瞬間のマウス位置（全画面座標、左下原点）。
+    /// 貼付時にこの位置へ合成クリックを送って「マウスがあった場所」へ
+    /// テキストキャレットを移してから ⌘V を撃つために使う。
+    private(set) var summonPoint: NSPoint?
+
     init(store: ClipStore,
          pinboards: PinboardStore,
          stack: PasteStack,
@@ -162,6 +167,7 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func showSpotlight() {
+        recordSummonPoint()
         let panel = spotlight ?? makeSpotlight()
         spotlight = panel
         positionAtCursorScreen(panel: panel, fractionFromTop: 0.30)
@@ -202,12 +208,21 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func showStrip() {
+        recordSummonPoint()
         let panel = strip ?? makeStrip()
         strip = panel
         if let screen = NSScreen.cursorScreen() {
             panel.position(onScreen: screen)
         }
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// パネルを召喚した瞬間のマウス座標を記録。`PasteAutomator` が貼付
+    /// 直前にここへ合成クリックを送ることで、ユーザがカーソルを置いて
+    /// いた場所にテキストキャレットを移してから ⌘V を撃てる。
+    private func recordSummonPoint() {
+        summonPoint = NSEvent.mouseLocation
+        PasteAutomator.shared.summonMouseLocation = NSEvent.mouseLocation
     }
 
     func dismissStrip() {

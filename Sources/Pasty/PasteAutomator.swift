@@ -10,6 +10,11 @@ final class PasteAutomator {
     static let shared = PasteAutomator()
     private init() {}
 
+    /// PanelCoordinator が「パネルを召喚した瞬間のマウス位置」を保存する場所。
+    /// 貼付時にここへ合成クリックを送ることで「マウスがあった場所」にキャレットを
+    /// 移してから ⌘V を撃つ → 「クリック位置に貼り付く」体験になる。
+    var summonMouseLocation: NSPoint?
+
     /// Accessibility 権限が取れているか。初回は OS のダイアログを出す。
     @discardableResult
     func ensureAccessibilityPermission(prompt: Bool = true) -> Bool {
@@ -38,13 +43,57 @@ final class PasteAutomator {
                 }
                 return
             }
-            await PreviousAppTracker.shared.restoreFocus()
+            // 1) 直前アプリを再アクティベート（パネルが消えた瞬間にも保険）
+            await PreviousAppTracker.shared.restoreFocus(grace: 0.12)
+            // 2) ユーザが Pasty を召喚する直前にカーソルがあった場所へ
+            //    合成クリックを送って、テキストキャレットをそこに移す。
+            //    これでユーザが「ここに貼りたい」と思っていた位置に
+            //    確実に貼り付けが入る。
+            if SettingsStore.shared.clickBeforePaste,
+               let pt = summonMouseLocation {
+                clickAtScreenPoint(pt)
+                try? await Task.sleep(nanoseconds: 60_000_000) // 60ms
+            }
+            // 3) ⌘V を送出
             emitCommandV()
+            // 4) 記録 + トースト
             PasteHistory.shared.record(item)
             if SettingsStore.shared.toastEnabled {
                 let app = PreviousAppTracker.shared.previous?.localizedName
-                PasteToast.shared.show(targetApp: app)
+                let toastAnchor = summonMouseLocation ?? NSEvent.mouseLocation
+                PasteToast.shared.show(targetApp: app, near: toastAnchor)
             }
+            // 5) 次回召喚まで保存
+            summonMouseLocation = nil
+        }
+    }
+
+    /// `summonMouseLocation`（左下原点・全画面座標）に左クリックを 1 回送る。
+    /// 受信側アプリ（TextEdit / Slack / メモ など）のテキスト入力欄上を
+    /// クリックすればキャレットがそこに移動するので、続く ⌘V がそこへ貼り付く。
+    private func clickAtScreenPoint(_ point: NSPoint) {
+        // CGEvent は左上原点・y下向き。NSEvent.mouseLocation は左下原点・y上向き。
+        // ターゲットスクリーンの高さ基準で反転する。
+        let cgY: CGFloat
+        if let screen = NSScreen.screens.first(where: { NSPointInRect(point, $0.frame) })
+            ?? NSScreen.main {
+            cgY = screen.frame.maxY - point.y
+        } else {
+            cgY = point.y
+        }
+        let cgPoint = CGPoint(x: point.x, y: cgY)
+        let src = CGEventSource(stateID: .combinedSessionState)
+        if let down = CGEvent(mouseEventSource: src,
+                              mouseType: .leftMouseDown,
+                              mouseCursorPosition: cgPoint,
+                              mouseButton: .left) {
+            down.post(tap: .cghidEventTap)
+        }
+        if let up = CGEvent(mouseEventSource: src,
+                            mouseType: .leftMouseUp,
+                            mouseCursorPosition: cgPoint,
+                            mouseButton: .left) {
+            up.post(tap: .cghidEventTap)
         }
     }
 
