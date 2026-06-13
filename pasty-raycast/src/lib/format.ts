@@ -21,13 +21,23 @@ export function kindIcon(kind: ClipRow["kind"]): Icon {
   }
 }
 
-export function relativeTime(unixSeconds: number): string {
-  const diff = Math.max(0, Date.now() / 1000 - unixSeconds);
+/** Parse a GRDB DATETIME string ("YYYY-MM-DD HH:MM:SS.SSS", UTC) or a unix epoch number. */
+export function parseCreatedAt(v: string | number): Date {
+  if (typeof v === "number") return new Date(v * 1000);
+  // GRDB writes UTC datetimes without timezone suffix. Convert "YYYY-MM-DD HH:MM:SS.SSS" → ISO.
+  const iso = v.includes("T") ? v : v.replace(" ", "T") + "Z";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+export function relativeTime(createdAt: string | number): string {
+  const d = parseCreatedAt(createdAt);
+  const diff = Math.max(0, (Date.now() - d.getTime()) / 1000);
   if (diff < 60) return `${Math.round(diff)}s`;
   if (diff < 3600) return `${Math.round(diff / 60)}m`;
   if (diff < 86400) return `${Math.round(diff / 3600)}h`;
   if (diff < 86400 * 7) return `${Math.round(diff / 86400)}d`;
-  return new Date(unixSeconds * 1000).toLocaleDateString();
+  return d.toLocaleDateString();
 }
 
 export function shortBytes(n: number): string {

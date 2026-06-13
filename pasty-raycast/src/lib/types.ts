@@ -31,7 +31,9 @@ export type ClipKind = "text" | "richText" | "code" | "image" | "link" | "file" 
  * - `sourceAppName`   — human-readable source app (e.g. "Safari")
  * - `sourceBundleId`  — bundle id of the source app (e.g. "com.apple.Safari")
  * - `byteSize`        — payload size in bytes
- * - `createdAt`       — capture time as a unix epoch in **seconds**
+ * - `createdAt`       — capture time as an ISO datetime string (`YYYY-MM-DD HH:MM:SS.SSS`)
+ *                       written by GRDB. Use `new Date(createdAt + "Z")` or
+ *                       helpers in `format.ts` to parse.
  */
 export interface ClipRow {
   id: number;
@@ -42,7 +44,7 @@ export interface ClipRow {
   sourceAppName: string | null;
   sourceBundleId: string | null;
   byteSize: number;
-  createdAt: number; // unix epoch seconds
+  createdAt: string; // GRDB DATETIME column, e.g. "2026-06-13 04:11:23.217"
 }
 
 /**

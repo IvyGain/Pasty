@@ -2,7 +2,7 @@ import { List, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipActions } from "./lib/actions";
 import { recentClips, searchClips, pinboards, clipsInFolder, dbExists, dbFile } from "./lib/db";
-import { kindIcon, relativeTime, shortBytes, detailMarkdown } from "./lib/format";
+import { kindIcon, relativeTime, shortBytes, detailMarkdown, parseCreatedAt } from "./lib/format";
 import type { ClipRow, PinboardRow } from "./lib/types";
 
 export default function Command() {
@@ -131,7 +131,7 @@ export default function Command() {
                     )}
                     <List.Item.Detail.Metadata.Label
                       title="コピー時刻"
-                      text={new Date(clip.createdAt * 1000).toLocaleString("ja-JP")}
+                      text={parseCreatedAt(clip.createdAt).toLocaleString("ja-JP")}
                     />
                     {selectedIds.size > 0 && (
                       <List.Item.Detail.Metadata.TagList title="選択中">

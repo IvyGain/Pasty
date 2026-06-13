@@ -13,7 +13,12 @@ interface Prefs {
 export function dbFile(): string {
   const custom = getPreferenceValues<Prefs>().dbPath?.trim();
   if (custom && custom.length > 0) return custom.replace(/^~/, homedir());
-  return join(homedir(), "Library", "Application Support", "Pasty", "clips.sqlite");
+  // Pasty 本体の実ファイル名は `pasty.sqlite` (lowercase)。
+  // 旧 ClipStore で `clips.sqlite` が存在するインストールにはフォールバック。
+  const base = join(homedir(), "Library", "Application Support", "Pasty");
+  const primary = join(base, "pasty.sqlite");
+  const legacy = join(base, "clips.sqlite");
+  return existsSync(primary) ? primary : legacy;
 }
 
 export function dbExists(): boolean {
@@ -45,7 +50,7 @@ export async function recentClips(limit = pageSize()): Promise<ClipRow[]> {
   return withRetry(() =>
     executeSQL<ClipRow>(
       dbFile(),
-      `SELECT ${COLS} FROM clip_items ORDER BY createdAt DESC LIMIT ${limit};`,
+      `SELECT ${COLS} FROM clips ORDER BY createdAt DESC LIMIT ${limit};`,
     ),
   );
 }
@@ -53,14 +58,14 @@ export async function recentClips(limit = pageSize()): Promise<ClipRow[]> {
 export async function searchClips(q: string): Promise<ClipRow[]> {
   const trimmed = q.trim();
   if (!trimmed) return recentClips();
-  // Match against the FTS5 search table (clip_search) if it exists, fall back to LIKE.
+  // Match against the FTS5 search table (clips_fts) if it exists, fall back to LIKE.
   try {
     return await withRetry(() =>
       executeSQL<ClipRow>(
         dbFile(),
-        `SELECT c.${COLS.split(", ").join(", c.")} FROM clip_items c
-       JOIN clip_search s ON s.rowid = c.id
-       WHERE clip_search MATCH '${escapeForFts(trimmed)}*'
+        `SELECT c.${COLS.split(", ").join(", c.")} FROM clips c
+       JOIN clips_fts s ON s.rowid = c.id
+       WHERE clips_fts MATCH '${escapeForFts(trimmed)}*'
        ORDER BY c.createdAt DESC LIMIT ${pageSize()};`,
       ),
     );
@@ -70,7 +75,7 @@ export async function searchClips(q: string): Promise<ClipRow[]> {
     return withRetry(() =>
       executeSQL<ClipRow>(
         dbFile(),
-        `SELECT ${COLS} FROM clip_items
+        `SELECT ${COLS} FROM clips
        WHERE preview LIKE '${like}' OR content LIKE '${like}'
        ORDER BY createdAt DESC LIMIT ${pageSize()};`,
       ),
@@ -82,10 +87,10 @@ export async function clipsInFolder(folderId: number): Promise<ClipRow[]> {
   return withRetry(() =>
     executeSQL<ClipRow>(
       dbFile(),
-      `SELECT c.${COLS.split(", ").join(", c.")} FROM clip_items c
+      `SELECT c.${COLS.split(", ").join(", c.")} FROM clips c
      JOIN pinboard_items p ON p.clipId = c.id
      WHERE p.pinboardId = ${folderId}
-     ORDER BY p.position ASC, c.createdAt DESC
+     ORDER BY p.sortOrder ASC, c.createdAt DESC
      LIMIT ${pageSize()};`,
     ),
   );
@@ -95,7 +100,7 @@ export async function recentImages(): Promise<ClipRow[]> {
   return withRetry(() =>
     executeSQL<ClipRow>(
       dbFile(),
-      `SELECT ${COLS} FROM clip_items
+      `SELECT ${COLS} FROM clips
      WHERE kind = 'image'
         OR (kind = 'file' AND (
             lower(content) LIKE '%.png' OR lower(content) LIKE '%.jpg'
@@ -112,7 +117,7 @@ export async function pinboards(): Promise<PinboardRow[]> {
   return withRetry(() =>
     executeSQL<PinboardRow>(
       dbFile(),
-      `SELECT id, name, colorHex FROM pinboards ORDER BY name ASC;`,
+      `SELECT id, name, colorHex FROM pinboards ORDER BY sortOrder ASC, name ASC;`,
     ),
   );
 }
