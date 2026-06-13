@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#000000" />
+<meta name="color-scheme" content="light dark" />
+<title>Pasty — Your clipboard, reimagined.</title>
+<meta name="description" content="A blazing-fast, local-first, open-source clipboard manager for macOS. Spotlight modal, bottom strip, and the world's first notch-hover dropdown — free under MIT." />
+
+<meta property="og:title" content="Pasty — Your clipboard, reimagined." />
+<meta property="og:description" content="Spotlight modal, bottom strip, notch-hover dropdown. Local-first. Open-source. Free." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://ivygain.github.io/Pasty/" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M22 18h14a8 8 0 0 1 8 8v20a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4V24a6 6 0 0 1 6-6z' fill='white' opacity='0.95'/%3E%3Cpath d='M26 14h12a4 4 0 0 1 4 4v2H22v-2a4 4 0 0 1 4-4z' fill='white' opacity='0.95'/%3E%3C/svg%3E" />
+
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --bg-soft: #f5f5f7;
+    --bg-card: rgba(255,255,255,0.7);
+    --text: #1d1d1f;
+    --text-soft: #6e6e73;
+    --text-dim: #86868b;
+    --line: rgba(0,0,0,0.08);
+    --line-strong: rgba(0,0,0,0.18);
+    --accent: #6366f1;
+    --accent-2: #a855f7;
+    --accent-3: #06b6d4;
+    --glass: rgba(255,255,255,0.55);
+    --glass-stroke: rgba(255,255,255,0.6);
+    --shadow: 0 30px 80px -20px rgba(0,0,0,0.25), 0 6px 18px -8px rgba(0,0,0,0.15);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Inter", "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --bg-soft: #0a0a0a;
+      --bg-card: rgba(28,28,30,0.65);
+      --text: #f5f5f7;
+      --text-soft: #c7c7cc;
+      --text-dim: #86868b;
+      --line: rgba(255,255,255,0.10);
+      --line-strong: rgba(255,255,255,0.22);
+      --glass: rgba(28,28,30,0.5);
+      --glass-stroke: rgba(255,255,255,0.10);
+      --shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 6px 18px -8px rgba(0,0,0,0.5);
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1.5;
+    overflow-x: hidden;
+    letter-spacing: -0.011em;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(80vw 60vh at 80% -20%, rgba(99,102,241,0.18), transparent 60%),
+      radial-gradient(60vw 60vh at -10% 30%, rgba(168,85,247,0.16), transparent 60%),
+      radial-gradient(60vw 60vh at 50% 120%, rgba(6,182,212,0.12), transparent 60%);
+    z-index: -1;
+    pointer-events: none;
+    animation: drift 22s ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    0%   { transform: translate3d(0,0,0) scale(1); }
+    100% { transform: translate3d(0,-2%,0) scale(1.04); }
+  }
+
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---- Nav ---- */
+  nav.top {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.top .row {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  nav.top .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  nav.top .brand-mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 4px 12px -2px rgba(99,102,241,0.4);
+  }
+  nav.top ul { list-style: none; display: flex; gap: 28px; align-items: center; }
+  nav.top ul a { color: var(--text-soft); font-size: 14px; font-weight: 500; transition: color .2s; }
+  nav.top ul a:hover { color: var(--text); }
+  nav.top .cta {
+    padding: 7px 14px; border-radius: 999px;
+    background: var(--text); color: var(--bg);
+    font-size: 13px; font-weight: 600;
+    transition: transform .2s, opacity .2s;
+  }
+  nav.top .cta:hover { transform: translateY(-1px); opacity: 0.9; }
+  @media (max-width: 720px) {
+    nav.top ul li:not(.cta-li) { display: none; }
+  }
+
+  /* ---- Hero ---- */
+  .hero { padding: 80px 0 40px; text-align: center; position: relative; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent);
+    padding: 6px 14px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    margin-bottom: 24px;
+  }
+  h1.headline {
+    font-size: clamp(44px, 7.6vw, 96px);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
+  }
+  h1.headline .accent {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2) 50%, var(--accent-3));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p.subtitle {
+    font-size: clamp(18px, 2.2vw, 22px);
+    color: var(--text-soft);
+    max-width: 720px; margin: 0 auto 36px;
+    letter-spacing: -0.01em;
+  }
+  .hero .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 70px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 24px; border-radius: 999px;
+    font-size: 16px; font-weight: 600;
+    border: 1px solid transparent;
+    transition: transform .2s, box-shadow .2s, background .2s;
+    cursor: pointer;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white;
+    box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
+  }
+  .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 18px 36px -8px rgba(99,102,241,0.7); }
+  .btn.ghost {
+    border-color: var(--line-strong);
+    color: var(--text);
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+  }
+  .btn.ghost:hover { transform: translateY(-2px); }
+  .btn small { font-weight: 400; opacity: 0.75; font-size: 13px; }
+
+  /* ---- Hero MacBook with notch ---- */
+  .stage {
+    max-width: 1100px; margin: 0 auto; padding: 0 28px;
+    perspective: 1500px;
+  }
+  .macbook {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: 28px 28px 20px 20px;
+    background: linear-gradient(180deg, #1d1d1f 0%, #2a2a2c 100%);
+    box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,0.06);
+    overflow: hidden;
+    transform-style: preserve-3d;
+    transform: rotateX(2deg);
+    transition: transform .6s cubic-bezier(.22,1,.36,1);
+  }
+  .macbook:hover { transform: rotateX(0deg); }
+  .screen {
+    position: absolute; inset: 16px 16px 16px 16px;
+    border-radius: 16px;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #1c1d22, #0b0d10 70%);
+    overflow: hidden;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 32%; max-width: 240px; height: 26px;
+    background: #000;
+    border-radius: 0 0 14px 14px;
+    z-index: 30;
+    cursor: pointer;
+  }
+  .notch-hot {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 56%; max-width: 480px; height: 60px;
+    z-index: 31; cursor: crosshair;
+  }
+  .notch::after {
+    content: "";
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle, #444 0%, #111 70%);
+  }
+  .menubar {
+    position: absolute; top: 0; left: 0; right: 0; height: 26px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 18px;
+    color: rgba(255,255,255,0.85);
+    font-size: 11px; font-weight: 500;
+    z-index: 20;
+  }
+  .menubar .left { display: flex; gap: 14px; }
+  .menubar .right { margin-left: auto; display: flex; gap: 12px; align-items: center; opacity: 0.9; }
+  .menubar .right .pasty-icon {
+    width: 14px; height: 14px; border-radius: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 12px rgba(99,102,241,0.45);
+  }
+
+  /* The dropdown that slides down when hovering the notch */
+  .notch-dropdown {
+    position: absolute; top: 0; left: 50%;
+    transform: translate(-50%, -100%);
+    width: 78%; max-width: 720px;
+    background: rgba(20,22,28,0.6);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: none;
+    border-radius: 0 0 18px 18px;
+    box-shadow: 0 20px 60px -10px rgba(0,0,0,0.6);
+    padding: 14px;
+    z-index: 25;
+    transition: transform .35s cubic-bezier(.22,1,.36,1), opacity .25s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .macbook.open .notch-dropdown,
+  .notch-dropdown.open {
+    transform: translate(-50%, 0%);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .notch-dropdown .label-row {
+    display: flex; align-items: center; gap: 8px; padding: 0 4px 8px;
+    color: rgba(255,255,255,0.7);
+    font-size: 11px;
+  }
+  .notch-dropdown .label-row .dot { width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .notch-dropdown .label-row .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    font-size: 10px;
+  }
+  .notch-dropdown .cards {
+    display: flex; gap: 8px; overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+  .notch-dropdown .cards::-webkit-scrollbar { height: 4px; }
+  .notch-dropdown .cards::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  .clip-card {
+    flex: 0 0 150px;
+    height: 110px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 8px 10px;
+    color: rgba(255,255,255,0.92);
+    font-size: 11px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    cursor: grab;
+    transition: transform .2s, background .2s;
+  }
+  .clip-card:hover { background: rgba(255,255,255,0.10); transform: translateY(-2px); }
+  .clip-card .meta {
+    display: flex; justify-content: space-between; color: rgba(255,255,255,0.55);
+    font-size: 10px;
+  }
+  .clip-card .body { font-family: var(--mono); line-height: 1.4; overflow: hidden; }
+  .clip-card .kind {
+    display: inline-block; font-size: 9px; font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.08em;
+  }
+  .clip-card[data-kind="link"]  .body { color: #93c5fd; }
+  .clip-card[data-kind="code"]  .body { color: #fda4af; }
+  .clip-card[data-kind="text"]  .body { font-family: var(--font); font-size: 11.5px; }
+
+  .notch-hint {
+    position: absolute; top: 36px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.9);
+    font-size: 11px;
+    padding: 6px 14px; border-radius: 999px;
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    opacity: 0;
+    animation: hintFade 6s ease-in-out 1s infinite;
+    z-index: 24;
+  }
+  .macbook.open .notch-hint { display: none; }
+  @keyframes hintFade {
+    0%, 100% { opacity: 0; transform: translate(-50%, -4px); }
+    30%, 70% { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* Wallpaper inside screen */
+  .wallpaper {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 90% at 50% 110%, rgba(99,102,241,0.40), transparent 60%),
+      radial-gradient(80% 70% at 20% 0%, rgba(168,85,247,0.30), transparent 60%),
+      radial-gradient(80% 70% at 80% 30%, rgba(6,182,212,0.22), transparent 60%),
+      #0b0d12;
+  }
+  .editor {
+    position: absolute; left: 8%; right: 8%; top: 28%; bottom: 16%;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 18px 20px;
+    color: rgba(255,255,255,0.86);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+  .editor .line .c1 { color: #ff79c6; }
+  .editor .line .c2 { color: #50fa7b; }
+  .editor .line .c3 { color: #f1fa8c; }
+  .editor .line .c4 { color: #8be9fd; }
+  .editor .line .comment { color: rgba(255,255,255,0.4); }
+
+  .dock {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    display: flex; gap: 10px; padding: 8px 12px;
+    background: rgba(255,255,255,0.08); backdrop-filter: blur(20px);
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    z-index: 10;
+  }
+  .dock .icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: linear-gradient(135deg, #4f46e5, #a855f7);
+  }
+  .dock .icon:nth-child(2) { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+  .dock .icon:nth-child(3) { background: linear-gradient(135deg, #f97316, #ef4444); }
+  .dock .icon:nth-child(4) { background: linear-gradient(135deg, #10b981, #22d3ee); }
+  .dock .icon:nth-child(5) { background: linear-gradient(135deg, #f59e0b, #f43f5e); }
+
+  /* ---- Reveal helper ---- */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity .8s ease-out, transform .8s cubic-bezier(.22,1,.36,1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* ---- Section base ---- */
+  section { padding: 110px 0; }
+  section .eyebrow.dark { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  h2.section-title {
+    font-size: clamp(34px, 5.4vw, 64px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin-bottom: 18px;
+    max-width: 880px;
+  }
+  h2.section-title .accent {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .section-sub {
+    font-size: 19px;
+    color: var(--text-soft);
+    max-width: 720px;
+    margin-bottom: 64px;
+  }
+
+  /* ---- Three surfaces ---- */
+  .surfaces-wrap {
+    display: grid; grid-template-columns: 320px 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+  @media (max-width: 880px) {
+    .surfaces-wrap { grid-template-columns: 1fr; gap: 32px; }
+  }
+  .surface-list { display: flex; flex-direction: column; gap: 8px; }
+  .surface-tab {
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: all .25s;
+  }
+  .surface-tab .label { font-weight: 600; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+  .surface-tab .kbd {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    background: var(--bg-soft); color: var(--text-soft);
+    padding: 2px 8px; border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+  .surface-tab .desc { color: var(--text-soft); font-size: 14px; margin-top: 6px; }
+  .surface-tab:hover { background: var(--bg-soft); }
+  .surface-tab.active {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border-color: var(--line);
+    box-shadow: 0 6px 18px -8px rgba(0,0,0,0.12);
+  }
+  .surface-tab.active .label { color: var(--accent); }
+
+  .surface-stage {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, #131418, #0a0b0e);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .surface-frame { position: absolute; inset: 0; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  .surface-frame.show { opacity: 1; pointer-events: auto; }
+
+  /* ---- Spotlight modal mock ---- */
+  .spotlight-mock {
+    position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+    width: 78%; max-width: 640px;
+    border-radius: 16px;
+    background: rgba(20,22,28,0.7);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 30px 80px -10px rgba(0,0,0,0.6);
+    color: white;
+    padding: 14px 0;
+  }
+  .spotlight-mock .search {
+    display: flex; gap: 10px; align-items: center;
+    padding: 8px 18px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 18px;
+  }
+  .spotlight-mock .search .magn { opacity: 0.7; }
+  .spotlight-mock .search input {
+    flex: 1; background: transparent; border: 0; outline: 0; color: white;
+    font: inherit; font-size: 18px;
+  }
+  .spotlight-mock .search input::placeholder { color: rgba(255,255,255,0.4); }
+  .spotlight-mock ul { list-style: none; padding: 6px 0; max-height: 220px; overflow: auto; }
+  .spotlight-mock li {
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .spotlight-mock li.selected,
+  .spotlight-mock li:hover { background: rgba(99,102,241,0.18); }
+  .spotlight-mock li .badge {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: rgba(99,102,241,0.3); color: white;
+    display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  }
+  .spotlight-mock li .row-main { flex: 1; }
+  .spotlight-mock li .row-main .title { font-size: 13px; }
+  .spotlight-mock li .row-main .meta {
+    font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;
+  }
+  .spotlight-mock .foot {
+    display: flex; gap: 12px;
+    padding: 10px 18px 4px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.55);
+    font-size: 11px;
+  }
+  .spotlight-mock .foot .kbdr {
+    background: rgba(255,255,255,0.08);
+    padding: 2px 6px; border-radius: 4px;
+    font-family: var(--mono); font-size: 10px; margin-right: 4px;
+  }
+
+  /* ---- Strip mock ---- */
+  .strip-mock {
+    position: absolute; left: 4%; right: 4%; bottom: 4%; height: 38%;
+    border-radius: 16px;
+    background: rgba(20,22,28,0.65);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 30px 80px -10px rgba(0,0,0,0.6);
+    padding: 12px 16px;
+    color: white;
+  }
+  .strip-mock .head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 11px; color: rgba(255,255,255,0.7); }
+  .strip-mock .head .chip { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); display: inline-flex; gap: 4px; align-items: center; }
+  .strip-mock .head .chip .pinclr { width: 6px; height: 6px; border-radius: 50%; }
+  .strip-mock .row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .strip-mock .card {
+    flex: 0 0 140px; height: 110px;
+    border-radius: 10px; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 8px 10px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-size: 11px;
+    transition: background .2s, transform .2s;
+  }
+  .strip-mock .card:hover { background: rgba(255,255,255,0.10); transform: translateY(-2px); }
+  .strip-mock .card.active { box-shadow: 0 0 0 2px var(--accent); }
+  .strip-mock .card .meta { display: flex; justify-content: space-between; font-size: 9px; color: rgba(255,255,255,0.55); }
+
+  /* Notch surface = use a smaller macbook silhouette */
+  .surface-frame.notch-frame .mini-mac {
+    position: absolute; inset: 6% 6% 6% 6%;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #1d1d1f 0%, #2a2a2c 100%);
+    overflow: hidden;
+    box-shadow: 0 30px 80px -10px rgba(0,0,0,0.6);
+  }
+  .surface-frame.notch-frame .mini-screen {
+    position: absolute; inset: 10px;
+    border-radius: 12px;
+    background: radial-gradient(120% 80% at 50% 0%, #1c1d22, #0b0d10 70%);
+    overflow: hidden;
+  }
+  .surface-frame.notch-frame .mini-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 30%; max-width: 220px; height: 24px;
+    background: #000; border-radius: 0 0 12px 12px; z-index: 2;
+  }
+  .surface-frame.notch-frame .mini-drop {
+    position: absolute; top: 0; left: 50%; transform: translate(-50%, 0%);
+    width: 76%; max-width: 540px;
+    background: rgba(20,22,28,0.7);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    padding: 12px;
+    z-index: 1;
+    color: white;
+  }
+  .surface-frame.notch-frame .mini-drop .row { display: flex; gap: 8px; overflow: hidden; }
+  .surface-frame.notch-frame .mini-drop .card {
+    flex: 0 0 120px; height: 80px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); padding: 6px 8px;
+    font-size: 10px; color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex; align-items: end;
+  }
+
+  /* ---- Feature cards ---- */
+  .features {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  }
+  @media (max-width: 900px) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    transition: transform .3s, box-shadow .3s;
+  }
+  .feature:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+  .feature .ico {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    color: white;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 20px -6px rgba(99,102,241,0.5);
+  }
+  .feature h3 { font-size: 20px; margin-bottom: 8px; letter-spacing: -0.01em; }
+  .feature p { color: var(--text-soft); font-size: 15px; }
+
+  /* ---- DSL live search ---- */
+  .dsl-stage {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    box-shadow: var(--shadow);
+  }
+  .dsl-stage .examples { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .dsl-stage .ex {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--bg-soft); color: var(--text);
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .dsl-stage .ex:hover { background: var(--accent); color: white; border-color: var(--accent); }
+  .dsl-stage .input-wrap {
+    display: flex; gap: 10px; align-items: center;
+    padding: 14px 20px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+  .dsl-stage input {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    font: inherit; font-size: 16px; color: var(--text);
+    font-family: var(--mono);
+  }
+  .dsl-stage .results {
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 280px; overflow: auto;
+  }
+  .dsl-stage .result-row {
+    display: flex; gap: 12px; align-items: center;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    animation: rowIn .25s ease-out;
+  }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .dsl-stage .result-row .badge {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent); display: grid; place-items: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .dsl-stage .result-row .info { flex: 1; }
+  .dsl-stage .result-row .info .t { font-size: 14px; }
+  .dsl-stage .result-row .info .m { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .dsl-stage .empty { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
+
+  /* ---- Download ---- */
+  .download-card {
+    background: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(168,85,247,0.10));
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 56px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+  }
+  .download-card h2 {
+    font-size: clamp(32px, 4vw, 48px); letter-spacing: -0.03em; margin-bottom: 10px;
+  }
+  .download-card p { font-size: 18px; color: var(--text-soft); margin-bottom: 28px; max-width: 600px; margin-left: auto; margin-right: auto; }
+  .download-card .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .download-card .meta-row {
+    margin-top: 32px;
+    display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+    color: var(--text-dim); font-size: 13px;
+  }
+  .download-card .meta-row span::before { content: "•"; margin-right: 8px; opacity: 0.4; }
+  .download-card .meta-row span:first-child::before { content: ""; margin: 0; }
+
+  /* ---- Guide (how-to) ---- */
+  .guide-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  }
+  @media (max-width: 900px) { .guide-grid { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 28px;
+    backdrop-filter: blur(20px);
+  }
+  .step .num {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 18px;
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    margin-bottom: 16px;
+  }
+  .step h3 { font-size: 19px; margin-bottom: 8px; }
+  .step p { color: var(--text-soft); font-size: 15px; }
+  .step code {
+    font-family: var(--mono); font-size: 13px;
+    background: var(--bg-soft); padding: 2px 6px; border-radius: 4px;
+    border: 1px solid var(--line);
+  }
+
+  /* ---- Shortcut table ---- */
+  .shortcut-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 28px 32px;
+    backdrop-filter: blur(20px);
+  }
+  @media (max-width: 720px) { .shortcut-grid { grid-template-columns: 1fr; } }
+  .shortcut-row { display: flex; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .shortcut-row:last-child, .shortcut-row:nth-last-child(2) { border-bottom: 0; }
+  .shortcut-row .keys { display: flex; gap: 4px; font-family: var(--mono); font-size: 12px; }
+  .shortcut-row .keys .k {
+    background: var(--bg-soft); border: 1px solid var(--line);
+    padding: 4px 8px; border-radius: 6px; font-weight: 600; min-width: 28px; text-align: center;
+  }
+  .shortcut-row .desc { color: var(--text-soft); font-size: 14px; flex: 1; }
+
+  /* ---- Privacy / specs section ---- */
+  .privacy-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 56px;
+    align-items: center;
+  }
+  @media (max-width: 900px) { .privacy-grid { grid-template-columns: 1fr; } }
+  .privacy-grid .mono-list {
+    background: #0b0d12; color: #e5e7eb;
+    border-radius: var(--radius-md);
+    padding: 26px 28px;
+    font-family: var(--mono); font-size: 13px;
+    line-height: 1.8;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow-x: auto;
+  }
+  .privacy-grid .mono-list .dim { color: #6b7280; }
+  .privacy-grid .mono-list .ok { color: #6ee7b7; }
+
+  /* ---- Footer ---- */
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 60px 0 40px;
+    margin-top: 40px;
+  }
+  footer .grid {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px;
+  }
+  @media (max-width: 720px) { footer .grid { grid-template-columns: 1fr; } }
+  footer h4 { font-size: 13px; font-weight: 600; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+  footer ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  footer ul a { font-size: 14px; color: var(--text-soft); transition: color .2s; }
+  footer ul a:hover { color: var(--text); }
+  footer .legal { margin-top: 50px; color: var(--text-dim); font-size: 12px; text-align: center; }
+
+  /* ---- Misc ---- */
+  ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container row">
+    <a class="brand" href="#top">
+      <span class="brand-mark"></span>
+      <span>Pasty</span>
+    </a>
+    <ul>
+      <li><a href="#surfaces">Surfaces</a></li>
+      <li><a href="#search">Search</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#download">Download</a></li>
+      <li><a href="#guide">Guide</a></li>
+      <li class="cta-li"><a class="cta" href="#download">Get Pasty</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="top">
+
+<!-- HERO ============================================ -->
+<header class="hero">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">v0.1 · open source · MIT</span>
+      <h1 class="headline">Your clipboard,<br/><span class="accent">reimagined.</span></h1>
+      <p class="subtitle">
+        A blazing-fast, local-first clipboard manager for macOS. Three ways to summon it — including one Paste never thought of.
+      </p>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/download/v0.1.0/Pasty-0.1.0.dmg">
+          Download for macOS
+          <small>· 2.3 MB · macOS 14+</small>
+        </a>
+        <a class="btn ghost" href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage reveal" id="heroStage">
+    <div class="macbook" id="macbook">
+      <div class="screen">
+        <div class="wallpaper"></div>
+
+        <div class="menubar">
+          <div class="left"><strong>Pasty</strong><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+          <div class="right"><span class="pasty-icon"></span><span>14:21</span></div>
+        </div>
+
+        <div class="notch"></div>
+        <div class="notch-hot" id="notchHot" aria-label="Hover the notch to summon Pasty"></div>
+        <div class="notch-hint">↑ hover the notch</div>
+
+        <div class="notch-dropdown" id="dropdown">
+          <div class="label-row">
+            <span class="dot"></span>
+            <span>Pasty · drag a clip downward to paste</span>
+            <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>Inbox</span>
+            <span class="chip"><span class="pinclr" style="background:#34C759"></span>Work</span>
+            <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>Code</span>
+          </div>
+          <div class="cards" id="dropdownCards"></div>
+        </div>
+
+        <div class="editor">
+          <div class="line"><span class="comment"># clipboard.swift</span></div>
+          <div class="line"><span class="c1">func</span> <span class="c2">paste</span>(<span class="c4">item</span>: <span class="c3">ClipItem</span>) {</div>
+          <div class="line">&nbsp;&nbsp;NSPasteboard.general.<span class="c2">setString</span>(item.content, forType: .string)</div>
+          <div class="line">&nbsp;&nbsp;<span class="c2">CGEvent</span>.<span class="c2">post</span>(cmdV)</div>
+          <div class="line">}</div>
+          <div class="line">&nbsp;</div>
+          <div class="line"><span class="comment">// hover the notch ↑ to try it</span></div>
+        </div>
+
+        <div class="dock">
+          <div class="icon"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- THREE SURFACES ============================================ -->
+<section id="surfaces">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">three ways to summon</span>
+      <h2 class="section-title">One clipboard. <span class="accent">Three surfaces.</span></h2>
+      <p class="section-sub">Pasty meets you wherever your hands are — keyboard, mouse, or the corner of your eye.</p>
+    </div>
+
+    <div class="surfaces-wrap reveal">
+      <div class="surface-list" role="tablist">
+        <button class="surface-tab active" data-surface="spotlight" role="tab">
+          <div class="label">Spotlight modal <span class="kbd">⇧⌘V</span></div>
+          <div class="desc">Center modal. Type a DSL query, hit Return. The fastest path when you know what you want.</div>
+        </button>
+        <button class="surface-tab" data-surface="strip" role="tab">
+          <div class="label">Bottom strip <span class="kbd">⌥⇧V</span></div>
+          <div class="desc">Paste-style carousel — slimmer than Paste's. Browse visually, filter by kind, paste with ⌘1-9.</div>
+        </button>
+        <button class="surface-tab" data-surface="notch" role="tab">
+          <div class="label">Notch hover <span class="kbd">↑ mouse</span></div>
+          <div class="desc">Mouse the notch (or top-centre on non-notched Macs). Drag a card down onto your editor. No keys.</div>
+        </button>
+      </div>
+
+      <div class="surface-stage">
+        <!-- Spotlight -->
+        <div class="surface-frame show" data-frame="spotlight">
+          <div class="spotlight-mock">
+            <div class="search">
+              <span class="magn">🔍</span>
+              <input value="type:link safari" readonly aria-label="Search demo" />
+            </div>
+            <ul>
+              <li class="selected"><span class="badge">1</span><div class="row-main"><div class="title">https://github.com/IvyGain/Pasty</div><div class="meta">LINK · Safari · just now</div></div></li>
+              <li><span class="badge">2</span><div class="row-main"><div class="title">https://maccy.app</div><div class="meta">LINK · Safari · 2 m ago</div></div></li>
+              <li><span class="badge">3</span><div class="row-main"><div class="title">https://pasteapp.io/pricing</div><div class="meta">LINK · Safari · 14 m ago</div></div></li>
+              <li><span class="badge">4</span><div class="row-main"><div class="title">https://developer.apple.com/foundation-models</div><div class="meta">LINK · Safari · 28 m ago</div></div></li>
+            </ul>
+            <div class="foot">
+              <span><span class="kbdr">↩</span>Paste</span>
+              <span><span class="kbdr">⇧↩</span>Plain</span>
+              <span><span class="kbdr">⌘1-9</span>Quick</span>
+              <span><span class="kbdr">␣</span>Preview</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strip -->
+        <div class="surface-frame" data-frame="strip">
+          <div class="strip-mock">
+            <div class="head">
+              <strong style="color:white">Pasty</strong>
+              <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>Inbox</span>
+              <span class="chip"><span class="pinclr" style="background:#34C759"></span>Work</span>
+              <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>Code</span>
+              <span class="chip"><span class="pinclr" style="background:#BF5AF2"></span>Refs</span>
+              <span style="margin-left:auto">All Aa 🖼 🔗 📄</span>
+            </div>
+            <div class="row">
+              <div class="card active"><div><strong>def hello():</strong><br><span style="color:#fda4af">    return "pasty"</span></div><div class="meta"><span>CODE</span><span>⌘1</span></div></div>
+              <div class="card"><div>https://github.com/<br>IvyGain/Pasty</div><div class="meta"><span>LINK</span><span>⌘2</span></div></div>
+              <div class="card"><div>{<br>&nbsp;"version": "0.1.0",<br>&nbsp;"license": "MIT"<br>}</div><div class="meta"><span>JSON</span><span>⌘3</span></div></div>
+              <div class="card"><div>Meeting notes —<br>ship v0.1 today</div><div class="meta"><span>TEXT</span><span>⌘4</span></div></div>
+              <div class="card"><div>Pasty — Paste killer</div><div class="meta"><span>TEXT</span><span>⌘5</span></div></div>
+              <div class="card"><div>screenshot.png<br>(2.3 MB)</div><div class="meta"><span>IMG</span><span>⌘6</span></div></div>
+              <div class="card"><div>/usr/local/bin/pasty</div><div class="meta"><span>FILE</span><span>⌘7</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notch -->
+        <div class="surface-frame notch-frame" data-frame="notch">
+          <div class="mini-mac">
+            <div class="mini-screen">
+              <div class="mini-drop">
+                <div style="display:flex;gap:6px;align-items:center;color:rgba(255,255,255,0.7);font-size:10px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7)"></span>Pasty · drag downward</div>
+                <div class="row">
+                  <div class="card">Hello world</div>
+                  <div class="card">https://github.com</div>
+                  <div class="card">def hi(): …</div>
+                  <div class="card">{ "ok": true }</div>
+                </div>
+              </div>
+              <div class="mini-notch"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY ============================================ -->
+<section style="padding-top:0">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">why pasty</span>
+      <h2 class="section-title">Built on the things <span class="accent">Paste forgot.</span></h2>
+      <p class="section-sub">Pasty studied every complaint left on Paste's review pages, Reddit, and Hacker News. Then it answered them.</p>
+    </div>
+
+    <div class="features reveal">
+      <div class="feature">
+        <div class="ico">⚡</div>
+        <h3>Lighter than Maccy.</h3>
+        <p>Idle under 60 MB. Cold launch in under 0.2 s. Polling done with care, not panic — and the 2.3 MB dmg proves it.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔒</div>
+        <h3>Local. Period.</h3>
+        <p>Nothing leaves your Mac. No cloud account, no telemetry, no analytics. The store is a single SQLite file you can inspect any time.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">⌥</div>
+        <h3>The notch knows.</h3>
+        <p>The first clipboard manager that turns the notch into a verb. Hover to summon, drag to paste, no keyboard required.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">{}</div>
+        <h3>Made for devs.</h3>
+        <p>Tree-shaken syntax highlighting in 7 languages. <code style="font-family:var(--mono);font-size:13px">{{date}} {{cursor}} {{uuid}}</code> snippets that actually expand. Built-in diff.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔍</div>
+        <h3>Search that thinks.</h3>
+        <p>Full-text via SQLite FTS5. A real DSL on top — <code style="font-family:var(--mono);font-size:12px">type:link source:Safari /TODO/ &gt;7d</code> — composable like grep, fast like Spotlight.</p>
+      </div>
+      <div class="feature">
+        <div class="ico">∞</div>
+        <h3>Free. Open. Forever.</h3>
+        <p>MIT-licensed. Every line on GitHub. No subscription, no tier you'll outgrow, no rug-pull. Fork it, ship it, make it yours.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DSL SEARCH DEMO ============================================ -->
+<section id="search">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">search dsl</span>
+      <h2 class="section-title">Spotlight, <span class="accent">but for what you copied.</span></h2>
+      <p class="section-sub">Tap an example, or type your own. The results update as you type — and yes, this whole demo runs in your browser with the same DSL Pasty ships with.</p>
+    </div>
+
+    <div class="dsl-stage reveal">
+      <div class="examples">
+        <button class="ex" data-q="">recent</button>
+        <button class="ex" data-q="type:link">type:link</button>
+        <button class="ex" data-q="type:code python">type:code python</button>
+        <button class="ex" data-q="source:Safari">source:Safari</button>
+        <button class="ex" data-q="pasty">pasty</button>
+        <button class="ex" data-q="/(TODO|FIXME)/">/(TODO|FIXME)/</button>
+        <button class="ex" data-q="&gt;1d">&gt;1d</button>
+      </div>
+      <div class="input-wrap">
+        <span style="opacity:0.5">🔍</span>
+        <input id="dslInput" placeholder='try  type:link source:Safari  or  /TODO/' value="" />
+      </div>
+      <div class="results" id="dslResults"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRIVACY ============================================ -->
+<section id="privacy">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">privacy by default</span>
+      <h2 class="section-title">Your clipboard is yours. <span class="accent">Yours alone.</span></h2>
+      <p class="section-sub">Pasty stores everything in a single SQLite file under your Application Support folder. Pause it, wipe it, peek inside with the macOS Terminal. There is nothing else.</p>
+    </div>
+
+    <div class="privacy-grid reveal">
+      <div>
+        <h3 style="font-size:24px;letter-spacing:-0.02em;margin-bottom:14px">Zero networking.<br/>Zero analytics.<br/>Zero secrets to lose.</h3>
+        <p style="color:var(--text-soft);margin-bottom:14px">
+          The kindest thing a clipboard manager can do is be boring on the network. Pasty's binary has no HTTP client wired up at all.
+          Sensitive flag on the pasteboard? Skipped. Password manager up front? Skipped. You can blacklist apps by bundle id too.
+        </p>
+        <p style="color:var(--text-soft)">
+          <code style="font-family:var(--mono);font-size:13px">⌃⇧P</code> pauses capture for 60 seconds. The Settings → Privacy tab will wipe everything in one click.
+        </p>
+      </div>
+      <div class="mono-list">
+<span class="dim"># everything Pasty stores</span><br>
+~/Library/Application Support/Pasty/<br>
+├── pasty.sqlite&nbsp;&nbsp;<span class="dim"># clips, pinboards, FTS5 index</span><br>
+└── blobs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="dim"># content-addressed image cache</span><br><br>
+<span class="dim"># everything Pasty sends</span><br>
+<span class="ok">✓ nothing</span><br><br>
+<span class="dim"># everything Pasty needs from Apple</span><br>
+<span class="ok">✓ Accessibility</span> <span class="dim">— to send ⌘V into your apps</span><br>
+<span class="ok">✓ nothing else</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD ============================================ -->
+<section id="download">
+  <div class="container">
+    <div class="download-card reveal">
+      <h2>Get Pasty.</h2>
+      <p>Download. Drag into <code style="font-family:var(--mono);font-size:0.9em">/Applications</code>. Press <code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>. That's the whole installer.</p>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/download/v0.1.0/Pasty-0.1.0.dmg">
+          Download Pasty-0.1.0.dmg
+          <small>· 2.3 MB</small>
+        </a>
+        <a class="btn ghost" href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">
+          All releases
+        </a>
+      </div>
+      <div class="meta-row">
+        <span>macOS 14 Sonoma or newer</span>
+        <span>Apple Silicon &amp; Intel</span>
+        <span>MIT licensed</span>
+        <span>~6 MB installed</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO USE / GUIDE ============================================ -->
+<section id="guide">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">how to use</span>
+      <h2 class="section-title">Five minutes to <span class="accent">never lose a copy again.</span></h2>
+      <p class="section-sub">Pasty is designed to vanish into the muscle memory you already have. There are no tutorials to sit through, no accounts to make. Here is everything, in order.</p>
+    </div>
+
+    <div class="guide-grid reveal">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Install &amp; first launch</h3>
+        <p>Download the dmg. Drag <code>Pasty.app</code> to <code>/Applications</code>. The first time, right-click → Open to dismiss Gatekeeper. The menu-bar icon appears in your top-right.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Grant Accessibility</h3>
+        <p>Pasty asks once. This permission is what lets it post <code>⌘V</code> into the app you were just using. Nothing else uses it.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Copy as you normally would</h3>
+        <p>Use <code>⌘C</code>, drag-to-copy, Share Sheets — anything. Pasty captures it in the background and dedupes by content hash.</p>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <h3>Press <code>⇧⌘V</code></h3>
+        <p>The Spotlight-style modal appears at your cursor's screen. Type freely or pull out the DSL (<code>type:link source:Safari /TODO/</code>). Hit Return. Done.</p>
+      </div>
+      <div class="step">
+        <div class="num">5</div>
+        <h3>Or press <code>⌥⇧V</code></h3>
+        <p>The bottom strip slides up. Use <code>←/→</code> to scan, <code>⌘1-9</code> to paste a specific card, <code>⇧↩</code> to strip rich-text formatting on the way in.</p>
+      </div>
+      <div class="step">
+        <div class="num">6</div>
+        <h3>Hover the notch</h3>
+        <p>Float your cursor over the MacBook notch. A Liquid-Glass strip slides down. Drag any card onto your editor — instant paste, mouse only. (Non-notched Mac? The top-centre 20% becomes a virtual notch.)</p>
+      </div>
+      <div class="step">
+        <div class="num">7</div>
+        <h3>Pin to a Pinboard</h3>
+        <p>Right-click any clip → "Pin to Inbox / Work / Code / Refs". Each pinboard is colour-tagged. Make new ones from Settings → Pinboards.</p>
+      </div>
+      <div class="step">
+        <div class="num">8</div>
+        <h3>Stack &amp; paste in order</h3>
+        <p>Add multiple clips to a Stack, then walk through them with repeated <code>⌘V</code>. Useful for forms, transcripts, multi-cell tables.</p>
+      </div>
+      <div class="step">
+        <div class="num">9</div>
+        <h3>Pause it any time</h3>
+        <p><code>⌃⇧P</code> pauses capture for 60 seconds — perfect for when you're juggling a password manager. The menu-bar icon turns coloured while paused.</p>
+      </div>
+    </div>
+
+    <h3 style="margin:64px 0 18px;font-size:22px;letter-spacing:-0.01em">Full keyboard reference</h3>
+    <div class="shortcut-grid reveal">
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">Toggle the Spotlight-style modal.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">Toggle the bottom strip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">P</span></div><div class="desc">Pause capture for 60 seconds.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">Paste the selected clip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">Paste as plain text.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">1</span><span style="opacity:0.5">…</span><span class="k">9</span></div><div class="desc">Paste the Nth visible clip directly.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div><div class="desc">Navigate within a panel.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">F</span></div><div class="desc">Focus the search field.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">E</span></div><div class="desc">Edit the selected clip inline.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">N</span></div><div class="desc">Create a new text clip from scratch.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Quick Look preview.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">,</span></div><div class="desc">Open Settings.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌫</span></div><div class="desc">Delete the highlighted clip.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⎋</span></div><div class="desc">Dismiss any panel.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER ============================================ -->
+<footer>
+  <div class="container">
+    <div class="grid">
+      <div>
+        <a class="brand" href="#top" style="display:flex;align-items:center;gap:10px;font-weight:600;margin-bottom:12px">
+          <span class="brand-mark" style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#a855f7);display:inline-block"></span>
+          <span>Pasty</span>
+        </a>
+        <p style="color:var(--text-soft);font-size:14px;max-width:340px">
+          A blazing-fast, local-first, open-source clipboard manager for macOS. Built on the unglamorous truth that the clipboard is the smallest, most-used UI on your computer.
+        </p>
+      </div>
+      <div>
+        <h4>Pasty</h4>
+        <ul>
+          <li><a href="#surfaces">Surfaces</a></li>
+          <li><a href="#search">Search DSL</a></li>
+          <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Source</h4>
+        <ul>
+          <li><a href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">GitHub repo</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/blob/main/docs/research/PASTE-RESEARCH.md" target="_blank" rel="noopener">Design dossier</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Made on</h4>
+        <ul>
+          <li><span style="color:var(--text-soft);font-size:14px">Swift 6 · SwiftUI</span></li>
+          <li><span style="color:var(--text-soft);font-size:14px">GRDB · SQLite FTS5</span></li>
+          <li><span style="color:var(--text-soft);font-size:14px">Vision · NaturalLanguage</span></li>
+          <li><span style="color:var(--text-soft);font-size:14px">Carbon HotKey</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p>© 2026 Pasty contributors · MIT licensed · Built with <a href="https://claude.com/claude-code" style="color:var(--text-soft);border-bottom:1px dotted var(--line-strong)">Claude Code</a>.</p>
+      <p style="margin-top:10px;font-size:11px;opacity:0.6">macOS, Mac, and Apple are trademarks of Apple Inc. Pasty is not affiliated with Apple Inc., Paste Team, or Maccy.</p>
+    </div>
+  </div>
+</footer>
+
+</main>
+
+<script>
+  // ---- Notch hover dropdown ---------------------------------------------
+  (function () {
+    const stage = document.getElementById('macbook');
+    const dropdown = document.getElementById('dropdown');
+    const cards = document.getElementById('dropdownCards');
+    const hot = document.getElementById('notchHot');
+
+    const clips = [
+      { kind: 'text', body: 'Pasty v0.1 — ship it', meta: 'Notes · just now' },
+      { kind: 'link', body: 'https://github.com/IvyGain/Pasty', meta: 'Safari · 1m' },
+      { kind: 'code', body: "def hello():\n  return 'pasty'", meta: 'VSCode · 3m' },
+      { kind: 'text', body: '{"version":"0.1.0","license":"MIT"}', meta: 'Terminal · 5m' },
+      { kind: 'text', body: 'TODO: notarize before next release', meta: 'Things · 8m' },
+      { kind: 'link', body: 'https://maccy.app', meta: 'Safari · 12m' },
+      { kind: 'code', body: 'swift run Pasty', meta: 'Terminal · 17m' },
+      { kind: 'text', body: 'Meeting notes — clipboard ux review', meta: 'Notes · 24m' },
+    ];
+
+    function render() {
+      cards.innerHTML = clips.map(c => `
+        <div class="clip-card" data-kind="${c.kind}" draggable="true">
+          <div class="body">${escapeHtml(c.body).replace(/\n/g,'<br>')}</div>
+          <div class="meta"><span class="kind">${c.kind.toUpperCase()}</span><span>${c.meta.split(' · ')[1]||''}</span></div>
+        </div>
+      `).join('');
+      cards.querySelectorAll('.clip-card').forEach(el => {
+        el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', el.textContent.trim()); });
+      });
+    }
+    function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    let openTimer = null, closeTimer = null;
+    function open() {
+      clearTimeout(closeTimer);
+      if (stage.classList.contains('open')) return;
+      openTimer = setTimeout(() => stage.classList.add('open'), 180);
+    }
+    function close() {
+      clearTimeout(openTimer);
+      closeTimer = setTimeout(() => stage.classList.remove('open'), 250);
+    }
+    hot.addEventListener('mouseenter', open);
+    hot.addEventListener('mouseleave', close);
+    dropdown.addEventListener('mouseenter', () => { clearTimeout(closeTimer); });
+    dropdown.addEventListener('mouseleave', close);
+
+    // On touch devices, tap to toggle.
+    hot.addEventListener('click', e => {
+      stage.classList.toggle('open');
+    });
+
+    render();
+  })();
+
+  // ---- Surface switcher --------------------------------------------------
+  (function () {
+    const tabs = document.querySelectorAll('.surface-tab');
+    const frames = document.querySelectorAll('.surface-frame');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.classList.remove('active'));
+      frames.forEach(f => f.classList.remove('show'));
+      t.classList.add('active');
+      const s = t.dataset.surface;
+      document.querySelector(`.surface-frame[data-frame="${s}"]`).classList.add('show');
+    }));
+  })();
+
+  // ---- DSL live search demo ---------------------------------------------
+  (function () {
+    const corpus = [
+      { kind: 'link',  text: 'https://github.com/IvyGain/Pasty', source: 'Safari', age: 0.01 },
+      { kind: 'link',  text: 'https://maccy.app',                source: 'Safari', age: 0.02 },
+      { kind: 'link',  text: 'https://pasteapp.io/pricing',      source: 'Safari', age: 0.7 },
+      { kind: 'link',  text: 'https://developer.apple.com/foundation-models', source: 'Safari', age: 1.2 },
+      { kind: 'code',  text: "def hello():\n  return 'pasty'",   source: 'VSCode', age: 0.05 },
+      { kind: 'code',  text: 'swift run Pasty',                  source: 'Terminal', age: 0.1 },
+      { kind: 'code',  text: 'NSPasteboard.general.changeCount', source: 'Xcode', age: 0.4 },
+      { kind: 'code',  text: '// TODO: notarize before next release', source: 'Xcode', age: 0.5 },
+      { kind: 'code',  text: '// FIXME: handle large blobs',     source: 'Cursor', age: 2.2 },
+      { kind: 'text',  text: 'Meeting: clipboard ux review at 3pm', source: 'Notes', age: 0.3 },
+      { kind: 'text',  text: 'Pasty — Paste killer · ship it!',   source: 'Things', age: 0.9 },
+      { kind: 'text',  text: '{"version":"0.1.0","license":"MIT"}', source: 'Terminal', age: 0.05 },
+      { kind: 'image', text: 'screenshot 2026-06-13 at 11.55 — 2.3 MB', source: 'Screenshot', age: 0.02 },
+      { kind: 'file',  text: 'Pasty-0.1.0.dmg', source: 'Finder', age: 0.01 },
+      { kind: 'text',  text: 'TODO refactor Hello pasty rocks!', source: 'Notes', age: 1.5 },
+    ];
+
+    function parse(q) {
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const out = { kind: null, source: null, freeText: [], regex: null, days: null };
+      for (const t of tokens) {
+        if (t.startsWith('type:')) out.kind = t.slice(5).toLowerCase();
+        else if (t.startsWith('source:')) out.source = t.slice(7).toLowerCase();
+        else if (t.startsWith('>') && t.endsWith('d')) {
+          const n = parseInt(t.slice(1, -1), 10); if (!isNaN(n)) out.days = n;
+        } else if (t.startsWith('/') && t.endsWith('/') && t.length > 2) {
+          try { out.regex = new RegExp(t.slice(1, -1), 'i'); } catch (e) {}
+        } else out.freeText.push(t);
+      }
+      return out;
+    }
+
+    function match(item, q) {
+      if (q.kind && item.kind !== q.kind) return false;
+      if (q.source && !item.source.toLowerCase().includes(q.source)) return false;
+      if (q.days != null && item.age > q.days) return false;
+      if (q.regex && !q.regex.test(item.text)) return false;
+      if (q.freeText.length) {
+        const hay = (item.text + ' ' + item.source).toLowerCase();
+        for (const tok of q.freeText) if (!hay.includes(tok.toLowerCase())) return false;
+      }
+      return true;
+    }
+
+    const input = document.getElementById('dslInput');
+    const results = document.getElementById('dslResults');
+
+    function fmt(age) {
+      if (age < 1/24)  return Math.round(age * 1440) + ' m ago';
+      if (age < 1)     return Math.round(age * 24) + ' h ago';
+      return Math.round(age) + ' d ago';
+    }
+
+    function run() {
+      const q = parse(input.value);
+      const matched = corpus.filter(c => match(c, q));
+      if (!matched.length) {
+        results.innerHTML = `<div class="empty">No matches. Try one of the chips above ↑</div>`;
+        return;
+      }
+      results.innerHTML = matched.slice(0, 10).map((c, i) => `
+        <div class="result-row">
+          <div class="badge">${i + 1}</div>
+          <div class="info">
+            <div class="t">${escapeHtml(firstLine(c.text))}</div>
+            <div class="m">${c.kind.toUpperCase()} · ${c.source} · ${fmt(c.age)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    function firstLine(s) { return (s.split('\n')[0] || '').slice(0, 96); }
+    function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    document.querySelectorAll('.ex').forEach(b => b.addEventListener('click', () => {
+      input.value = b.dataset.q;
+      input.focus();
+      run();
+    }));
+    input.addEventListener('input', run);
+    run();
+  })();
+
+  // ---- Reveal on scroll --------------------------------------------------
+  (function () {
+    const els = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    els.forEach(el => io.observe(el));
+  })();
+</script>
+
+</body>
+</html>
