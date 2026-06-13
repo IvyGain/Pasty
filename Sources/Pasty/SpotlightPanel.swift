@@ -72,6 +72,7 @@ struct SpotlightView: View {
         .onChange(of: store.recent) { _, _ in reload() }
         .onChange(of: folderID) { _, _ in reload() }
         .onChange(of: kindFilter) { _, _ in reload() }
+        .onDisappear { HoverPreviewController.shared.dismissNow() }
     }
 
     private var pinboardBar: some View {
@@ -131,17 +132,20 @@ struct SpotlightView: View {
             Image(systemName: "magnifyingglass")
                 .font(.title3)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             TextField("Search clipboard…  type:link  source:Safari  /regex/", text: $query)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($searchFocused)
                 .onSubmit { pasteCurrent(plain: false) }
+                .accessibilityLabel("クリップ検索")
             if !query.isEmpty {
                 Button(action: { query = "" }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("検索クリア")
             }
             Button(action: onOpenSettings) {
                 Image(systemName: "gearshape")
@@ -150,6 +154,7 @@ struct SpotlightView: View {
             }
             .buttonStyle(.plain)
             .help("Settings…  ⌘,")
+            .accessibilityLabel("設定")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -427,11 +432,14 @@ private struct SpotlightRow: View {
                         .font(.caption2.monospacedDigit().weight(.semibold))
                 }
             }
+            .accessibilityHidden(true)
             ClipThumbnail(clip: clip, size: 28)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(clip.preview)
                     .font(PastyTheme.titleFont)
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
                     Text(clip.kind.rawValue.uppercased())
                         .font(PastyTheme.subtitleFont)
@@ -459,6 +467,28 @@ private struct SpotlightRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { onTap(CurrentInput.modifierFlags) }
+        .onHover { hovering in
+            guard SettingsStore.shared.hoverPreviewEnabled else { return }
+            if hovering {
+                HoverPreviewController.shared.scheduleShow(
+                    for: clip,
+                    near: NSEvent.mouseLocation,
+                    on: NSScreen.main
+                )
+            } else {
+                HoverPreviewController.shared.cancel()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(clip.preview)
+        .accessibilityHint(accessibilityHintText)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var accessibilityHintText: String {
+        let kind = clip.kind.rawValue
+        let source = clip.sourceAppName ?? ""
+        return source.isEmpty ? kind : "\(kind), \(source)"
     }
 
     private var rowBackground: Color {

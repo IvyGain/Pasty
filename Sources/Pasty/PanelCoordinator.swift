@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
@@ -11,6 +12,13 @@ final class PanelCoordinator: ObservableObject {
     private var spotlight: SpotlightPanel?
     private var strip: StripPanel?
     let notch: NotchHoverController
+
+    /// IDs returned by HotKeyManager so we can wipe + rebuild whenever
+    /// the user changes a binding in Settings.
+    private var installedHotkeyIDs: [UInt32] = []
+    /// Subscription on `HotkeyStore.shared.$bindings`. Held so the Combine
+    /// pipeline lives as long as the coordinator does.
+    private var hotkeyBindingsCancellable: AnyCancellable?
 
     init(store: ClipStore,
          pinboards: PinboardStore,
@@ -30,22 +38,100 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func installHotkeys() {
-        // ⇧⌘V → 設定で選んだプライマリサーフェスを開く（デフォルト Spotlight）
-        HotKeyManager.shared.register(.init(keyCode: KeyCode.v, modifiers: [.command, .shift])) {
-            [weak self] in self?.togglePrimary()
+        // 1) 初回の登録
+        rebuildHotkeys()
+
+        // 2) HotkeyStore のバインディング変更を購読し、変更があれば全部
+        //    unregister → 再登録。dropFirst() で「現在値」での即時発火は
+        //    避け、ユーザーの編集操作のみに反応する。SwiftUI が一度の
+        //    キーストロークで複数 didSet を撃ち込んでも RunLoop.main 経由で
+        //    1 サイクルにまとめてから再登録する。
+        hotkeyBindingsCancellable = HotkeyStore.shared.$bindings
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.rebuildHotkeys()
+            }
+    }
+
+    /// Read the current `HotkeyStore` bindings and (re)register them all
+    /// with `HotKeyManager`. Always called on the main thread because the
+    /// underlying Carbon API installs handlers against the main run loop.
+    private func rebuildHotkeys() {
+        // Tear down any previously installed registrations. We use the
+        // generic `unregisterAll` rather than tracked IDs to also catch
+        // anything a future call site might add outside this method.
+        HotKeyManager.shared.unregisterAll()
+        installedHotkeyIDs.removeAll()
+
+        let hotkeys = HotkeyStore.shared
+        for action in HotkeyAction.allCases {
+            let descriptor = hotkeys.descriptor(for: action)
+            // keyCode == 0 means "unbound" — skip silently.
+            if descriptor.isUnset || descriptor.keyCode == 0 { continue }
+            if let id = HotKeyManager.shared.register(descriptor.carbonCombo,
+                                                     action: handler(for: action)) {
+                installedHotkeyIDs.append(id)
+            }
         }
-        // ⌥⇧V → セカンダリサーフェス（プライマリの逆側）を開く
-        HotKeyManager.shared.register(.init(keyCode: KeyCode.v, modifiers: [.option, .shift])) {
-            [weak self] in self?.toggleSecondary()
+    }
+
+    /// Maps a `HotkeyAction` to the closure HotKeyManager should fire.
+    /// Returning a fresh closure keeps `[weak self]` captures localized to
+    /// the actions that actually touch the coordinator's mutable state.
+    private func handler(for action: HotkeyAction) -> () -> Void {
+        switch action {
+        case .primarySurface:
+            return { [weak self] in self?.togglePrimary() }
+        case .secondarySurface:
+            return { [weak self] in self?.toggleSecondary() }
+        case .pauseCapture:
+            return {
+                SettingsStore.shared.pause(forSeconds: 60)
+                NSSound(named: "Tink")?.play()
+            }
+        case .undoPaste:
+            return { PasteHistory.shared.undoLast() }
+        case .aiRewrite:
+            return { [weak self] in self?.runAIActionFromGlobalHotkey(.rewrite(tone: .formal)) }
+        case .aiTranslate:
+            return { [weak self] in self?.runAIActionFromGlobalHotkey(.translate(target: .auto)) }
+        case .aiSummarize:
+            return { [weak self] in self?.runAIActionFromGlobalHotkey(.summarize(length: .medium)) }
+        case .aiReformat:
+            return { [weak self] in self?.runAIActionFromGlobalHotkey(.reformat(to: .plainText)) }
+        case .aiEmailify:
+            return { [weak self] in self?.runAIActionFromGlobalHotkey(.emailify) }
         }
-        HotKeyManager.shared.register(.init(keyCode: KeyCode.p, modifiers: [.control, .shift])) {
-            SettingsStore.shared.pause(forSeconds: 60)
-            NSSound(named: "Tink")?.play()
+    }
+
+    /// Global-hotkey entry point for AI actions. We pick the "current"
+    /// clip by inspecting whichever Pasty panel is on screen and using
+    /// the shared `SelectionModel.cursorIndex`; if no panel is open we
+    /// surface a toast asking the user to open Pasty first.
+    func runAIActionFromGlobalHotkey(_ action: AIAction) {
+        let items = store.recent
+        let panelOpen = (strip?.isVisible == true) || (spotlight?.isVisible == true)
+
+        let target: ClipItem?
+        if panelOpen, items.indices.contains(selection.cursorIndex) {
+            target = items[selection.cursorIndex]
+        } else if panelOpen, let first = items.first {
+            // Panel is open but selection somehow out of range — fall
+            // back to the top of the list rather than refusing.
+            target = first
+        } else {
+            target = nil
         }
-        // ⌃⇧Z — 直前の貼付を取り消し
-        HotKeyManager.shared.register(.init(keyCode: 0x06, modifiers: [.control, .shift])) {
-            PasteHistory.shared.undoLast()
+
+        guard let clip = target else {
+            PasteToast.shared.show(targetApp: nil,
+                                   customMessage: "Pasty を開いてください")
+            NSSound(named: "Funk")?.play()
+            return
         }
+
+        AIActionCoordinator.shared.execute(action, on: clip, store: store)
     }
 
     func togglePrimary() {

@@ -18,6 +18,10 @@ struct PastyApp: App {
         do { store = try ClipStore.shared() }
         catch { fatalError("Failed to open ClipStore: \(error)") }
 
+        // PasteHistory など ClipStore を持たないシングルトンから
+        // 貼付イベントを永続化できるよう、共有コンテナにも差し込んでおく。
+        ClipStoreContainer.shared.store = store
+
         let pinboards = PinboardStore(dbWriter: store.dbWriter)
         let stack = PasteStack()
         let selection = SelectionModel()

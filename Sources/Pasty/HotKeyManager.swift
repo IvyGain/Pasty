@@ -65,6 +65,15 @@ final class HotKeyManager {
         }
     }
 
+    /// Tear down every registered hotkey. Used when the user changes a
+    /// binding so we can wipe the slate and re-register the full set.
+    func unregisterAll() {
+        for (_, value) in registrations {
+            UnregisterEventHotKey(value.0)
+        }
+        registrations.removeAll()
+    }
+
     private func installHandlerIfNeeded() {
         guard !handlerInstalled else { return }
         handlerInstalled = true

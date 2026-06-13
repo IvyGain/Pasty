@@ -11,7 +11,7 @@ private struct DailyCount: Identifiable, Equatable {
     let count: Int
 }
 
-/// 種類別 (text / code / link / image / file / other) の集計行。
+/// 種類別 (text / rich text / link / image / file / color / other) の集計行。
 private struct KindCount: Identifiable, Equatable {
     let id = UUID()
     let label: String
@@ -26,11 +26,12 @@ private struct AppCount: Identifiable, Equatable {
     let count: Int
 }
 
-/// 再利用クリップ行。
-private struct ReusedClip: Identifiable, Equatable {
+/// 「最も再利用されたクリップ」行(paste_events 集計ベース)。
+/// 名称は歴史的経緯で `LongLivedClip` だが、v0.4.2 以降は貼付回数ベース。
+private struct LongLivedClip: Identifiable, Equatable {
     let id: Int64
     let preview: String
-    let count: Int
+    let pasteCount: Int
 }
 
 /// ダッシュボード全体のスナップショット。
@@ -40,8 +41,7 @@ private struct InsightsSnapshot: Equatable {
     var daily: [DailyCount] = []
     var kinds: [KindCount] = []
     var apps: [AppCount] = []
-    var reused: [ReusedClip] = []
-    var hasPasteCountColumn: Bool = false
+    var longLived: [LongLivedClip] = []
 }
 
 // MARK: - Insights Dashboard
@@ -75,7 +75,7 @@ struct InsightsDashboard: View {
                     dailyChartCard
                     kindDistributionCard
                     appRankingCard
-                    reusedClipsCard
+                    longLivedClipsCard
                 }
             }
             .padding(16)
@@ -185,32 +185,21 @@ struct InsightsDashboard: View {
         }
     }
 
-    private var reusedClipsCard: some View {
+    /// v0.4.2: paste_events テーブルを集計した「最も再利用されたクリップ」Top 10。
+    /// 旧フォールバック (createdAt ASC) は廃止。データが無い時は空状態を出す。
+    private var longLivedClipsCard: some View {
         InsightsCard(title: "最も再利用されたクリップ（Top 10）") {
-            if !snapshot.hasPasteCountColumn {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Coming soon")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Text("ペースト回数の記録機能は今後のリリースで有効になります。現在は古い順にスタックされたクリップを参考表示しています。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if !snapshot.reused.isEmpty {
-                        Divider().padding(.vertical, 4)
-                        reusedList
-                    }
-                }
-            } else if snapshot.reused.isEmpty {
-                EmptyStateText("まだデータがありません")
+            if snapshot.longLived.isEmpty {
+                EmptyStateText("貼付履歴がまだありません")
             } else {
-                reusedList
+                longLivedList
             }
         }
     }
 
-    private var reusedList: some View {
+    private var longLivedList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(snapshot.reused.enumerated()), id: \.element.id) { idx, clip in
+            ForEach(Array(snapshot.longLived.enumerated()), id: \.element.id) { idx, clip in
                 HStack(spacing: 10) {
                     Text("\(idx + 1).")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -221,12 +210,12 @@ struct InsightsDashboard: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Spacer(minLength: 8)
-                    Text("\(clip.count) 回")
+                    Text("\(clip.pasteCount) 回")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
-                if idx < snapshot.reused.count - 1 {
+                if idx < snapshot.longLived.count - 1 {
                     Divider().opacity(0.4)
                 }
             }
@@ -264,18 +253,17 @@ struct InsightsDashboard: View {
         isLoading = false
     }
 
-    private static func loadSnapshot(dbWriter: any DatabaseWriter) async throws -> InsightsSnapshot {
+    nonisolated private static func loadSnapshot(dbWriter: any DatabaseWriter) async throws -> InsightsSnapshot {
         try await dbWriter.read { db in
             var snap = InsightsSnapshot()
 
-            // paste_count カラムの有無を検出
-            let columns = try db.columns(in: "clips")
-            snap.hasPasteCountColumn = columns.contains { $0.name == "paste_count" || $0.name == "pasteCount" }
+            // Note: `paste_count` カラムは未実装のため、再利用回数ベースのランキングは
+            // 取得できない。代わりに最古のクリップ 10 件を読み出す(UI 側で表示)。
 
             let calendar = Calendar.current
             let now = Date()
             let startOfToday = calendar.startOfDay(for: now)
-            // ISO week (Monday-start). Adjust to system locale if available.
+            // 週の始まりはシステム Calendar に従う。
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? startOfToday
 
             // 今日 / 今週
@@ -318,7 +306,7 @@ struct InsightsDashboard: View {
             }
             snap.daily = daily
 
-            // 種類別分布: ClipKind の raw を表示用日本語/英語ラベルにまとめる
+            // 種類別分布: ClipKind の raw を表示用ラベルにまとめる。
             let kindRows = try Row.fetchAll(db, sql: """
                 SELECT kind, COUNT(*) AS c FROM clips GROUP BY kind
                 """)
@@ -349,52 +337,43 @@ struct InsightsDashboard: View {
                 return AppCount(bundleId: bid, appName: display, count: cnt)
             }
 
-            // 再利用ランキング Top 10
-            if snap.hasPasteCountColumn {
-                let pcColumn = columns.contains { $0.name == "paste_count" } ? "paste_count" : "pasteCount"
-                let rows = try Row.fetchAll(db, sql: """
-                    SELECT id, preview, \(pcColumn) AS pc
-                    FROM clips
-                    WHERE \(pcColumn) > 0
-                    ORDER BY pc DESC
-                    LIMIT 10
-                    """)
-                snap.reused = rows.compactMap { row in
-                    guard let id: Int64 = row["id"] else { return nil }
-                    let preview: String = row["preview"] ?? ""
-                    let pc: Int = row["pc"] ?? 0
-                    return ReusedClip(id: id, preview: preview, count: pc)
-                }
-            } else {
-                // フォールバック: 古いものから「長く残っている = 再利用されている」と推測。
-                let rows = try Row.fetchAll(db, sql: """
-                    SELECT id, preview, createdAt
-                    FROM clips
-                    ORDER BY createdAt ASC
-                    LIMIT 10
-                    """)
-                snap.reused = rows.compactMap { row in
-                    guard let id: Int64 = row["id"] else { return nil }
-                    let preview: String = row["preview"] ?? ""
-                    return ReusedClip(id: id, preview: preview, count: 0)
-                }
+            // 「最も再利用されたクリップ」Top 10
+            //   = paste_events を clipId で集計し、件数 desc で 10 件。
+            //   v0.4.2 で paste_events が入ったので、createdAt フォールバックは廃止。
+            let longLivedRows = try Row.fetchAll(db, sql: """
+                SELECT c.id, c.preview, COUNT(pe.id) AS cnt
+                FROM clips c
+                JOIN paste_events pe ON pe.clipId = c.id
+                GROUP BY c.id
+                ORDER BY cnt DESC
+                LIMIT 10
+                """)
+            snap.longLived = longLivedRows.compactMap { (row: Row) -> LongLivedClip? in
+                guard let id: Int64 = row["id"] else { return nil }
+                let preview: String = row["preview"] ?? ""
+                let cnt: Int = row["cnt"] ?? 0
+                return LongLivedClip(id: id, preview: preview, pasteCount: cnt)
             }
 
             return snap
         }
     }
 
+    /// ClipKind raw → 表示ラベル。`richText` だけ "rich text" に整形し、
+    /// それ以外は raw 値をそのまま使う(`text` / `link` / `image` / `file` / `color` / `other`)。
+    /// 旧バージョンの未知 raw 値はすべて `other` に寄せる。
     nonisolated private static func displayLabel(forKindRaw raw: String) -> String {
-        // ClipKind.richText を "code" 風に扱うのは違うが、
-        // 要件は text / code / link / image / file / other の 6 種。
-        // code は明示的なカラムがないため、現状は text と統合し other に link 等を分離する。
         switch raw {
-        case ClipKind.text.rawValue: return "text"
-        case ClipKind.richText.rawValue: return "code"
-        case ClipKind.link.rawValue: return "link"
-        case ClipKind.image.rawValue: return "image"
-        case ClipKind.file.rawValue: return "file"
-        default: return "other"
+        case ClipKind.richText.rawValue: return "rich text"
+        case ClipKind.text.rawValue,
+             ClipKind.link.rawValue,
+             ClipKind.image.rawValue,
+             ClipKind.file.rawValue,
+             ClipKind.color.rawValue,
+             ClipKind.other.rawValue:
+            return raw
+        default:
+            return "other"
         }
     }
 }

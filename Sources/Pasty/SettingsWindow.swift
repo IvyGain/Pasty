@@ -108,18 +108,75 @@ struct SettingsView: View {
                     }
                 }
             }
+            Divider()
+            autoCategorizerSection
         }
         .padding()
     }
 
-    private var uiTab: some View {
-        Form {
-            Toggle("Bottom strip (⌥⇧V)", isOn: $settings.stripPanelEnabled)
-            Toggle("Notch-hover dropdown", isOn: $settings.notchHoverEnabled)
-            Text("Tip: hover the notch (or top-centre on non-notched Macs) to slide the panel down. Drag a card downward to paste with the mouse.")
+    @ViewBuilder
+    private var autoCategorizerSection: some View {
+        Section("自動カテゴリ分類") {
+            Text("コピーした内容を自動判定して、対応するフォルダに自動的に追加します")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(AutoCategory.allCases) { cat in
+                        AutoCategoryMappingRow(category: cat, pinboards: pinboards)
+                    }
+                }
+            }
+            .frame(maxHeight: 220)
         }
+    }
+
+    private var uiTab: some View {
+        Form {
+            Section("サーフェス") {
+                Toggle("下部ストリップ (⌥⇧V)", isOn: $settings.stripPanelEnabled)
+                Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
+                Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。カードを下方向にドラッグするとマウスでペーストできます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("プレビュー") {
+                Toggle("ホバープレビュー", isOn: $settings.hoverPreviewEnabled)
+                Toggle("Explorer モード (分割ペイン) を常時 ON", isOn: $settings.explorerMode)
+                Picker("プレビューフォントサイズ", selection: $settings.previewFontSize) {
+                    ForEach(SettingsStore.PreviewFontSize.allCases) { size in
+                        Text(size.jpLabel).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("フィードバック") {
+                Toggle("貼付完了トースト", isOn: $settings.toastEnabled)
+                Toggle("Stack ピル表示", isOn: $settings.stackPillEnabled)
+            }
+
+            Section("AI") {
+                HStack {
+                    Text("Apple Intelligence (Foundation Models)")
+                    Spacer()
+                    if AIEngine.isFoundationModelsAvailable {
+                        Label("利用可能", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("利用不可", systemImage: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                }
+                if !AIEngine.isFoundationModelsAvailable {
+                    Text("macOS 26 以降 + Apple Intelligence が必要です")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
         .padding()
     }
 
@@ -205,6 +262,44 @@ struct SettingsView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
+    }
+}
+
+@MainActor
+private struct AutoCategoryMappingRow: View {
+    let category: AutoCategory
+    @ObservedObject var pinboards: PinboardStore
+    @State private var selection: Int64? = nil
+
+    var body: some View {
+        HStack {
+            Image(systemName: category.systemImage)
+                .frame(width: 18)
+            Text(category.japaneseLabel)
+            Spacer()
+            Picker("", selection: $selection) {
+                Text("自動分類しない").tag(Int64?.none)
+                ForEach(pinboards.boards) { board in
+                    if let bid = board.id {
+                        Text(board.name).tag(Int64?.some(bid))
+                    }
+                }
+            }
+            .labelsHidden()
+            .frame(maxWidth: 220)
+            .onAppear {
+                selection = AutoCategorizer.shared.mapping[category]
+            }
+            .onChange(of: selection) { newValue in
+                var m = AutoCategorizer.shared.mapping
+                if let v = newValue {
+                    m[category] = v
+                } else {
+                    m.removeValue(forKey: category)
+                }
+                AutoCategorizer.shared.mapping = m
+            }
+        }
     }
 }
 

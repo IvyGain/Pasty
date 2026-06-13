@@ -49,6 +49,12 @@ final class SettingsStore: ObservableObject {
     @Published var stackPillEnabled: Bool {
         didSet { defaults.set(stackPillEnabled, forKey: Keys.stackPillEnabled) }
     }
+    @Published var hoverPreviewEnabled: Bool {
+        didSet { defaults.set(hoverPreviewEnabled, forKey: Keys.hoverPreviewEnabled) }
+    }
+    @Published var previewFontSize: PreviewFontSize {
+        didSet { defaults.set(previewFontSize.rawValue, forKey: Keys.previewFontSize) }
+    }
 
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
@@ -64,6 +70,8 @@ final class SettingsStore: ObservableObject {
         static let explorerMode           = "pasty.explorerMode"
         static let hasCompletedOnboarding = "pasty.hasCompletedOnboarding"
         static let stackPillEnabled       = "pasty.stackPillEnabled"
+        static let hoverPreviewEnabled    = "pasty.hoverPreviewEnabled"
+        static let previewFontSize        = "pasty.previewFontSize"
     }
 
     private init() {
@@ -85,6 +93,8 @@ final class SettingsStore: ObservableObject {
             Keys.explorerMode: false,
             Keys.hasCompletedOnboarding: false,
             Keys.stackPillEnabled: true,
+            Keys.hoverPreviewEnabled: true,
+            Keys.previewFontSize: PreviewFontSize.medium.rawValue,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -109,6 +119,31 @@ final class SettingsStore: ObservableObject {
         self.explorerMode = defaults.bool(forKey: Keys.explorerMode)
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         self.stackPillEnabled = defaults.bool(forKey: Keys.stackPillEnabled)
+        self.hoverPreviewEnabled = defaults.bool(forKey: Keys.hoverPreviewEnabled)
+        let rawFontSize = defaults.string(forKey: Keys.previewFontSize) ?? PreviewFontSize.medium.rawValue
+        self.previewFontSize = PreviewFontSize(rawValue: rawFontSize) ?? .medium
+    }
+
+    enum PreviewFontSize: String, CaseIterable, Identifiable {
+        case small
+        case medium
+        case large
+
+        var id: String { rawValue }
+        var jpLabel: String {
+            switch self {
+            case .small:  return "小"
+            case .medium: return "中"
+            case .large:  return "大"
+            }
+        }
+        var pointSize: CGFloat {
+            switch self {
+            case .small:  return 11
+            case .medium: return 13
+            case .large:  return 16
+            }
+        }
     }
 
     enum PrimarySurface: String, CaseIterable, Identifiable {

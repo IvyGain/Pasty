@@ -15,7 +15,7 @@ struct OnboardingView: View {
 
     @State private var step: Int = 0
 
-    private let totalSteps = 3
+    private let totalSteps = 5
 
     var body: some View {
         ZStack {
@@ -31,8 +31,12 @@ struct OnboardingView: View {
                         welcomeStep
                     case 1:
                         shortcutStep
-                    default:
+                    case 2:
                         folderStep
+                    case 3:
+                        templateStep
+                    default:
+                        aiStep
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -48,7 +52,7 @@ struct OnboardingView: View {
                     .padding(.bottom, 28)
             }
         }
-        .frame(width: 640, height: 460)
+        .frame(width: 640, height: 520)
         .animation(.easeInOut(duration: 0.22), value: step)
     }
 
@@ -66,7 +70,7 @@ struct OnboardingView: View {
                 .font(.system(size: 26, weight: .semibold, design: .default))
                 .foregroundStyle(.primary)
 
-            Text("クリップボードを倉庫として持ち歩く、3 つの呼び出し方")
+            Text("クリップボードを倉庫として持ち歩く、5 つのステップ")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -118,6 +122,86 @@ struct OnboardingView: View {
                 .padding(.horizontal, 60)
         }
         .padding(.top, 24)
+    }
+
+    private var templateStep: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "text.cursor")
+                .font(.system(size: 76, weight: .regular))
+                .foregroundStyle(Color.accentColor)
+                .symbolRenderingMode(.hierarchical)
+
+            Text("定型文を書こう")
+                .font(.system(size: 24, weight: .semibold, design: .default))
+                .foregroundStyle(.primary)
+
+            Text("⌘N でいつでも新しい定型文を作成。\n[[name]] のようなプレースホルダで使うときに穴埋めできます")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 50)
+
+            sampleBlock("Hi [[name]], thanks for [[topic]].")
+                .padding(.top, 2)
+        }
+        .padding(.top, 8)
+    }
+
+    private var aiStep: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 68, weight: .regular))
+                .foregroundStyle(Color.accentColor)
+                .symbolRenderingMode(.hierarchical)
+
+            Text("AI で書き直し")
+                .font(.system(size: 24, weight: .semibold, design: .default))
+                .foregroundStyle(.primary)
+
+            Text("⌘I のメニュー、または ⌃⇧R / ⌃⇧T / ⌃⇧S で\n書き直し・翻訳・要約。Foundation Models が無い環境でも heuristic で動きます")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 36)
+
+            sampleBlock("AI: ⌃⇧T を押すと自動翻訳")
+
+            VStack(spacing: 8) {
+                Text("最後に、アクセシビリティ権限を許可してください")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
+                } label: {
+                    Label("権限ダイアログを開く", systemImage: "lock.shield")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+            }
+            .padding(.top, 4)
+        }
+        .padding(.top, 4)
+    }
+
+    // MARK: - Sample block
+
+    private func sampleBlock(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .regular, design: .monospaced))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(PastyTheme.strokeOpacity), lineWidth: 1)
+            )
     }
 
     // MARK: - Progress
@@ -235,7 +319,7 @@ final class OnboardingPresenter {
         let hosting = NSHostingController(rootView: rootView)
 
         let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 520),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

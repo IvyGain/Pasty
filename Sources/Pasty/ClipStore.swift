@@ -93,6 +93,20 @@ final class ClipStore: ObservableObject {
             }
         }
 
+        // v0.4.2: 貼付イベントの永続化。`PasteHistory` のメモリ版を補強し、
+        // Insights ダッシュボードの「よく貼るクリップ」を正確な実測に切り替える。
+        migrator.registerMigration("v3.paste_events") { db in
+            try db.create(table: "paste_events") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("clipId", .integer).notNull()
+                    .references("clips", onDelete: .cascade)
+                    .indexed()
+                t.column("targetBundleId", .text)
+                t.column("targetAppName", .text)
+                t.column("pastedAt", .datetime).notNull().indexed()
+            }
+        }
+
         try migrator.migrate(dbWriter)
     }
 

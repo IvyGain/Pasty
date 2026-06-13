@@ -28,12 +28,20 @@ final class StripPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 
     func position(onScreen screen: NSScreen) {
+        // ユーザー要望 (v0.4):
+        //  - **横幅は画面いっぱい** (左右に申し訳程度の 8pt マージンだけ)
+        //  - **縦位置は Dock の真上** にぴたっと吸着 (visible.minY)
+        // `visibleFrame` は Dock とメニューバーを除いた領域なので、その
+        // 最下端 = Dock の上端。そこに底面を合わせれば一番下にくる。
         let visible = screen.visibleFrame
-        let width = min(visible.width - 32, 1320)
-        let height: CGFloat = 360
+        let margin: CGFloat = 8
+        let width = max(visible.width - margin * 2, 480)
+        // Explorer モード（⌘P トグル）では分割ペイン構成で縦方向の情報量が
+        // 増えるので、パネル全体を背高くする。通常カルーセル時は 360。
+        let height: CGFloat = SettingsStore.shared.explorerMode ? 520 : 360
         let origin = CGPoint(
-            x: visible.midX - width / 2,
-            y: visible.minY + 16
+            x: visible.minX + margin,
+            y: visible.minY                  // ← Dock の真上
         )
         setFrame(NSRect(origin: origin, size: NSSize(width: width, height: height)),
                  display: false)
@@ -51,6 +59,10 @@ struct StripView: View {
     @ObservedObject var pinboards: PinboardStore
     @ObservedObject var stack: PasteStack
     @ObservedObject var selection: SelectionModel
+    // Explorer モード切替を監視するため SettingsStore も購読。
+    // ⌘P で `explorerMode` がトグルされると body が再評価され、
+    // カルーセル ↔ 分割ペインのレイアウトが切り替わる。
+    @ObservedObject private var settings = SettingsStore.shared
     var mode: CarouselMode = .strip
     @State private var query: String = ""
     @State private var items: [ClipItem] = []
@@ -69,7 +81,11 @@ struct StripView: View {
             header
             folderBar
             Divider().opacity(0.25)
-            carousel
+            if settings.explorerMode {
+                explorerLayout
+            } else {
+                carousel
+            }
             if selection.hasSelection {
                 Divider().opacity(0.25)
                 multiSelectBar
@@ -95,6 +111,7 @@ struct StripView: View {
         .background(keyHandler)
         .sheet(isPresented: $showingNewFolder) { newFolderSheet }
         .sheet(isPresented: $showingNewSnippet) { newSnippetSheet }
+        .onDisappear { HoverPreviewController.shared.dismissNow() }
     }
 
     // MARK: - Header
@@ -145,6 +162,7 @@ struct StripView: View {
             }
             .buttonStyle(.plain)
             .help("設定…  ⌘,")
+            .accessibilityLabel("設定")
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark.circle.fill")
@@ -152,6 +170,7 @@ struct StripView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("閉じる")
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
@@ -239,11 +258,11 @@ struct StripView: View {
             )
         }
         .buttonStyle(.plain)
-        .onDrop(of: [.plainText, .url, .fileURL], isTargeted: nil) { providers in
-            // 他のカードをフォルダタブにドロップすると、そのフォルダに pin する。
-            handleDropToFolder(providers: providers, folderID: id)
-            return true
-        }
+        // 1) Pasty 内のクリップカードをドロップ → そのフォルダに pin
+        .acceptClipReferenceDrop(pinboardId: id, pinboards: pinboards, store: store)
+        // 2) 外部アプリのテキスト/URL/ファイルをドロップ → 新規クリップとして登録、
+        //    フォルダが選ばれていればそのまま pin
+        .acceptExternalDropAsClip(pinboardId: id, store: store, pinboards: pinboards)
     }
 
     // MARK: - Carousel
@@ -261,7 +280,7 @@ struct StripView: View {
                         )
                         .id(idx)
                         .onTapGesture { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
-                        .draggable(clip.content ?? clip.preview)
+                        .draggable(ClipReference(clip: clip))
                         .contextMenu {
                             Section("フォルダに振り分け") {
                                 ForEach(pinboards.boards) { board in
@@ -311,6 +330,153 @@ struct StripView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.primary.opacity(0.04))
         )
+    }
+
+    // MARK: - Explorer split pane
+
+    /// `SettingsStore.explorerMode` が ON のときに使う 2 ペイン構成。
+    /// 左: クリップの縦リスト (約 280pt 幅)、右: 選択中クリップの `ClipPreviewView`。
+    /// カルーセルより縦長で全体を把握しやすく、長文プレビューに強い。
+    private var explorerLayout: some View {
+        HStack(spacing: 0) {
+            explorerList
+                .frame(width: 280)
+            Divider()
+            explorerPreview
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var explorerList: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVStack(spacing: 4) {
+                    if items.isEmpty {
+                        explorerEmptyRow
+                    } else {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { idx, clip in
+                            explorerRow(clip: clip, index: idx)
+                                .id(idx)
+                                .onTapGesture {
+                                    handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
+                                }
+                                .draggable(ClipReference(clip: clip))
+                                .contextMenu {
+                                    Section("フォルダに振り分け") {
+                                        ForEach(pinboards.boards) { board in
+                                            Button(board.name) {
+                                                guard let cid = clip.id, let bid = board.id else { return }
+                                                Task { try? await pinboards.pin(clipId: cid, toBoard: bid) }
+                                            }
+                                        }
+                                    }
+                                    Divider()
+                                    Button("Stack に追加") { stack.push(clip) }
+                                    Divider()
+                                    Button("削除", role: .destructive) {
+                                        guard let cid = clip.id else { return }
+                                        Task { try? await store.delete(clipId: cid) }
+                                    }
+                                }
+                        }
+                    }
+                }
+                .padding(.horizontal, 8).padding(.vertical, 8)
+            }
+            .onChange(of: selection.cursorIndex) { _, n in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    proxy.scrollTo(n, anchor: .center)
+                }
+            }
+        }
+    }
+
+    private func explorerRow(clip: ClipItem, index: Int) -> some View {
+        let isCursor = index == selection.cursorIndex
+        let isSelected = selection.isSelected(clip.id ?? -1)
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : clip.kind.iconName)
+                .font(.callout)
+                .foregroundStyle(.tint)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(clip.preview)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 6) {
+                    Text(clip.kind.rawValue.uppercased())
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    if let app = clip.sourceAppName, !app.isEmpty {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(app).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Text(clip.createdAt, style: .relative)
+                        .font(.system(size: 9))
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+            if index < 9 {
+                Text("⌘\(index + 1)")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(rowBackground(isCursor: isCursor, isSelected: isSelected))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(
+                    isCursor ? Color.accentColor.opacity(0.9) : .clear,
+                    lineWidth: isCursor ? 1.5 : 0
+                )
+        )
+        .contentShape(Rectangle())
+    }
+
+    private func rowBackground(isCursor: Bool, isSelected: Bool) -> Color {
+        if isCursor   { return Color.accentColor.opacity(0.18) }
+        if isSelected { return Color.accentColor.opacity(0.10) }
+        return Color.primary.opacity(0.04)
+    }
+
+    private var explorerEmptyRow: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "tray")
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+            Text("クリップがありません")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
+    }
+
+    @ViewBuilder
+    private var explorerPreview: some View {
+        if items.indices.contains(selection.cursorIndex) {
+            ClipPreviewView(clip: items[selection.cursorIndex], isCompact: false)
+                .padding(12)
+        } else {
+            VStack(spacing: 10) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+                Text("クリップを選択してください")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(20)
+        }
     }
 
     // MARK: - Multi-select bar
@@ -456,6 +622,10 @@ struct StripView: View {
 
     private var keyHandler: some View {
         KeyHandlingView(
+            // Explorer モードは縦リスト主体なので ↑/↓ もカーソル移動に振る。
+            // カルーセル時は ←/→ と併用しても無害（同じ axis を動かすだけ）。
+            onUp:           { selection.moveCursor(by: -1, in: items) },
+            onDown:         { selection.moveCursor(by:  1, in: items) },
             onLeft:         { selection.moveCursor(by: -1, in: items) },
             onRight:        { selection.moveCursor(by:  1, in: items) },
             onReturn:       { onReturn(plain: false) },
@@ -672,14 +842,19 @@ private struct StripCard: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
                 } else {
-                    Image(systemName: clip.kind.iconName).foregroundStyle(.tint)
+                    Image(systemName: clip.kind.iconName)
+                        .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
                 }
                 Text(clip.sourceAppName ?? "—")
                     .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Text(index <= 9 ? "⌘\(index)" : "")
                     .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             if clip.kind == .image, let p = clip.dataPath,
                let img = ImageBlobCache.shared.image(for: p) {
@@ -689,11 +864,13 @@ private struct StripCard: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 110)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityHidden(true)
             } else {
                 Text(clip.preview)
                     .font(.caption)
-                    .lineLimit(7)
+                    .lineLimit(8)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
             HStack {
@@ -715,6 +892,28 @@ private struct StripCard: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: isCursor ? 2 : 1.5)
         )
+        .onHover { hovering in
+            guard SettingsStore.shared.hoverPreviewEnabled else { return }
+            if hovering {
+                HoverPreviewController.shared.scheduleShow(
+                    for: clip,
+                    near: NSEvent.mouseLocation,
+                    on: NSScreen.main
+                )
+            } else {
+                HoverPreviewController.shared.cancel()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(clip.preview)
+        .accessibilityHint(accessibilityHintText)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var accessibilityHintText: String {
+        let kind = clip.kind.rawValue
+        let source = clip.sourceAppName ?? ""
+        return source.isEmpty ? kind : "\(kind), \(source)"
     }
 
     private var borderColor: Color {

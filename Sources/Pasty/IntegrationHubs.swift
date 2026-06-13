@@ -44,7 +44,12 @@ enum TemplateFieldPresenter {
         }
 
         let fields = fieldNames.map {
-            TemplateField(id: $0, label: $0, value: "", suggestions: [])
+            TemplateField(
+                id: $0,
+                label: $0,
+                value: "",
+                suggestions: FieldHistoryStore.shared.suggestions(for: $0)
+            )
         }
         let view = TemplateFieldDialog(
             template: raw,
@@ -54,6 +59,11 @@ enum TemplateFieldPresenter {
                 dismissPanel()
             },
             onConfirm: { _, values in
+                // ユーザが確定した値はそのままサジェスト履歴にフィードバック。
+                // 空文字は store 側で弾くのでここでは丸ごと渡す。
+                for (key, value) in values {
+                    FieldHistoryStore.shared.record(fieldName: key, value: value)
+                }
                 TemplateFieldRuntime.setPending(values)
                 dismissPanel()
                 then()
@@ -183,6 +193,22 @@ final class PasteHistory {
         lastPastedAt = Date()
         if let id = clip.id {
             pasteCount[id, default: 0] += 1
+
+            // 永続化 (v0.4.2): メモリ上のカウンタに加えて paste_events にも記録。
+            // ClipStore がまだ用意されていなければ静かに無視する（ベストエフォート）。
+            // 直前の貼付先アプリは PreviousAppTracker から取得。
+            let targetApp = PreviousAppTracker.shared.previous
+            let bid = targetApp?.bundleIdentifier
+            let name = targetApp?.localizedName
+            if let store = ClipStoreContainer.shared.store {
+                Task {
+                    try? await store.recordPaste(
+                        clipId: id,
+                        targetBundleId: bid,
+                        targetAppName: name
+                    )
+                }
+            }
         }
     }
 

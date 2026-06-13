@@ -249,13 +249,15 @@ private struct ClipRow: View {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                     .frame(width: 18)
+                    .accessibilityHidden(true)
             } else {
                 ClipThumbnail(clip: clip, size: 26)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(clip.preview)
                     .font(.callout)
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
                     Text(clip.kind.rawValue.uppercased())
                         .font(.caption2)
@@ -279,6 +281,16 @@ private struct ClipRow: View {
                 ? Color.accentColor.opacity(0.12)
                 : Color.clear
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(clip.preview)
+        .accessibilityHint(accessibilityHintText)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var accessibilityHintText: String {
+        let kind = clip.kind.rawValue
+        let source = clip.sourceAppName ?? ""
+        return source.isEmpty ? kind : "\(kind), \(source)"
     }
 }
 

@@ -790,6 +790,7 @@
     <ul>
       <li><a href="#surfaces">サーフェス</a></li>
       <li><a href="#folders">倉庫</a></li>
+      <li><a href="#ai">AI</a></li>
       <li><a href="#multi">複数選択</a></li>
       <li><a href="#search">検索</a></li>
       <li><a href="#privacy">プライバシー</a></li>
@@ -806,15 +807,15 @@
 <header class="hero">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">v0.3.0 · フォルダ倉庫 · ストリップ主役化 · オープンソース · MIT</span>
+      <span class="eyebrow">v0.4.1 · AI · テンプレート · プレビュー · オープンソース · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Spotlight がサード。同じ履歴を、3 つの呼び方で。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Spotlight がサード。v0.4 ではプレビュー全画面、テンプレ差し込み、オンデバイス AI、スマートフォルダ、自動カテゴリ分類を新搭載。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           macOS 用をダウンロード
-          <small>· 3.4 MB · macOS 14 以降</small>
+          <small>· 4.0 MB · macOS 14 以降</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">
           GitHub で見る
@@ -976,7 +977,7 @@
       <div class="feature">
         <div class="ico">⚡</div>
         <h3>Maccy より軽い。</h3>
-        <p>常時 60 MB 未満。コールドスタート 0.2 秒以下。慎重なポーリング、必要十分なメモリ。3.4 MB の dmg がそれを物語っています。</p>
+        <p>常時 60 MB 未満。コールドスタート 0.2 秒以下。慎重なポーリング、必要十分なメモリ。4.0 MB の dmg がそれを物語っています。</p>
       </div>
       <div class="feature">
         <div class="ico">🔒</div>
@@ -1099,6 +1100,101 @@
   </div>
 </section>
 
+<!-- v0.4 REVOLUTIONS ============================================ -->
+<section id="ai">
+  <div class="container">
+    <div class="reveal">
+      <span class="eyebrow">v0.4 で投入した革命</span>
+      <h2 class="section-title">クリップボードに、<span class="accent">プレビューと AI と賢さを。</span></h2>
+      <p class="section-sub">v0.4 は、Pasty を「貯める道具」から「使い倒す道具」へ引き上げる更新です。全画面プレビュー、テンプレ差し込み、Apple Intelligence による書き直し・翻訳・要約、自動カテゴリ分類、スマートフォルダ — すべてオンデバイスで完結します。</p>
+    </div>
+
+    <div class="features reveal" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="feature">
+        <div class="ico">🔍</div>
+        <h3>プレビュー革命</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">Space</code> で Quick Look 全画面、<code style="font-family:var(--mono);font-size:13px">⌘P</code> で Explorer 分割ペイン (リスト + 大きなプレビュー)。カードに乗せるだけの Hover Pill で、中身を見ながら選べます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">✨</div>
+        <h3>テンプレート差し込み</h3>
+        <p>定型文に <code style="font-family:var(--mono);font-size:13px">[[name]] [[topic]]</code> といったプレースホルダを埋め込んでおくと、貼付の瞬間にダイアログが立ち上がって値を入力 → 完成したテキストが送られます。メール、伝票、議事録ですぐ効きます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🧠</div>
+        <h3>オンデバイス AI</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">⌘I</code> で AI メニュー、<code style="font-family:var(--mono);font-size:13px">⌃⇧R/T/S/J/E</code> で直接 (書き直し / 翻訳 / 要約 / 変換 / メール整形)。macOS 26+ では Foundation Models (Apple Intelligence) と統合、それ未満では heuristic にフォールバック。ネットワークは介しません。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">📂</div>
+        <h3>スマートフォルダ</h3>
+        <p>今日 / 今週 / 画像 / リンク / コード / 定型文 / 大容量 — Pasty が自動で 7 つのスマートフォルダを生成。条件にマッチするクリップが流れ込み、消しても自動で再構成されます。手で作った倉庫と並んで使えます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">⚙️</div>
+        <h3>自動カテゴリ分類</h3>
+        <p>コピーした直後に <code style="font-family:var(--mono);font-size:13px">NLLanguageRecognizer</code> + heuristic が走り、コード / URL / JSON / 日本語 / 英語 を判定。指定したフォルダに自動 pin。「気付いたら倉庫が育っている」体験。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">📚</div>
+        <h3>フローティング Stack ピル</h3>
+        <p>選択中のクリップ件数を、画面右下に常時表示。ストリップを閉じても「今いくつ抱えているか」がひと目で分かるので、Shift クリックで集めて、別アプリへ運んで、まとめて貼る、が自然に。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🎬</div>
+        <h3>オンボーディング + ヘルプ</h3>
+        <p>初回起動に 3 ステップのウォークスルー。コピー → 呼び出し → 貼付 を実機で体験できます。あとはいつでも <code style="font-family:var(--mono);font-size:13px">⌘?</code> で全キー早見表をオーバーレイ表示。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔑</div>
+        <h3>ホットキーカスタマイズ</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">⇧⌘V</code> / <code style="font-family:var(--mono);font-size:13px">⌥⇧V</code> / <code style="font-family:var(--mono);font-size:13px">⌃⇧P</code> / <code style="font-family:var(--mono);font-size:13px">⌃⇧Z</code> / <code style="font-family:var(--mono);font-size:13px">⌃⇧R-E</code> まで、全部リバインド可能。既存のショートカットと衝突しない組み合わせに、自分の指で合わせ込めます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">📊</div>
+        <h3>インサイトダッシュボード</h3>
+        <p>SwiftUI Charts による統計ビュー。何種類のクリップを抱え、どのフォルダがよく使われ、どんな時間帯にコピーしているか — クリップボードの使い方を可視化します。設定 → インサイト から。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">💾</div>
+        <h3>JSON Import / Export</h3>
+        <p>全クリップ + フォルダ構造を 1 つの JSON にバックアップ。別の Mac に移行する時、リカバリ時、共有時に。プレーンテキストなので diff も取れますし、自分でスクリプトを書いて加工も自在。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🎉</div>
+        <h3>貼付完了トースト</h3>
+        <p>貼り付いた瞬間、画面右下にミニ通知。「いま 3 つ目を貼った」「テンプレの値が埋まった」が一目で分かるので、連続貼付や複数選択の流れが止まりません。控えめに、でも頼もしく。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">↩️</div>
+        <h3>Undo Paste</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">⌃⇧Z</code> で直前の貼付を取り消し。間違った欄に流し込んだ瞬間、ひとつ前のクリップボード状態に戻すので、「やってしまった」を恐れずに連続貼付できます。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">⌘?</div>
+        <h3>ヘルプオーバーレイ</h3>
+        <p>いつでも <code style="font-family:var(--mono);font-size:13px">⌘?</code> で全ショートカット一覧をその場に重ねて表示。覚えなくていい。忘れていい。必要な時に、必要なだけ、ヒントが現れます。</p>
+      </div>
+    </div>
+
+    <div class="dsl-stage reveal" style="margin-top:32px;padding:0;overflow:hidden;background:#0b0d12;border:1px solid rgba(255,255,255,0.06)">
+      <div style="padding:18px 22px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);color:#c7c7cc;font-size:13px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#a855f7"></span>
+        <span style="font-weight:600;color:#e5e7eb">⌘I  AI アクション</span>
+        <span style="opacity:0.6">— 選択中のクリップに対して、オンデバイスで実行</span>
+        <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:#86868b">Foundation Models · macOS 26+</span>
+      </div>
+      <div style="padding:14px 16px;color:#e5e7eb;font-family:var(--font);font-size:13px;line-height:1.7">
+        <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:rgba(168,85,247,0.16)"><span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;text-align:center;font-size:12px;line-height:22px;font-weight:700">R</span><span style="flex:1">書き直す — もう少し丁寧に / カジュアルに / 短く</span><span style="font-family:var(--mono);font-size:11px;color:#86868b">⌃⇧R</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:rgba(99,102,241,0.14);margin-top:4px"><span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;text-align:center;font-size:12px;line-height:22px;font-weight:700">T</span><span style="flex:1">翻訳 — 日本語 ↔ 英語、自動判定</span><span style="font-family:var(--mono);font-size:11px;color:#86868b">⌃⇧T</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:rgba(6,182,212,0.14);margin-top:4px"><span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#10b981,#22d3ee);color:white;text-align:center;font-size:12px;line-height:22px;font-weight:700">S</span><span style="flex:1">要約 — 長文を 3 行に</span><span style="font-family:var(--mono);font-size:11px;color:#86868b">⌃⇧S</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,0.14);margin-top:4px"><span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#f59e0b,#f97316);color:white;text-align:center;font-size:12px;line-height:22px;font-weight:700">J</span><span style="flex:1">変換 — JSON 整形 / マークダウン化 / 箇条書き</span><span style="font-family:var(--mono);font-size:11px;color:#86868b">⌃⇧J</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:rgba(244,63,94,0.14);margin-top:4px"><span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#ef4444,#f43f5e);color:white;text-align:center;font-size:12px;line-height:22px;font-weight:700">E</span><span style="flex:1">メール整形 — 件名・本文・署名のテンプレに流し込み</span><span style="font-family:var(--mono);font-size:11px;color:#86868b">⌃⇧E</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DSL SEARCH DEMO ============================================ -->
 <section id="search">
   <div class="container">
@@ -1171,7 +1267,7 @@
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Pasty.dmg をダウンロード
-          <small>· 3.4 MB</small>
+          <small>· 4.0 MB</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">
           すべてのリリース
@@ -1229,8 +1325,8 @@
       </div>
       <div class="step">
         <div class="num">7</div>
-        <h3>フォルダ＝倉庫に振り分ける</h3>
-        <p>ストリップ上部の「+ 新しいフォルダ」で好きな名前・色のフォルダを作成。クリップを右クリック → 「フォルダに振り分け」で分類。「定型文」ボタン or <code>⌘N</code> で文章を直接書いて保存することも。</p>
+        <h3>フォルダ＝倉庫に振り分け（自動分類も可）</h3>
+        <p>ストリップ上部の「+ 新しいフォルダ」で好きな名前・色のフォルダを作成。クリップを右クリック → 「フォルダに振り分け」で分類。「定型文」ボタン or <code>⌘N</code> で文章を直接書いて保存することも。設定 → 自動カテゴリ分類 をオンにすれば、コピーした瞬間に種別を判定して指定フォルダへ自動 pin されます。</p>
       </div>
       <div class="step">
         <div class="num">8</div>
@@ -1242,6 +1338,11 @@
         <h3>いつでも一時停止</h3>
         <p><code>⌃⇧P</code> でキャプチャを 60 秒間停止。パスワードマネージャを触る瞬間に使えます。一時停止中はメニューバーアイコンが色付きになります。</p>
       </div>
+      <div class="step">
+        <div class="num">10</div>
+        <h3>AI で書き直し・翻訳 <code>⌃⇧R/T/S</code></h3>
+        <p>クリップを選んで <code>⌘I</code> で AI メニュー。または <code>⌃⇧R</code> 書き直し、<code>⌃⇧T</code> 翻訳、<code>⌃⇧S</code> 要約、<code>⌃⇧J</code> 変換、<code>⌃⇧E</code> メール整形を直接実行。macOS 26+ は Apple Intelligence (Foundation Models)、それ未満は heuristic にフォールバック。すべてオンデバイスです。</p>
+      </div>
     </div>
 
     <h3 style="margin:64px 0 18px;font-size:22px;letter-spacing:-0.01em">キーボードショートカット早見表</h3>
@@ -1252,7 +1353,7 @@
       <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">選択中のクリップを貼付（複数選択中は順次貼付）。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">書式を捨ててプレーンテキストとして貼付。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">↩</span></div><div class="desc">複数選択を 1 ブロックに連結して貼付。</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">現在のカードを選択 / 解除。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">␣</span></div><div class="desc">現在のカードを選択 / 解除（複数選択トグル）。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↑</span><span class="k">↓</span></div><div class="desc">範囲選択を上 / 下に拡張。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">A</span></div><div class="desc">表示中の全件を選択。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">クリック</span></div><div class="desc">個別のクリップを選択トグル。</div></div>
@@ -1262,7 +1363,16 @@
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">F</span></div><div class="desc">検索フィールドにフォーカス。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">E</span></div><div class="desc">クリップを編集。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">N</span></div><div class="desc">テキストクリップを新規作成。</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Quick Look プレビュー。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Quick Look プレビュー（全画面）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">P</span></div><div class="desc">Explorer モード切替（分割ペインプレビュー）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">I</span></div><div class="desc">AI アクションメニュー。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">R</span></div><div class="desc">AI で書き直し。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">T</span></div><div class="desc">AI で翻訳（日本語 ↔ 英語）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">S</span></div><div class="desc">AI で要約。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">J</span></div><div class="desc">AI で変換（JSON 整形・Markdown 化など）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">E</span></div><div class="desc">AI でメール整形。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">Z</span></div><div class="desc">直前の貼付を Undo。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">?</span></div><div class="desc">ヘルプオーバーレイ（全キー早見表）を表示。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">,</span></div><div class="desc">設定を開く。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⌫</span></div><div class="desc">ハイライト中のクリップを削除。</div></div>
       <div class="shortcut-row"><div class="keys"><span class="k">⎋</span></div><div class="desc">パネルを閉じる。</div></div>
@@ -1287,6 +1397,7 @@
         <h4>Pasty</h4>
         <ul>
           <li><a href="#surfaces">サーフェス</a></li>
+          <li><a href="#ai">v0.4 の革命</a></li>
           <li><a href="#search">検索 DSL</a></li>
           <li><a href="#privacy">プライバシー</a></li>
           <li><a href="#download">ダウンロード</a></li>
