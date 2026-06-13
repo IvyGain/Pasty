@@ -1,17 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#000000" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty — Your clipboard, reimagined.</title>
-<meta name="description" content="A blazing-fast, local-first, open-source clipboard manager for macOS. Spotlight modal, bottom strip, and the world's first notch-hover dropdown — free under MIT." />
+<title>Pasty — クリップボードを、もう一度。</title>
+<meta name="description" content="macOS のための、超軽量・ローカルファースト・オープンソースなクリップボードマネージャ。Spotlight モーダル、下部ストリップ、そして世界初のノッチ・ホバー・ドロップダウン。MITで完全無料。" />
 
-<meta property="og:title" content="Pasty — Your clipboard, reimagined." />
-<meta property="og:description" content="Spotlight modal, bottom strip, notch-hover dropdown. Local-first. Open-source. Free." />
+<meta property="og:title" content="Pasty — クリップボードを、もう一度。" />
+<meta property="og:description" content="Spotlight モーダル、下部ストリップ、ノッチ・ホバー。ローカルファースト。オープンソース。無料。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://ivygain.github.io/Pasty/" />
+<meta property="og:locale" content="ja_JP" />
 <meta name="twitter:card" content="summary_large_image" />
 
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png" />
@@ -780,13 +781,13 @@
       <span>Pasty</span>
     </a>
     <ul>
-      <li><a href="#surfaces">Surfaces</a></li>
-      <li><a href="#multi">Multi-select</a></li>
-      <li><a href="#search">Search</a></li>
-      <li><a href="#privacy">Privacy</a></li>
-      <li><a href="#download">Download</a></li>
-      <li><a href="#guide">Guide</a></li>
-      <li class="cta-li"><a class="cta" href="#download">Get Pasty</a></li>
+      <li><a href="#surfaces">サーフェス</a></li>
+      <li><a href="#multi">複数選択</a></li>
+      <li><a href="#search">検索</a></li>
+      <li><a href="#privacy">プライバシー</a></li>
+      <li><a href="#download">ダウンロード</a></li>
+      <li><a href="#guide">使い方</a></li>
+      <li class="cta-li"><a class="cta" href="#download">ダウンロード</a></li>
     </ul>
   </div>
 </nav>
@@ -797,23 +798,23 @@
 <header class="hero">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">v0.2.0 · multi-select · open source · MIT</span>
-      <h1 class="headline">Your clipboard,<br/><span class="accent">reimagined.</span></h1>
+      <span class="eyebrow">v0.2.2 · 画像対応・複数選択 · オープンソース · MIT</span>
+      <h1 class="headline">クリップボードを、<br/><span class="accent">もう一度。</span></h1>
       <p class="subtitle">
-        A blazing-fast, local-first clipboard manager for macOS. Three ways to summon it — including one Paste never thought of.
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。呼び出す方法は3つ。そのうち1つは、Paste が思いつかなかったやり方です。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
-          Download for macOS
-          <small>· 3.3 MB · macOS 14+</small>
+          macOS 用をダウンロード
+          <small>· 3.4 MB · macOS 14 以降</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">
-          View on GitHub
+          GitHub で見る
         </a>
       </div>
 
       <div class="hero-icon" aria-hidden="true">
-        <img src="assets/icon-512.png" alt="Pasty app icon" width="220" height="220" />
+        <img src="assets/icon-512.png" alt="Pasty のアプリアイコン" width="220" height="220" />
       </div>
     </div>
   </div>
@@ -824,21 +825,21 @@
         <div class="wallpaper"></div>
 
         <div class="menubar">
-          <div class="left"><strong>Pasty</strong><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+          <div class="left"><strong>Pasty</strong><span>ファイル</span><span>編集</span><span>表示</span><span>ウインドウ</span><span>ヘルプ</span></div>
           <div class="right"><span class="pasty-icon"></span><span>14:21</span></div>
         </div>
 
         <div class="notch"></div>
-        <div class="notch-hot" id="notchHot" aria-label="Hover the notch to summon Pasty"></div>
-        <div class="notch-hint">↑ hover the notch</div>
+        <div class="notch-hot" id="notchHot" aria-label="ノッチに重ねると Pasty が降りてきます"></div>
+        <div class="notch-hint">↑ ノッチに重ねてみる</div>
 
         <div class="notch-dropdown" id="dropdown">
           <div class="label-row">
             <span class="dot"></span>
-            <span>Pasty · drag a clip downward to paste</span>
-            <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>Inbox</span>
-            <span class="chip"><span class="pinclr" style="background:#34C759"></span>Work</span>
-            <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>Code</span>
+            <span>Pasty · カードを下にドラッグすると貼り付け</span>
+            <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>受信</span>
+            <span class="chip"><span class="pinclr" style="background:#34C759"></span>仕事</span>
+            <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>コード</span>
           </div>
           <div class="cards" id="dropdownCards"></div>
         </div>
@@ -850,7 +851,7 @@
           <div class="line">&nbsp;&nbsp;<span class="c2">CGEvent</span>.<span class="c2">post</span>(cmdV)</div>
           <div class="line">}</div>
           <div class="line">&nbsp;</div>
-          <div class="line"><span class="comment">// hover the notch ↑ to try it</span></div>
+          <div class="line"><span class="comment">// ノッチ ↑ にカーソルを乗せてみてください</span></div>
         </div>
 
         <div class="dock">
@@ -865,24 +866,24 @@
 <section id="surfaces">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">three ways to summon</span>
-      <h2 class="section-title">One clipboard. <span class="accent">Three surfaces.</span></h2>
-      <p class="section-sub">Pasty meets you wherever your hands are — keyboard, mouse, or the corner of your eye.</p>
+      <span class="eyebrow">3 つの呼び出し方</span>
+      <h2 class="section-title">ひとつの履歴を、<span class="accent">3 つの方法で。</span></h2>
+      <p class="section-sub">キーボードでも、マウスでも、視界の端でも。Pasty は、あなたの手があるところに現れます。</p>
     </div>
 
     <div class="surfaces-wrap reveal">
       <div class="surface-list" role="tablist">
         <button class="surface-tab active" data-surface="spotlight" role="tab">
-          <div class="label">Spotlight modal <span class="kbd">⇧⌘V</span></div>
-          <div class="desc">Center modal. Type a DSL query, hit Return. The fastest path when you know what you want.</div>
+          <div class="label">Spotlight モーダル <span class="kbd">⇧⌘V</span></div>
+          <div class="desc">中央モーダル。検索 DSL を入力して Return。何をペーストしたいか分かっている時の最短経路。</div>
         </button>
         <button class="surface-tab" data-surface="strip" role="tab">
-          <div class="label">Bottom strip <span class="kbd">⌥⇧V</span></div>
-          <div class="desc">Paste-style carousel — slimmer than Paste's. Browse visually, filter by kind, paste with ⌘1-9.</div>
+          <div class="label">下部ストリップ <span class="kbd">⌥⇧V</span></div>
+          <div class="desc">Paste 風のカルーセル。Paste より細身で、見て探して、種類で絞って、⌘1〜9 で一発貼付。</div>
         </button>
         <button class="surface-tab" data-surface="notch" role="tab">
-          <div class="label">Notch hover <span class="kbd">↑ mouse</span></div>
-          <div class="desc">Mouse the notch (or top-centre on non-notched Macs). Drag a card down onto your editor. No keys.</div>
+          <div class="label">ノッチホバー <span class="kbd">↑ マウス</span></div>
+          <div class="desc">ノッチにマウスを乗せる（ノッチがない Mac は画面上端中央 20% が代わり）。カードを下にドラッグすればキーボードなしで貼付完了。</div>
         </button>
       </div>
 
@@ -892,19 +893,19 @@
           <div class="spotlight-mock">
             <div class="search">
               <span class="magn">🔍</span>
-              <input value="type:link safari" readonly aria-label="Search demo" />
+              <input value="type:link safari" readonly aria-label="検索デモ" />
             </div>
             <ul>
-              <li class="selected"><span class="badge">1</span><div class="row-main"><div class="title">https://github.com/IvyGain/Pasty</div><div class="meta">LINK · Safari · just now</div></div></li>
-              <li><span class="badge">2</span><div class="row-main"><div class="title">https://maccy.app</div><div class="meta">LINK · Safari · 2 m ago</div></div></li>
-              <li><span class="badge">3</span><div class="row-main"><div class="title">https://pasteapp.io/pricing</div><div class="meta">LINK · Safari · 14 m ago</div></div></li>
-              <li><span class="badge">4</span><div class="row-main"><div class="title">https://developer.apple.com/foundation-models</div><div class="meta">LINK · Safari · 28 m ago</div></div></li>
+              <li class="selected"><span class="badge">1</span><div class="row-main"><div class="title">https://github.com/IvyGain/Pasty</div><div class="meta">リンク · Safari · たった今</div></div></li>
+              <li><span class="badge">2</span><div class="row-main"><div class="title">https://maccy.app</div><div class="meta">リンク · Safari · 2 分前</div></div></li>
+              <li><span class="badge">3</span><div class="row-main"><div class="title">https://pasteapp.io/pricing</div><div class="meta">リンク · Safari · 14 分前</div></div></li>
+              <li><span class="badge">4</span><div class="row-main"><div class="title">https://developer.apple.com/foundation-models</div><div class="meta">リンク · Safari · 28 分前</div></div></li>
             </ul>
             <div class="foot">
-              <span><span class="kbdr">↩</span>Paste</span>
-              <span><span class="kbdr">⇧↩</span>Plain</span>
-              <span><span class="kbdr">⌘1-9</span>Quick</span>
-              <span><span class="kbdr">␣</span>Preview</span>
+              <span><span class="kbdr">↩</span>貼付</span>
+              <span><span class="kbdr">⇧↩</span>プレーン</span>
+              <span><span class="kbdr">⌘1-9</span>クイック</span>
+              <span><span class="kbdr">␣</span>プレビュー</span>
             </div>
           </div>
         </div>
@@ -914,20 +915,20 @@
           <div class="strip-mock">
             <div class="head">
               <strong style="color:white">Pasty</strong>
-              <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>Inbox</span>
-              <span class="chip"><span class="pinclr" style="background:#34C759"></span>Work</span>
-              <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>Code</span>
-              <span class="chip"><span class="pinclr" style="background:#BF5AF2"></span>Refs</span>
-              <span style="margin-left:auto">All Aa 🖼 🔗 📄</span>
+              <span class="chip"><span class="pinclr" style="background:#7C8CF8"></span>受信</span>
+              <span class="chip"><span class="pinclr" style="background:#34C759"></span>仕事</span>
+              <span class="chip"><span class="pinclr" style="background:#FF9F0A"></span>コード</span>
+              <span class="chip"><span class="pinclr" style="background:#BF5AF2"></span>参考</span>
+              <span style="margin-left:auto">すべて Aa 🖼 🔗 📄</span>
             </div>
             <div class="row">
-              <div class="card active"><div><strong>def hello():</strong><br><span style="color:#fda4af">    return "pasty"</span></div><div class="meta"><span>CODE</span><span>⌘1</span></div></div>
-              <div class="card"><div>https://github.com/<br>IvyGain/Pasty</div><div class="meta"><span>LINK</span><span>⌘2</span></div></div>
-              <div class="card"><div>{<br>&nbsp;"version": "0.1.0",<br>&nbsp;"license": "MIT"<br>}</div><div class="meta"><span>JSON</span><span>⌘3</span></div></div>
-              <div class="card"><div>Meeting notes —<br>ship v0.1 today</div><div class="meta"><span>TEXT</span><span>⌘4</span></div></div>
-              <div class="card"><div>Pasty — Paste killer</div><div class="meta"><span>TEXT</span><span>⌘5</span></div></div>
-              <div class="card"><div>screenshot.png<br>(2.3 MB)</div><div class="meta"><span>IMG</span><span>⌘6</span></div></div>
-              <div class="card"><div>/usr/local/bin/pasty</div><div class="meta"><span>FILE</span><span>⌘7</span></div></div>
+              <div class="card active"><div><strong>def hello():</strong><br><span style="color:#fda4af">    return "pasty"</span></div><div class="meta"><span>コード</span><span>⌘1</span></div></div>
+              <div class="card"><div>https://github.com/<br>IvyGain/Pasty</div><div class="meta"><span>リンク</span><span>⌘2</span></div></div>
+              <div class="card"><div>{<br>&nbsp;"version": "0.2.2",<br>&nbsp;"license": "MIT"<br>}</div><div class="meta"><span>JSON</span><span>⌘3</span></div></div>
+              <div class="card"><div>議事メモ —<br>今日 v0.2 出荷</div><div class="meta"><span>テキスト</span><span>⌘4</span></div></div>
+              <div class="card"><div>Pasty — Paste の代わりに</div><div class="meta"><span>テキスト</span><span>⌘5</span></div></div>
+              <div class="card"><div>screenshot.png<br>(2.3 MB)</div><div class="meta"><span>画像</span><span>⌘6</span></div></div>
+              <div class="card"><div>/usr/local/bin/pasty</div><div class="meta"><span>ファイル</span><span>⌘7</span></div></div>
             </div>
           </div>
         </div>
@@ -937,9 +938,9 @@
           <div class="mini-mac">
             <div class="mini-screen">
               <div class="mini-drop">
-                <div style="display:flex;gap:6px;align-items:center;color:rgba(255,255,255,0.7);font-size:10px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7)"></span>Pasty · drag downward</div>
+                <div style="display:flex;gap:6px;align-items:center;color:rgba(255,255,255,0.7);font-size:10px;margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7)"></span>Pasty · 下にドラッグ</div>
                 <div class="row">
-                  <div class="card">Hello world</div>
+                  <div class="card">こんにちは</div>
                   <div class="card">https://github.com</div>
                   <div class="card">def hi(): …</div>
                   <div class="card">{ "ok": true }</div>
@@ -958,41 +959,41 @@
 <section style="padding-top:0">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">why pasty</span>
-      <h2 class="section-title">Built on the things <span class="accent">Paste forgot.</span></h2>
-      <p class="section-sub">Pasty studied every complaint left on Paste's review pages, Reddit, and Hacker News. Then it answered them.</p>
+      <span class="eyebrow">なぜ Pasty なのか</span>
+      <h2 class="section-title">Paste が見落としたところに、<span class="accent">手を入れました。</span></h2>
+      <p class="section-sub">Paste のレビュー、Reddit、Hacker News に書かれた不満をひとつずつ読み、それぞれに答える形で Pasty を作りました。</p>
     </div>
 
     <div class="features reveal">
       <div class="feature">
         <div class="ico">⚡</div>
-        <h3>Lighter than Maccy.</h3>
-        <p>Idle under 60 MB. Cold launch in under 0.2 s. Polling done with care, not panic — and the 2.3 MB dmg proves it.</p>
+        <h3>Maccy より軽い。</h3>
+        <p>常時 60 MB 未満。コールドスタート 0.2 秒以下。慎重なポーリング、必要十分なメモリ。3.4 MB の dmg がそれを物語っています。</p>
       </div>
       <div class="feature">
         <div class="ico">🔒</div>
-        <h3>Local. Period.</h3>
-        <p>Nothing leaves your Mac. No cloud account, no telemetry, no analytics. The store is a single SQLite file you can inspect any time.</p>
+        <h3>すべて、ローカルだけで。</h3>
+        <p>あなたの Mac から外には何も出ません。クラウドアカウントなし、テレメトリなし、解析なし。データは SQLite ファイル 1 つに入っているので、いつでも自分で覗けます。</p>
       </div>
       <div class="feature">
         <div class="ico">⌥</div>
-        <h3>The notch knows.</h3>
-        <p>The first clipboard manager that turns the notch into a verb. Hover to summon, drag to paste, no keyboard required.</p>
+        <h3>ノッチが、動詞になる。</h3>
+        <p>ノッチをインタラクティブにした世界初のクリップボードマネージャ。乗せて呼び出し、ドラッグして貼り付ける。キーボードに触れる必要はありません。</p>
       </div>
       <div class="feature">
         <div class="ico">{}</div>
-        <h3>Made for devs.</h3>
-        <p>Tree-shaken syntax highlighting in 7 languages. <code style="font-family:var(--mono);font-size:13px">{{date}} {{cursor}} {{uuid}}</code> snippets that actually expand. Built-in diff.</p>
+        <h3>開発者のために。</h3>
+        <p>7 言語の構文ハイライト。<code style="font-family:var(--mono);font-size:13px">{{date}} {{cursor}} {{uuid}}</code> といったスニペットは貼付の瞬間に展開。差分ビュー内蔵。</p>
       </div>
       <div class="feature">
         <div class="ico">🔍</div>
-        <h3>Search that thinks.</h3>
-        <p>Full-text via SQLite FTS5. A real DSL on top — <code style="font-family:var(--mono);font-size:12px">type:link source:Safari /TODO/ &gt;7d</code> — composable like grep, fast like Spotlight.</p>
+        <h3>意図を読む検索。</h3>
+        <p>SQLite FTS5 による全文検索の上に、本物の DSL。<code style="font-family:var(--mono);font-size:12px">type:link source:Safari /TODO/ &gt;7d</code> のように grep のように組み合わせ、Spotlight のように速く。</p>
       </div>
       <div class="feature">
         <div class="ico">∞</div>
-        <h3>Free. Open. Forever.</h3>
-        <p>MIT-licensed. Every line on GitHub. No subscription, no tier you'll outgrow, no rug-pull. Fork it, ship it, make it yours.</p>
+        <h3>無料・OSS・ずっと。</h3>
+        <p>MIT ライセンス、コードはぜんぶ GitHub。サブスクなし、卒業するプランなし、後出しの値上げなし。フォークして、配って、好きにしてください。</p>
       </div>
     </div>
   </div>
@@ -1002,45 +1003,45 @@
 <section id="multi">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">multi-select &amp; bulk paste — new in v0.2</span>
-      <h2 class="section-title">Click. <span class="accent">Shift-click. Paste them all.</span></h2>
-      <p class="section-sub">Sometimes you copied five things to paste into five fields. Sometimes you want them merged into a single block. Pasty now does both — with the exact mouse and keyboard idioms you already know from Finder.</p>
+      <span class="eyebrow">複数選択 &amp; 一括ペースト — v0.2 で追加</span>
+      <h2 class="section-title">クリック。<span class="accent">Shift クリック。まとめて貼り付け。</span></h2>
+      <p class="section-sub">5 つの値を 5 つのフォーム欄に順に貼りたいこともあれば、ひとつのテキストにまとめて貼りたい時もある。Pasty はそのどちらにも、Finder で慣れた操作のまま対応します。</p>
     </div>
 
     <div class="features reveal" style="grid-template-columns: repeat(2, 1fr);">
       <div class="feature">
         <div class="ico">⇧</div>
-        <h3>Shift-click a range.</h3>
-        <p>Tap one clip, hold <code style="font-family:var(--mono);font-size:13px">⇧</code>, tap another. Everything between gets selected — same model as Finder, Mail, your editor. Or hold <code style="font-family:var(--mono);font-size:13px">⌘</code> to add and remove individual clips.</p>
+        <h3>Shift クリックで範囲選択。</h3>
+        <p>1 枚目を選んで、<code style="font-family:var(--mono);font-size:13px">⇧</code> を押しながら次のカードをクリック。間にあるカードがすべて選択されます。Finder、メール、エディタと同じ流儀。個別に足したい/外したいときは <code style="font-family:var(--mono);font-size:13px">⌘</code> を押しながらクリック。</p>
       </div>
       <div class="feature">
         <div class="ico">␣</div>
-        <h3>Or do it from the keyboard.</h3>
-        <p><code style="font-family:var(--mono);font-size:13px">␣</code> toggles the highlighted clip. <code style="font-family:var(--mono);font-size:13px">⇧↑/↓</code> extends the range. <code style="font-family:var(--mono);font-size:13px">⌘A</code> selects everything in view. The mouse and keyboard share the same selection — switch fluidly.</p>
+        <h3>キーボードでも同じ操作で。</h3>
+        <p><code style="font-family:var(--mono);font-size:13px">␣</code> で現在のカードを選択/解除。<code style="font-family:var(--mono);font-size:13px">⇧↑/↓</code> で範囲を広げる。<code style="font-family:var(--mono);font-size:13px">⌘A</code> で全件選択。マウスとキーボードは同じ「選択状態」を共有するので、好きな方法を行き来できます。</p>
       </div>
       <div class="feature">
         <div class="ico">↩</div>
-        <h3>Return pastes each, in order.</h3>
-        <p>With a selection, <code style="font-family:var(--mono);font-size:13px">↩</code> sends <code style="font-family:var(--mono);font-size:13px">⌘V</code> for each clip with a tiny pause between. Perfect for filling a multi-field form in one go.</p>
+        <h3>Return で順番に貼り付け。</h3>
+        <p>選択中に <code style="font-family:var(--mono);font-size:13px">↩</code> を押すと、各カードに対して <code style="font-family:var(--mono);font-size:13px">⌘V</code> を少し間隔を空けて送ります。複数欄のフォームをまとめて埋めたいとき向け。</p>
       </div>
       <div class="feature">
         <div class="ico">⌥↩</div>
-        <h3>Option+Return joins them.</h3>
-        <p>One paste, one block. Pasty stitches the selected clips together with a newline (configurable) and sends them as a single insertion. Ideal for meeting notes assembled from scattered Slack snippets.</p>
+        <h3>Option+Return でまとめて 1 ブロック。</h3>
+        <p>選択したカードを改行で連結して、1 回のペーストとして送信。Slack のあちこちから集めたメモを 1 つの議事録にまとめる時に最適です。</p>
       </div>
     </div>
 
     <div class="dsl-stage reveal" style="margin-top:32px;padding:0;overflow:hidden;background:#0b0d12;border:1px solid rgba(255,255,255,0.06)">
       <div style="padding:18px 22px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);color:#c7c7cc;font-size:13px">
         <span style="width:8px;height:8px;border-radius:50%;background:#6ee7b7"></span>
-        <span style="font-weight:600;color:#e5e7eb">3 selected</span>
-        <span style="opacity:0.6">— ↩ paste each · ⌥↩ paste joined</span>
+        <span style="font-weight:600;color:#e5e7eb">3 件選択中</span>
+        <span style="opacity:0.6">— ↩ それぞれ順に貼付 · ⌥↩ まとめて 1 ブロック</span>
       </div>
       <div style="padding:6px 12px 14px;color:#e5e7eb;font-family:var(--mono);font-size:13px;line-height:1.9">
-        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18)"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>Pasty v0.2 — multi-select shipped</span><span style="margin-left:auto;color:#86868b;font-size:11px">TEXT · Notes</span></div>
-        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>https://ivygain.github.io/Pasty/</span><span style="margin-left:auto;color:#86868b;font-size:11px">LINK · Safari</span></div>
-        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>def shipIt(): return True</span><span style="margin-left:auto;color:#86868b;font-size:11px">CODE · VSCode</span></div>
-        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;opacity:0.6;margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.1);color:#86868b;text-align:center;font-size:11px;line-height:18px">4</span><span>screenshot 2026-06-13 — 2.3 MB</span><span style="margin-left:auto;color:#86868b;font-size:11px">IMAGE · Screenshot</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18)"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>Pasty v0.2 — 複数選択をリリース</span><span style="margin-left:auto;color:#86868b;font-size:11px">テキスト · メモ</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>https://ivygain.github.io/Pasty/</span><span style="margin-left:auto;color:#86868b;font-size:11px">リンク · Safari</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:rgba(99,102,241,0.18);margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#6366f1;color:white;text-align:center;font-size:11px;line-height:18px">✓</span><span>def shipIt(): return True</span><span style="margin-left:auto;color:#86868b;font-size:11px">コード · VSCode</span></div>
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;opacity:0.6;margin-top:2px"><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.1);color:#86868b;text-align:center;font-size:11px;line-height:18px">4</span><span>スクリーンショット 2026-06-13 — 2.3 MB</span><span style="margin-left:auto;color:#86868b;font-size:11px">画像 · Screenshot</span></div>
       </div>
     </div>
   </div>
@@ -1050,14 +1051,14 @@
 <section id="search">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">search dsl</span>
-      <h2 class="section-title">Spotlight, <span class="accent">but for what you copied.</span></h2>
-      <p class="section-sub">Tap an example, or type your own. The results update as you type — and yes, this whole demo runs in your browser with the same DSL Pasty ships with.</p>
+      <span class="eyebrow">検索 DSL</span>
+      <h2 class="section-title">Spotlight を、<span class="accent">コピーした履歴に。</span></h2>
+      <p class="section-sub">サンプルを押すか、自分で入力してみてください。入力に合わせて結果がリアルタイムに更新されます。このデモはブラウザ上で、Pasty 本体と同じ DSL ロジックを動かしています。</p>
     </div>
 
     <div class="dsl-stage reveal">
       <div class="examples">
-        <button class="ex" data-q="">recent</button>
+        <button class="ex" data-q="">最近</button>
         <button class="ex" data-q="type:link">type:link</button>
         <button class="ex" data-q="type:code python">type:code python</button>
         <button class="ex" data-q="source:Safari">source:Safari</button>
@@ -1067,7 +1068,7 @@
       </div>
       <div class="input-wrap">
         <span style="opacity:0.5">🔍</span>
-        <input id="dslInput" placeholder='try  type:link source:Safari  or  /TODO/' value="" />
+        <input id="dslInput" placeholder='例:  type:link source:Safari  /TODO/  &gt;1d' value="" />
       </div>
       <div class="results" id="dslResults"></div>
     </div>
@@ -1078,32 +1079,32 @@
 <section id="privacy">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">privacy by default</span>
-      <h2 class="section-title">Your clipboard is yours. <span class="accent">Yours alone.</span></h2>
-      <p class="section-sub">Pasty stores everything in a single SQLite file under your Application Support folder. Pause it, wipe it, peek inside with the macOS Terminal. There is nothing else.</p>
+      <span class="eyebrow">プライバシーが、初期設定。</span>
+      <h2 class="section-title">あなたのクリップボードは、<span class="accent">あなたのもの。</span></h2>
+      <p class="section-sub">Pasty は、Application Support フォルダ配下にある SQLite ファイル 1 つにすべてを保存します。一時停止して、削除して、ターミナルで覗いてみてください。それ以外には何もありません。</p>
     </div>
 
     <div class="privacy-grid reveal">
       <div>
-        <h3 style="font-size:24px;letter-spacing:-0.02em;margin-bottom:14px">Zero networking.<br/>Zero analytics.<br/>Zero secrets to lose.</h3>
+        <h3 style="font-size:24px;letter-spacing:-0.02em;margin-bottom:14px">ネットワーク通信ゼロ。<br/>解析ゼロ。<br/>失うものもゼロ。</h3>
         <p style="color:var(--text-soft);margin-bottom:14px">
-          The kindest thing a clipboard manager can do is be boring on the network. Pasty's binary has no HTTP client wired up at all.
-          Sensitive flag on the pasteboard? Skipped. Password manager up front? Skipped. You can blacklist apps by bundle id too.
+          クリップボードマネージャがネットワーク上でできる最高の振る舞いは、何もしないことです。Pasty のバイナリには HTTP クライアントが組み込まれていません。
+          ペーストボードの sensitive フラグは尊重します。パスワードマネージャがフロントにいる時は記録しません。バンドルID単位でアプリを除外することもできます。
         </p>
         <p style="color:var(--text-soft)">
-          <code style="font-family:var(--mono);font-size:13px">⌃⇧P</code> pauses capture for 60 seconds. The Settings → Privacy tab will wipe everything in one click.
+          <code style="font-family:var(--mono);font-size:13px">⌃⇧P</code> でキャプチャを 60 秒間一時停止。設定 → プライバシータブから、ワンクリックで全履歴を消せます。
         </p>
       </div>
       <div class="mono-list">
-<span class="dim"># everything Pasty stores</span><br>
+<span class="dim"># Pasty が保存するもの</span><br>
 ~/Library/Application Support/Pasty/<br>
-├── pasty.sqlite&nbsp;&nbsp;<span class="dim"># clips, pinboards, FTS5 index</span><br>
-└── blobs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="dim"># content-addressed image cache</span><br><br>
-<span class="dim"># everything Pasty sends</span><br>
-<span class="ok">✓ nothing</span><br><br>
-<span class="dim"># everything Pasty needs from Apple</span><br>
-<span class="ok">✓ Accessibility</span> <span class="dim">— to send ⌘V into your apps</span><br>
-<span class="ok">✓ nothing else</span>
+├── pasty.sqlite&nbsp;&nbsp;<span class="dim"># 履歴・Pinboard・FTS5 インデックス</span><br>
+└── blobs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="dim"># 画像をハッシュで保存</span><br><br>
+<span class="dim"># Pasty が外部に送るもの</span><br>
+<span class="ok">✓ ありません</span><br><br>
+<span class="dim"># Pasty が Apple に要求する権限</span><br>
+<span class="ok">✓ アクセシビリティ</span> <span class="dim">— 直前のアプリに ⌘V を送るため</span><br>
+<span class="ok">✓ それ以外なし</span>
       </div>
     </div>
   </div>
@@ -1113,22 +1114,22 @@
 <section id="download">
   <div class="container">
     <div class="download-card reveal">
-      <h2>Get Pasty.</h2>
-      <p>Download. Drag into <code style="font-family:var(--mono);font-size:0.9em">/Applications</code>. Press <code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>. That's the whole installer.</p>
+      <h2>Pasty を、はじめる。</h2>
+      <p>ダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
-          Download Pasty.dmg
-          <small>· 3.3 MB</small>
+          Pasty.dmg をダウンロード
+          <small>· 3.4 MB</small>
         </a>
         <a class="btn ghost" href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">
-          All releases
+          すべてのリリース
         </a>
       </div>
       <div class="meta-row">
-        <span>macOS 14 Sonoma or newer</span>
-        <span>Apple Silicon &amp; Intel</span>
-        <span>MIT licensed</span>
-        <span>~6 MB installed</span>
+        <span>macOS 14 Sonoma 以降</span>
+        <span>Apple Silicon &amp; Intel 対応</span>
+        <span>MIT ライセンス</span>
+        <span>インストール時 約 7 MB</span>
       </div>
     </div>
   </div>
@@ -1138,81 +1139,81 @@
 <section id="guide">
   <div class="container">
     <div class="reveal">
-      <span class="eyebrow">how to use</span>
-      <h2 class="section-title">Five minutes to <span class="accent">never lose a copy again.</span></h2>
-      <p class="section-sub">Pasty is designed to vanish into the muscle memory you already have. There are no tutorials to sit through, no accounts to make. Here is everything, in order.</p>
+      <span class="eyebrow">使い方</span>
+      <h2 class="section-title">5 分で、<span class="accent">もう「コピーを失う」を、なくす。</span></h2>
+      <p class="section-sub">Pasty は、すでにある体の動きの中に溶け込むように設計されています。チュートリアルもアカウント作成もありません。順番にどうぞ。</p>
     </div>
 
     <div class="guide-grid reveal">
       <div class="step">
         <div class="num">1</div>
-        <h3>Install &amp; first launch</h3>
-        <p>Download the dmg. Drag <code>Pasty.app</code> to <code>/Applications</code>. The first time, right-click → Open to dismiss Gatekeeper. The menu-bar icon appears in your top-right.</p>
+        <h3>インストールと初回起動</h3>
+        <p>dmg をダウンロード、<code>Pasty.app</code> を <code>/Applications</code> にドラッグ。初回だけ右クリック → 開く で Gatekeeper をくぐります。メニューバーの右上にアイコンが出ます。</p>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <h3>Grant Accessibility</h3>
-        <p>Pasty asks once. This permission is what lets it post <code>⌘V</code> into the app you were just using. Nothing else uses it.</p>
+        <h3>アクセシビリティを許可</h3>
+        <p>Pasty は 1 度だけ聞きます。これは、直前のアプリに <code>⌘V</code> を送るために使います。それ以外には使いません。</p>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <h3>Copy as you normally would</h3>
-        <p>Use <code>⌘C</code>, drag-to-copy, Share Sheets — anything. Pasty captures it in the background and dedupes by content hash.</p>
+        <h3>いつも通りにコピー</h3>
+        <p><code>⌘C</code>、ドラッグコピー、共有メニュー、なんでも構いません。Pasty がバックグラウンドで拾い、内容ハッシュで重複排除します。</p>
       </div>
       <div class="step">
         <div class="num">4</div>
-        <h3>Press <code>⇧⌘V</code></h3>
-        <p>The Spotlight-style modal appears at your cursor's screen. Type freely or pull out the DSL (<code>type:link source:Safari /TODO/</code>). Hit Return. Done.</p>
+        <h3><code>⇧⌘V</code> を押す</h3>
+        <p>カーソルのいる画面の中央に Spotlight 風のモーダルが現れます。普通に検索しても、DSL を使っても (<code>type:link source:Safari /TODO/</code>)。Return で確定。</p>
       </div>
       <div class="step">
         <div class="num">5</div>
-        <h3>Or press <code>⌥⇧V</code></h3>
-        <p>The bottom strip slides up. Use <code>←/→</code> to scan, <code>⌘1-9</code> to paste a specific card, <code>⇧↩</code> to strip rich-text formatting on the way in.</p>
+        <h3><code>⌥⇧V</code> でも呼べます</h3>
+        <p>下からストリップがせり上がります。<code>←/→</code> で送る、<code>⌘1〜9</code> で番号指定貼付、<code>⇧↩</code> で書式を捨ててプレーンテキストとして貼付。</p>
       </div>
       <div class="step">
         <div class="num">6</div>
-        <h3>Hover the notch</h3>
-        <p>Float your cursor over the MacBook notch. A Liquid-Glass strip slides down. Drag any card onto your editor — instant paste, mouse only. (Non-notched Mac? The top-centre 20% becomes a virtual notch.)</p>
+        <h3>ノッチに乗せる</h3>
+        <p>カーソルを MacBook のノッチに近づけると、Liquid Glass のストリップが滑り降りてきます。カードをそのまま下のエディタへドラッグ。マウスだけで貼付完了。(ノッチがない Mac は、画面上端の中央 20% が代わりに反応します)</p>
       </div>
       <div class="step">
         <div class="num">7</div>
-        <h3>Pin to a Pinboard</h3>
-        <p>Right-click any clip → "Pin to Inbox / Work / Code / Refs". Each pinboard is colour-tagged. Make new ones from Settings → Pinboards.</p>
+        <h3>Pinboard に振り分ける</h3>
+        <p>クリップを右クリック → 「Pin to 受信 / 仕事 / コード / 参考」。各 Pinboard は色付きタグ。新規作成は 設定 → Pinboards から。</p>
       </div>
       <div class="step">
         <div class="num">8</div>
-        <h3>Stack &amp; paste in order</h3>
-        <p>Add multiple clips to a Stack, then walk through them with repeated <code>⌘V</code>. Useful for forms, transcripts, multi-cell tables.</p>
+        <h3>Stack で順番に貼り付ける</h3>
+        <p>複数のクリップを Stack に積んでから、<code>⌘V</code> を繰り返して順に貼り付け。フォーム入力、議事メモ起こし、表のセル単位入力などで便利。</p>
       </div>
       <div class="step">
         <div class="num">9</div>
-        <h3>Pause it any time</h3>
-        <p><code>⌃⇧P</code> pauses capture for 60 seconds — perfect for when you're juggling a password manager. The menu-bar icon turns coloured while paused.</p>
+        <h3>いつでも一時停止</h3>
+        <p><code>⌃⇧P</code> でキャプチャを 60 秒間停止。パスワードマネージャを触る瞬間に使えます。一時停止中はメニューバーアイコンが色付きになります。</p>
       </div>
     </div>
 
-    <h3 style="margin:64px 0 18px;font-size:22px;letter-spacing:-0.01em">Full keyboard reference</h3>
+    <h3 style="margin:64px 0 18px;font-size:22px;letter-spacing:-0.01em">キーボードショートカット早見表</h3>
     <div class="shortcut-grid reveal">
-      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">Toggle the Spotlight-style modal.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">Toggle the bottom strip.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">P</span></div><div class="desc">Pause capture for 60 seconds.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">Paste the selected clip (or each, when multi-selected).</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">Paste as plain text.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">↩</span></div><div class="desc">Paste the selection joined into one block.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Toggle selection on the highlighted clip.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↑</span><span class="k">↓</span></div><div class="desc">Extend selection up / down.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">A</span></div><div class="desc">Select every visible clip.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">click</span></div><div class="desc">Toggle a single clip into the selection.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">click</span></div><div class="desc">Extend the selection to the clicked clip.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">1</span><span style="opacity:0.5">…</span><span class="k">9</span></div><div class="desc">Paste the Nth visible clip directly.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div><div class="desc">Move the keyboard cursor.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">F</span></div><div class="desc">Focus the search field.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">E</span></div><div class="desc">Edit the selected clip inline.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">N</span></div><div class="desc">Create a new text clip from scratch.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Quick Look preview.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">,</span></div><div class="desc">Open Settings.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⌫</span></div><div class="desc">Delete the highlighted clip.</div></div>
-      <div class="shortcut-row"><div class="keys"><span class="k">⎋</span></div><div class="desc">Dismiss any panel.</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">⌘</span><span class="k">V</span></div><div class="desc">プライマリサーフェス（Spotlight / Strip）の表示・非表示。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">⇧</span><span class="k">V</span></div><div class="desc">もう一方のサーフェスの表示・非表示。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌃</span><span class="k">⇧</span><span class="k">P</span></div><div class="desc">キャプチャを 60 秒間一時停止。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↩</span></div><div class="desc">選択中のクリップを貼付（複数選択中は順次貼付）。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↩</span></div><div class="desc">書式を捨ててプレーンテキストとして貼付。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌥</span><span class="k">↩</span></div><div class="desc">複数選択を 1 ブロックに連結して貼付。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">現在のカードを選択 / 解除。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">↑</span><span class="k">↓</span></div><div class="desc">範囲選択を上 / 下に拡張。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">A</span></div><div class="desc">表示中の全件を選択。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">クリック</span></div><div class="desc">個別のクリップを選択トグル。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⇧</span><span class="k">クリック</span></div><div class="desc">クリックしたカードまで範囲選択を拡張。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">1</span><span style="opacity:0.5">…</span><span class="k">9</span></div><div class="desc">N 番目のカードを直接貼付。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">↑</span><span class="k">↓</span><span class="k">←</span><span class="k">→</span></div><div class="desc">キーボードカーソルを移動。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">F</span></div><div class="desc">検索フィールドにフォーカス。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">E</span></div><div class="desc">クリップを編集。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">N</span></div><div class="desc">テキストクリップを新規作成。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">␣</span></div><div class="desc">Quick Look プレビュー。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌘</span><span class="k">,</span></div><div class="desc">設定を開く。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⌫</span></div><div class="desc">ハイライト中のクリップを削除。</div></div>
+      <div class="shortcut-row"><div class="keys"><span class="k">⎋</span></div><div class="desc">パネルを閉じる。</div></div>
     </div>
   </div>
 </section>
@@ -1227,29 +1228,29 @@
           <span>Pasty</span>
         </a>
         <p style="color:var(--text-soft);font-size:14px;max-width:340px">
-          A blazing-fast, local-first, open-source clipboard manager for macOS. Built on the unglamorous truth that the clipboard is the smallest, most-used UI on your computer.
+          macOS のための、超軽量・ローカルファースト・オープンソースなクリップボードマネージャ。クリップボードはコンピュータで一番小さくて、一番よく使う UI だ — その地味な真実から、Pasty は生まれました。
         </p>
       </div>
       <div>
         <h4>Pasty</h4>
         <ul>
-          <li><a href="#surfaces">Surfaces</a></li>
-          <li><a href="#search">Search DSL</a></li>
-          <li><a href="#privacy">Privacy</a></li>
-          <li><a href="#download">Download</a></li>
+          <li><a href="#surfaces">サーフェス</a></li>
+          <li><a href="#search">検索 DSL</a></li>
+          <li><a href="#privacy">プライバシー</a></li>
+          <li><a href="#download">ダウンロード</a></li>
         </ul>
       </div>
       <div>
-        <h4>Source</h4>
+        <h4>ソース</h4>
         <ul>
-          <li><a href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">GitHub repo</a></li>
-          <li><a href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">Releases</a></li>
-          <li><a href="https://github.com/IvyGain/Pasty/blob/main/docs/research/PASTE-RESEARCH.md" target="_blank" rel="noopener">Design dossier</a></li>
-          <li><a href="https://github.com/IvyGain/Pasty/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty" target="_blank" rel="noopener">GitHub リポジトリ</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/releases" target="_blank" rel="noopener">リリース</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/blob/main/docs/research/PASTE-RESEARCH.md" target="_blank" rel="noopener">設計ドシエ</a></li>
+          <li><a href="https://github.com/IvyGain/Pasty/blob/main/LICENSE" target="_blank" rel="noopener">MIT ライセンス</a></li>
         </ul>
       </div>
       <div>
-        <h4>Made on</h4>
+        <h4>技術スタック</h4>
         <ul>
           <li><span style="color:var(--text-soft);font-size:14px">Swift 6 · SwiftUI</span></li>
           <li><span style="color:var(--text-soft);font-size:14px">GRDB · SQLite FTS5</span></li>
@@ -1259,8 +1260,8 @@
       </div>
     </div>
     <div class="legal">
-      <p>© 2026 Pasty contributors · MIT licensed · Built with <a href="https://claude.com/claude-code" style="color:var(--text-soft);border-bottom:1px dotted var(--line-strong)">Claude Code</a>.</p>
-      <p style="margin-top:10px;font-size:11px;opacity:0.6">macOS, Mac, and Apple are trademarks of Apple Inc. Pasty is not affiliated with Apple Inc., Paste Team, or Maccy.</p>
+      <p>© 2026 Pasty contributors · MIT ライセンス · <a href="https://claude.com/claude-code" style="color:var(--text-soft);border-bottom:1px dotted var(--line-strong)">Claude Code</a> で構築。</p>
+      <p style="margin-top:10px;font-size:11px;opacity:0.6">macOS、Mac、Apple は Apple Inc. の商標です。Pasty は Apple Inc.、Paste Team、Maccy のいずれとも関係ありません。</p>
     </div>
   </div>
 </footer>
@@ -1276,14 +1277,14 @@
     const hot = document.getElementById('notchHot');
 
     const clips = [
-      { kind: 'text', body: 'Pasty v0.1 — ship it', meta: 'Notes · just now' },
-      { kind: 'link', body: 'https://github.com/IvyGain/Pasty', meta: 'Safari · 1m' },
-      { kind: 'code', body: "def hello():\n  return 'pasty'", meta: 'VSCode · 3m' },
-      { kind: 'text', body: '{"version":"0.1.0","license":"MIT"}', meta: 'Terminal · 5m' },
-      { kind: 'text', body: 'TODO: notarize before next release', meta: 'Things · 8m' },
-      { kind: 'link', body: 'https://maccy.app', meta: 'Safari · 12m' },
-      { kind: 'code', body: 'swift run Pasty', meta: 'Terminal · 17m' },
-      { kind: 'text', body: 'Meeting notes — clipboard ux review', meta: 'Notes · 24m' },
+      { kind: 'text', body: 'Pasty v0.2 — 出荷', meta: 'メモ · たった今' },
+      { kind: 'link', body: 'https://github.com/IvyGain/Pasty', meta: 'Safari · 1分' },
+      { kind: 'code', body: "def hello():\n  return 'pasty'", meta: 'VSCode · 3分' },
+      { kind: 'text', body: '{"version":"0.2.2","license":"MIT"}', meta: 'ターミナル · 5分' },
+      { kind: 'text', body: 'TODO: 次回リリース前に公証', meta: 'Things · 8分' },
+      { kind: 'link', body: 'https://maccy.app', meta: 'Safari · 12分' },
+      { kind: 'code', body: 'swift run Pasty', meta: 'ターミナル · 17分' },
+      { kind: 'text', body: '議事メモ — クリップボード UX レビュー', meta: 'メモ · 24分' },
     ];
 
     function render() {
@@ -1343,16 +1344,16 @@
       { kind: 'link',  text: 'https://pasteapp.io/pricing',      source: 'Safari', age: 0.7 },
       { kind: 'link',  text: 'https://developer.apple.com/foundation-models', source: 'Safari', age: 1.2 },
       { kind: 'code',  text: "def hello():\n  return 'pasty'",   source: 'VSCode', age: 0.05 },
-      { kind: 'code',  text: 'swift run Pasty',                  source: 'Terminal', age: 0.1 },
+      { kind: 'code',  text: 'swift run Pasty',                  source: 'ターミナル', age: 0.1 },
       { kind: 'code',  text: 'NSPasteboard.general.changeCount', source: 'Xcode', age: 0.4 },
-      { kind: 'code',  text: '// TODO: notarize before next release', source: 'Xcode', age: 0.5 },
-      { kind: 'code',  text: '// FIXME: handle large blobs',     source: 'Cursor', age: 2.2 },
-      { kind: 'text',  text: 'Meeting: clipboard ux review at 3pm', source: 'Notes', age: 0.3 },
-      { kind: 'text',  text: 'Pasty — Paste killer · ship it!',   source: 'Things', age: 0.9 },
-      { kind: 'text',  text: '{"version":"0.1.0","license":"MIT"}', source: 'Terminal', age: 0.05 },
-      { kind: 'image', text: 'screenshot 2026-06-13 at 11.55 — 2.3 MB', source: 'Screenshot', age: 0.02 },
-      { kind: 'file',  text: 'Pasty-0.1.0.dmg', source: 'Finder', age: 0.01 },
-      { kind: 'text',  text: 'TODO refactor Hello pasty rocks!', source: 'Notes', age: 1.5 },
+      { kind: 'code',  text: '// TODO: 次回リリース前に公証', source: 'Xcode', age: 0.5 },
+      { kind: 'code',  text: '// FIXME: 大きな blob を扱う', source: 'Cursor', age: 2.2 },
+      { kind: 'text',  text: '会議: 15時にクリップボード UX レビュー', source: 'メモ', age: 0.3 },
+      { kind: 'text',  text: 'Pasty — Paste の代わりに · 出荷!', source: 'Things', age: 0.9 },
+      { kind: 'text',  text: '{"version":"0.2.2","license":"MIT"}', source: 'ターミナル', age: 0.05 },
+      { kind: 'image', text: 'スクリーンショット 2026-06-13 11.55 — 2.3 MB', source: 'Screenshot', age: 0.02 },
+      { kind: 'file',  text: 'Pasty.dmg', source: 'Finder', age: 0.01 },
+      { kind: 'text',  text: 'TODO: リファクタ Hello pasty rocks!', source: 'メモ', age: 1.5 },
     ];
 
     function parse(q) {
@@ -1386,16 +1387,21 @@
     const results = document.getElementById('dslResults');
 
     function fmt(age) {
-      if (age < 1/24)  return Math.round(age * 1440) + ' m ago';
-      if (age < 1)     return Math.round(age * 24) + ' h ago';
-      return Math.round(age) + ' d ago';
+      if (age < 1/24)  return Math.round(age * 1440) + ' 分前';
+      if (age < 1)     return Math.round(age * 24) + ' 時間前';
+      return Math.round(age) + ' 日前';
+    }
+
+    function kindLabel(k) {
+      return ({ link: 'リンク', code: 'コード', text: 'テキスト',
+                image: '画像', file: 'ファイル' })[k] || k.toUpperCase();
     }
 
     function run() {
       const q = parse(input.value);
       const matched = corpus.filter(c => match(c, q));
       if (!matched.length) {
-        results.innerHTML = `<div class="empty">No matches. Try one of the chips above ↑</div>`;
+        results.innerHTML = `<div class="empty">該当なし。上のチップ ↑ をどれか押してみてください</div>`;
         return;
       }
       results.innerHTML = matched.slice(0, 10).map((c, i) => `
@@ -1403,7 +1409,7 @@
           <div class="badge">${i + 1}</div>
           <div class="info">
             <div class="t">${escapeHtml(firstLine(c.text))}</div>
-            <div class="m">${c.kind.toUpperCase()} · ${c.source} · ${fmt(c.age)}</div>
+            <div class="m">${kindLabel(c.kind)} · ${c.source} · ${fmt(c.age)}</div>
           </div>
         </div>
       `).join('');
