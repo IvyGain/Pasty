@@ -336,11 +336,22 @@ private struct StripCard: View {
                 Text(index <= 9 ? "⌘\(index)" : "")
                     .font(.caption2.monospaced()).foregroundStyle(.secondary)
             }
-            Text(clip.preview)
-                .font(.caption)
-                .lineLimit(6)
-                .multilineTextAlignment(.leading)
-            Spacer()
+            // 画像クリップはサムネを大きく見せ、テキスト/その他は今まで通り。
+            if clip.kind == .image, let p = clip.dataPath,
+               let img = ImageBlobCache.shared.image(for: p) {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            } else {
+                Text(clip.preview)
+                    .font(.caption)
+                    .lineLimit(6)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer(minLength: 0)
             HStack {
                 Text(clip.kind.rawValue.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))

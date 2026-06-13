@@ -125,21 +125,25 @@ final class PasteboardObserver: ObservableObject {
             )
         }
 
-        // 3) Images (TIFF / PNG). For P0 we keep a metadata-only record;
-        //    blob writing arrives with P2 (image preview UI).
-        if let tiff = pasteboard.data(forType: .tiff) {
-            let preview = "Image \(tiff.count.formattedBytes())"
+        // 3) Images。PNG が直接来ていればそれを優先、無ければ TIFF を PNG に
+        //    変換してから保存する。Finder / スクリーンショット / Slack の
+        //    どれから来ても 1 つのコードパスで吸収できる。
+        if let raw = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
+            let pngData = Self.pngData(from: raw) ?? raw
+            let hash = Self.sha256Data(pngData)
+            let rel = ClipBlobs.writeImage(pngData, hash: hash, suggestedExt: "png")
+            let preview = "Image \(pngData.count.formattedBytes())"
             return ClipItem(
                 id: nil,
                 createdAt: now,
                 kind: .image,
                 preview: preview,
                 content: nil,
-                dataPath: nil,
-                byteSize: Int64(tiff.count),
+                dataPath: rel,
+                byteSize: Int64(pngData.count),
                 sourceBundleId: bundleId,
                 sourceAppName: appName,
-                contentHash: Self.sha256Data(tiff)
+                contentHash: hash
             )
         }
 
@@ -154,6 +158,19 @@ final class PasteboardObserver: ObservableObject {
         let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
     }
+
+    /// 与えられたデータを PNG に正規化。TIFF も PNG も Bitmap 経由で
+    /// 同じ手順で吸収する。
+    fileprivate static func pngData(from data: Data) -> Data? {
+        guard let image = NSImage(data: data) else { return nil }
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+}
+
+extension NSPasteboard.PasteboardType {
+    static let png = NSPasteboard.PasteboardType("public.png")
 }
 
 private extension String {

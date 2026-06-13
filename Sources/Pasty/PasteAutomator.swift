@@ -41,7 +41,19 @@ final class PasteAutomator {
         guard !items.isEmpty else { return }
         switch strategy {
         case .join(let sep):
-            let merged = items.compactMap { $0.content ?? $0.preview }.joined(separator: sep)
+            // 画像 / バイナリは「結合」には参加しない（=文字列に変換するのが嘘になる）。
+            // ファイルパスは絶対パス文字列として文字列扱いする。
+            let parts: [String] = items.compactMap { clip in
+                switch clip.kind {
+                case .image:
+                    return clip.dataPath.map { ClipBlobs.blobURL(for: $0).path }
+                case .file:
+                    return clip.content ?? clip.preview
+                default:
+                    return clip.content ?? clip.preview
+                }
+            }
+            let merged = parts.joined(separator: sep)
             let synthetic = ClipItem(
                 id: nil, createdAt: Date(),
                 kind: .text,
@@ -115,7 +127,15 @@ final class PasteAutomator {
             if let p = item.dataPath {
                 let url = ClipBlobs.blobURL(for: p)
                 if let data = try? Data(contentsOf: url) {
-                    pb.setData(data, forType: .tiff)
+                    // 受信側アプリの互換性のため PNG / TIFF / fileURL を一緒に並べる。
+                    // 多くの編集アプリは PNG を最優先で読むが、Pages/Keynote のような
+                    // Cocoa 系は TIFF を期待することもあるので両方提供。
+                    pb.setData(data, forType: .png)
+                    if let image = NSImage(data: data),
+                       let tiff = image.tiffRepresentation {
+                        pb.setData(tiff, forType: .tiff)
+                    }
+                    pb.writeObjects([url as NSURL])
                 }
             }
         }
@@ -137,6 +157,9 @@ final class PasteAutomator {
     }
 }
 
+/// バイナリ payload（画像・ファイル・将来的に動画）を内容ハッシュで
+/// 保存するシンプルなアドレスドストア。SQLiteを肥大化させず、`dataPath`
+/// は相対パスだけを持つ。
 enum ClipBlobs {
     static var directory: URL {
         let appSupport = (try? FileManager.default.url(
@@ -145,12 +168,29 @@ enum ClipBlobs {
             appropriateFor: nil,
             create: true
         )) ?? URL(fileURLWithPath: NSHomeDirectory())
-        return appSupport
+        let dir = appSupport
             .appendingPathComponent("Pasty", isDirectory: true)
             .appendingPathComponent("blobs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }
 
     static func blobURL(for relativePath: String) -> URL {
         directory.appendingPathComponent(relativePath)
+    }
+
+    /// 画像データを `images/<hash>.<ext>` に保存して相対パスを返す。
+    /// 既に同じハッシュのファイルがあれば書かずにパスだけ返す（自然なdedupe）。
+    @discardableResult
+    static func writeImage(_ data: Data, hash: String, suggestedExt: String = "png") -> String {
+        let subdir = "images"
+        let dir = directory.appendingPathComponent(subdir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let rel = "\(subdir)/\(hash).\(suggestedExt)"
+        let url = directory.appendingPathComponent(rel)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? data.write(to: url, options: .atomic)
+        }
+        return rel
     }
 }

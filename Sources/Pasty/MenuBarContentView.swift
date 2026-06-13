@@ -232,9 +232,7 @@ private struct ClipRow: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                     .frame(width: 18)
             } else {
-                Image(systemName: clip.kind.iconName)
-                    .foregroundStyle(.tint)
-                    .frame(width: 18)
+                ClipThumbnail(clip: clip, size: 26)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(clip.preview)

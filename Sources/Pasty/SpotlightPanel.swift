@@ -37,6 +37,8 @@ struct SpotlightView: View {
     @ObservedObject var selection: SelectionModel
     @State private var query: String = ""
     @State private var results: [ClipItem] = []
+    @State private var folderID: Int64? = nil       // 選択中の "フォルダ"（pinboard）
+    @State private var kindFilter: ClipKind? = nil
     @FocusState private var searchFocused: Bool
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
@@ -44,6 +46,7 @@ struct SpotlightView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
+            pinboardBar
             Divider().opacity(0.3)
             content
             if selection.hasSelection {
@@ -67,6 +70,58 @@ struct SpotlightView: View {
         }
         .onChange(of: query) { _, _ in reload() }
         .onChange(of: store.recent) { _, _ in reload() }
+        .onChange(of: folderID) { _, _ in reload() }
+        .onChange(of: kindFilter) { _, _ in reload() }
+    }
+
+    private var pinboardBar: some View {
+        HStack(spacing: 6) {
+            folderChip(id: nil, name: "All", colorHex: "#86868b")
+            ForEach(pinboards.boards) { board in
+                folderChip(id: board.id, name: board.name, colorHex: board.colorHex)
+            }
+            Spacer()
+            HStack(spacing: 4) {
+                kindChip(nil,      label: "All")
+                kindChip(.text,    label: "Aa")
+                kindChip(.image,   label: "🖼")
+                kindChip(.link,    label: "🔗")
+                kindChip(.file,    label: "📄")
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+    }
+
+    private func folderChip(id: Int64?, name: String, colorHex: String) -> some View {
+        Button {
+            folderID = (folderID == id) ? nil : id
+        } label: {
+            HStack(spacing: 5) {
+                Circle().fill(Color(hex: colorHex)).frame(width: 7, height: 7)
+                Text(name).font(.caption)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(
+                Color.primary.opacity(folderID == id ? 0.16 : 0.06),
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func kindChip(_ kind: ClipKind?, label: String) -> some View {
+        Button {
+            kindFilter = (kindFilter == kind) ? nil : kind
+        } label: {
+            Text(label)
+                .font(.caption)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(
+                    Color.primary.opacity(kindFilter == kind ? 0.18 : 0.06),
+                    in: RoundedRectangle(cornerRadius: 4)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Search
@@ -116,6 +171,16 @@ struct SpotlightView: View {
                                 onTap: { mods in handleTap(at: idx, modifiers: mods) }
                             )
                             .id(idx)
+                            .contextMenu {
+                                ForEach(pinboards.boards) { board in
+                                    Button("Move to \(board.name)") {
+                                        guard let cid = clip.id, let bid = board.id else { return }
+                                        Task { try? await pinboards.pin(clipId: cid, toBoard: bid) }
+                                    }
+                                }
+                                Divider()
+                                Button("Add to Stack") { stack.push(clip) }
+                            }
                         }
                     }
                 }
@@ -222,17 +287,42 @@ struct SpotlightView: View {
     private func reload(initial: Bool = false) {
         let q = query
         Task { @MainActor in
-            let parsed = SearchQuery.parse(q)
+            var parsed = SearchQuery.parse(q)
+            if let f = kindFilter { parsed.kind = f }
             do {
-                let items = try await SearchEngine.run(parsed, store: store)
-                self.results = items
-                if initial || selection.cursorIndex >= items.count {
-                    selection.cursorIndex = items.isEmpty ? 0 : 0
+                let baseItems: [ClipItem]
+                if let fid = folderID,
+                   let board = pinboards.boards.first(where: { $0.id == fid }) {
+                    // フォルダ（pinboard）が選ばれているときは、その中身を母集合にして
+                    // 検索 DSL / kind フィルタを後段で適用する。
+                    let pinned = (try? await pinboards.items(in: board.id ?? -1)) ?? []
+                    baseItems = applyFilters(pinned, q: parsed)
+                } else {
+                    baseItems = try await SearchEngine.run(parsed, store: store)
+                }
+                self.results = baseItems
+                if initial || selection.cursorIndex >= baseItems.count {
+                    selection.cursorIndex = baseItems.isEmpty ? 0 : 0
                 }
             } catch {
                 NSLog("Search failed: \(error)")
             }
         }
+    }
+
+    /// pinboard 内に絞っているときの簡易フィルタ。
+    private func applyFilters(_ items: [ClipItem], q: SearchQuery) -> [ClipItem] {
+        var out = items
+        if let k = q.kind { out = out.filter { $0.kind == k } }
+        if let src = q.sourceApp?.lowercased(), !src.isEmpty {
+            out = out.filter { ($0.sourceAppName ?? "").lowercased().contains(src) }
+        }
+        if !q.freeText.isEmpty {
+            let needle = q.freeText.lowercased()
+            out = out.filter { ($0.content ?? "").lowercased().contains(needle)
+                || $0.preview.lowercased().contains(needle) }
+        }
+        return out
     }
 
     private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
@@ -329,8 +419,7 @@ private struct SpotlightRow: View {
                         .font(.caption2.monospacedDigit().weight(.semibold))
                 }
             }
-            Image(systemName: clip.kind.iconName)
-                .foregroundStyle(.tint).frame(width: 18)
+            ClipThumbnail(clip: clip, size: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(clip.preview)
                     .font(PastyTheme.titleFont)
