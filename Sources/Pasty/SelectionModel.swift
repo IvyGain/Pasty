@@ -10,8 +10,12 @@ final class SelectionModel: ObservableObject {
     /// OFF のとき、行クリックは即座に貼付。Shift+クリックや ⌘A をすると自動で ON に切り替わる。
     @Published var multiMode: Bool = false
 
-    /// 選択中の clipId 集合。
-    @Published private(set) var selectedIDs: Set<Int64> = []
+    /// 選択中の clipId — **選択した順序** を保持する配列。Set ではなく
+    /// 配列なのは、結合貼付が「ユーザーが選んだ順」で行われるようにするため。
+    @Published private(set) var orderedSelectedIDs: [Int64] = []
+
+    /// 既存呼び出し互換のための薄いラッパ。
+    var selectedIDs: Set<Int64> { Set(orderedSelectedIDs) }
 
     /// キーボードカーソル位置（results 配列内のインデックス）。
     @Published var cursorIndex: Int = 0
@@ -19,13 +23,19 @@ final class SelectionModel: ObservableObject {
     /// Shift+矢印 / Shift+クリック の範囲選択アンカー。
     @Published var anchorIndex: Int? = nil
 
-    var hasSelection: Bool { !selectedIDs.isEmpty }
-    var count: Int { selectedIDs.count }
+    var hasSelection: Bool { !orderedSelectedIDs.isEmpty }
+    var count: Int { orderedSelectedIDs.count }
 
-    func isSelected(_ id: Int64) -> Bool { selectedIDs.contains(id) }
+    func isSelected(_ id: Int64) -> Bool { orderedSelectedIDs.contains(id) }
+
+    /// 選択された順番 (1 始まり)。未選択の場合は nil。
+    func order(of id: Int64) -> Int? {
+        guard let idx = orderedSelectedIDs.firstIndex(of: id) else { return nil }
+        return idx + 1
+    }
 
     func clearAll() {
-        selectedIDs.removeAll()
+        orderedSelectedIDs.removeAll()
         anchorIndex = nil
         multiMode = false
     }
@@ -95,24 +105,24 @@ final class SelectionModel: ObservableObject {
     /// ⌘A — 表示中の全件を選択。
     func selectAll(in items: [ClipItem]) {
         multiMode = true
-        selectedIDs = Set(items.compactMap { $0.id })
+        orderedSelectedIDs = items.compactMap { $0.id }
         anchorIndex = 0
         cursorIndex = max(0, items.count - 1)
     }
 
-    /// 選択中のアイテムを results からの順序を保ったまま取り出す。
+    /// 選択中のアイテムを **選択した順序** で取り出す (結合貼付・順次貼付で使用)。
     func selectedItems(from items: [ClipItem]) -> [ClipItem] {
-        items.filter { id in selectedIDs.contains(id.id ?? -1) }
+        orderedSelectedIDs.compactMap { id in items.first(where: { $0.id == id }) }
     }
 
     // MARK: - private
 
     private func toggle(id: Int64) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-            if selectedIDs.isEmpty { multiMode = false }
+        if let idx = orderedSelectedIDs.firstIndex(of: id) {
+            orderedSelectedIDs.remove(at: idx)
+            if orderedSelectedIDs.isEmpty { multiMode = false }
         } else {
-            selectedIDs.insert(id)
+            orderedSelectedIDs.append(id)
         }
     }
 
@@ -120,9 +130,11 @@ final class SelectionModel: ObservableObject {
         let lo = min(from, to), hi = max(from, to)
         let ids = items[lo...hi].compactMap { $0.id }
         if additive {
-            for id in ids { selectedIDs.insert(id) }
+            for id in ids where !orderedSelectedIDs.contains(id) {
+                orderedSelectedIDs.append(id)
+            }
         } else {
-            selectedIDs = Set(ids)
+            orderedSelectedIDs = ids
         }
     }
 

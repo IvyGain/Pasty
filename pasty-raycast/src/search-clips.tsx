@@ -18,7 +18,8 @@ export default function Command() {
   const [clips, setClips] = useState<ClipRow[]>([]);
   const [folders, setFolders] = useState<PinboardRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // 配列で保持して「選択した順」を保持する。結合貼付もこの順序で連結される。
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // Load folders once
   useEffect(() => {
@@ -49,25 +50,20 @@ export default function Command() {
   }, [query, folderId]);
 
   const selectedClips = useMemo(
-    () => clips.filter((c) => selectedIds.has(c.id)),
+    () => selectedIds.map((id) => clips.find((c) => c.id === id)).filter((c): c is ClipRow => !!c),
     [clips, selectedIds],
   );
 
   const toggle = useCallback((id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
 
   const selectAll = useCallback(() => {
-    setSelectedIds(new Set(clips.map((c) => c.id)));
+    setSelectedIds(clips.map((c) => c.id));
   }, [clips]);
 
   const clearSelection = useCallback(() => {
-    setSelectedIds(new Set());
+    setSelectedIds([]);
   }, []);
 
   // Empty state when DB is missing
@@ -103,14 +99,19 @@ export default function Command() {
           ))}
         </List.Dropdown>
       }
-      navigationTitle={selectedIds.size > 0 ? `${selectedIds.size} 件を選択中` : "Pasty"}
+      navigationTitle={selectedIds.length > 0 ? `${selectedIds.length} 件を選択中` : "Pasty"}
     >
       <List.EmptyView title="該当するクリップがありません" icon={Icon.MagnifyingGlass} />
       {clips.map((clip) => {
-        const isSelected = selectedIds.has(clip.id);
+        const selectionOrder = selectedIds.indexOf(clip.id);
+        const isSelected = selectionOrder >= 0;
         const accessories: List.Item.Accessory[] = [];
-        if (isSelected)
-          accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
+        if (isSelected) {
+          // 選択順番号バッジ。順に 1, 2, 3, ... が振られる。
+          accessories.push({
+            tag: { value: `${selectionOrder + 1}`, color: Color.Green },
+          });
+        }
         accessories.push({ text: relativeTime(clip.createdAt) });
         if (clip.sourceAppName) accessories.push({ tag: clip.sourceAppName });
         return (
@@ -140,10 +141,10 @@ export default function Command() {
                       title="コピー時刻"
                       text={parseCreatedAt(clip.createdAt).toLocaleString("ja-JP")}
                     />
-                    {selectedIds.size > 0 && (
+                    {selectedIds.length > 0 && (
                       <List.Item.Detail.Metadata.TagList title="選択中">
                         <List.Item.Detail.Metadata.TagList.Item
-                          text={`${selectedIds.size} 件`}
+                          text={`${selectedIds.length} 件`}
                           color={Color.Green}
                         />
                       </List.Item.Detail.Metadata.TagList>

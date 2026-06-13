@@ -278,7 +278,8 @@ struct StripView: View {
                             clip: clip,
                             index: idx + 1,
                             isCursor: idx == selection.cursorIndex,
-                            isSelected: selection.isSelected(clip.id ?? -1)
+                            isSelected: selection.isSelected(clip.id ?? -1),
+                            selectionOrder: selection.order(of: clip.id ?? -1)
                         )
                         .id(idx)
                         // ダブルクリック = 貼付 / シングルクリック = 選択。
@@ -916,6 +917,7 @@ private struct StripCard: View {
     let index: Int
     let isCursor: Bool
     let isSelected: Bool
+    var selectionOrder: Int? = nil
 
     // Linear / Things 系の「カード = 240×260, 上下 4pt グリッド」を踏襲。
     // 上部バンドは少し背を低くしてシャープに、フッタはゆったり余白を取る。
@@ -989,12 +991,20 @@ private struct StripCard: View {
                 ZStack {
                     Circle()
                         .fill(Color.accentColor)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .shadow(color: Color.accentColor.opacity(0.4),
                                 radius: 6, x: 0, y: 2)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(.white)
+                    // 選択順番号を優先表示、無ければ checkmark フォールバック
+                    if let order = selectionOrder {
+                        Text("\(order)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    } else {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .heavy))
+                            .foregroundStyle(.white)
+                    }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity,

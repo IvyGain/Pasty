@@ -59,7 +59,7 @@ export default function Command() {
 function FolderClips({ folder }: { folder: PinboardRow }) {
   const [clips, setClips] = useState<ClipRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -78,23 +78,16 @@ function FolderClips({ folder }: { folder: PinboardRow }) {
   }, [clips, query]);
 
   const selectedClips = useMemo(
-    () => filtered.filter((c) => selectedIds.has(c.id)),
+    () =>
+      selectedIds.map((id) => filtered.find((c) => c.id === id)).filter((c): c is ClipRow => !!c),
     [filtered, selectedIds],
   );
 
   const toggle = useCallback((id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
-  const selectAll = useCallback(
-    () => setSelectedIds(new Set(filtered.map((c) => c.id))),
-    [filtered],
-  );
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  const selectAll = useCallback(() => setSelectedIds(filtered.map((c) => c.id)), [filtered]);
+  const clearSelection = useCallback(() => setSelectedIds([]), []);
 
   return (
     <List
@@ -107,10 +100,14 @@ function FolderClips({ folder }: { folder: PinboardRow }) {
     >
       <List.EmptyView title="このフォルダは空です" icon={Icon.Folder} />
       {filtered.map((clip) => {
-        const isSelected = selectedIds.has(clip.id);
+        const selectionOrder = selectedIds.indexOf(clip.id);
+        const isSelected = selectionOrder >= 0;
         const accessories: List.Item.Accessory[] = [];
-        if (isSelected)
-          accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
+        if (isSelected) {
+          accessories.push({
+            tag: { value: `${selectionOrder + 1}`, color: Color.Green },
+          });
+        }
         accessories.push({ text: relativeTime(clip.createdAt) });
         return (
           <List.Item
