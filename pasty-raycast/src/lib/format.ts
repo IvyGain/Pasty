@@ -95,10 +95,10 @@ export function detailMarkdown(clip: ClipRow): string {
  */
 export const GUIDE_LINES = [
   "Enter — 貼付 (複数選択は改行で結合)",
-  "⌥Enter — 貼付 + 状態維持 (⌘Space で続行)",
-  "⇧Enter — 貼付 + 末尾改行 (Slack 送信)",
-  "Space — 選択トグル",
+  "⌥Enter — 貼付 + 状態維持 (⌘Space で再開)",
+  "⇧Enter — 貼付 + 末尾改行 = Slack/Discord 送信",
+  "Space — 選択トグル (順番に番号が振られる)",
   "⌘A / ⌘D — 全選択 / 解除",
-  "Tab / ⇧Tab (or ⌘[ ⌘]) — フォルダ切替",
+  "⌘[ / ⌘] — 種類・フォルダのフィルター切替",
   "⌘K — 全アクション一覧",
 ];

@@ -1221,7 +1221,10 @@ private struct StripCard: View {
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
-        .padding(.horizontal, 12)
+        // 左に ⌘N バッジ (約 36pt) が overlay されているので、その分だけ
+        // padding を広く取ってドメイン/アプリ名と被らないようにする。
+        .padding(.leading, 44)
+        .padding(.trailing, 12)
         .frame(height: Self.footerHeight)
         .background(
             ZStack {

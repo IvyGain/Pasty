@@ -1,7 +1,15 @@
 import { List, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipActions } from "./lib/actions";
-import { recentClips, searchClips, pinboards, clipsInFolder, dbExists, dbFile } from "./lib/db";
+import {
+  recentClips,
+  searchClips,
+  pinboards,
+  clipsInFolder,
+  clipsByKind,
+  dbExists,
+  dbFile,
+} from "./lib/db";
 import {
   kindIcon,
   relativeTime,
@@ -12,9 +20,15 @@ import {
 } from "./lib/format";
 import type { ClipRow, PinboardRow } from "./lib/types";
 
+/**
+ * Filter value format:
+ *   - "all"           = recent / search
+ *   - "kind:image"    = filter by clip kind (text/image/link/file)
+ *   - "folder:<id>"   = filter by pinboard id
+ */
 export default function Command() {
   const [query, setQuery] = useState("");
-  const [folderId, setFolderId] = useState<string>("all"); // "all" or string of pinboard id
+  const [filter, setFilter] = useState<string>("all");
   const [clips, setClips] = useState<ClipRow[]>([]);
   const [folders, setFolders] = useState<PinboardRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,13 +42,16 @@ export default function Command() {
       .catch(() => setFolders([]));
   }, []);
 
-  // Reload clips when query or folder changes
+  // Reload clips when query or filter changes
   useEffect(() => {
     setLoading(true);
     const run = async () => {
       try {
-        if (folderId !== "all") {
-          setClips(await clipsInFolder(parseInt(folderId, 10)));
+        if (filter.startsWith("folder:")) {
+          setClips(await clipsInFolder(parseInt(filter.slice("folder:".length), 10)));
+        } else if (filter.startsWith("kind:")) {
+          const k = filter.slice("kind:".length) as "text" | "image" | "link" | "file";
+          setClips(await clipsByKind(k, query));
         } else if (query.trim()) {
           setClips(await searchClips(query));
         } else {
@@ -47,7 +64,7 @@ export default function Command() {
       }
     };
     run();
-  }, [query, folderId]);
+  }, [query, filter]);
 
   const selectedClips = useMemo(
     () => selectedIds.map((id) => clips.find((c) => c.id === id)).filter((c): c is ClipRow => !!c),
@@ -83,20 +100,30 @@ export default function Command() {
     <List
       isShowingDetail
       isLoading={loading}
-      searchBarPlaceholder="検索 — ↑↓ 移動 / Space 選択 / Enter 貼付 / ⌥Enter 状態維持"
+      searchBarPlaceholder="検索 — Space 選択 / Enter 貼付 / ⇧Enter 送信 / ⌥Enter 状態維持"
       onSearchTextChange={setQuery}
       throttle
       searchBarAccessory={
-        <List.Dropdown tooltip="フォルダ" value={folderId} onChange={setFolderId}>
+        <List.Dropdown tooltip="フィルター (種類 / フォルダ)" value={filter} onChange={setFilter}>
           <List.Dropdown.Item title="すべて (履歴)" value="all" icon={Icon.Clock} />
-          {folders.map((f) => (
-            <List.Dropdown.Item
-              key={f.id}
-              title={f.name}
-              value={String(f.id)}
-              icon={{ source: Icon.Circle, tintColor: f.colorHex || Color.PrimaryText }}
-            />
-          ))}
+          <List.Dropdown.Section title="種類">
+            <List.Dropdown.Item title="テキスト" value="kind:text" icon={Icon.Text} />
+            <List.Dropdown.Item title="画像" value="kind:image" icon={Icon.Image} />
+            <List.Dropdown.Item title="リンク" value="kind:link" icon={Icon.Link} />
+            <List.Dropdown.Item title="ファイル" value="kind:file" icon={Icon.Document} />
+          </List.Dropdown.Section>
+          {folders.length > 0 && (
+            <List.Dropdown.Section title="フォルダ">
+              {folders.map((f) => (
+                <List.Dropdown.Item
+                  key={f.id}
+                  title={f.name}
+                  value={`folder:${f.id}`}
+                  icon={{ source: Icon.Folder, tintColor: f.colorHex || Color.PrimaryText }}
+                />
+              ))}
+            </List.Dropdown.Section>
+          )}
         </List.Dropdown>
       }
       navigationTitle={selectedIds.length > 0 ? `${selectedIds.length} 件を選択中` : "Pasty"}
@@ -166,8 +193,8 @@ export default function Command() {
                 onSelectAll={selectAll}
                 onClearSelection={clearSelection}
                 folders={folders}
-                currentFolderId={folderId}
-                onChangeFolder={setFolderId}
+                currentFolderId={filter}
+                onChangeFolder={setFilter}
               />
             }
           />

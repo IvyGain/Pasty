@@ -96,6 +96,49 @@ export async function clipsInFolder(folderId: number): Promise<ClipRow[]> {
   );
 }
 
+/**
+ * Filter by kind. `"text"` includes plain text and code; `"image"` also
+ * catches `kind = file` rows whose content is an image path (CleanShot etc.).
+ * Optional `q` adds a fulltext / LIKE filter on top.
+ */
+export async function clipsByKind(
+  kind: "text" | "image" | "link" | "file",
+  q?: string,
+): Promise<ClipRow[]> {
+  const where: string[] = [];
+  switch (kind) {
+    case "text":
+      where.push("kind IN ('text','richText','code','other')");
+      break;
+    case "image":
+      where.push(
+        `(kind = 'image' OR (kind = 'file' AND (
+          lower(content) LIKE '%.png' OR lower(content) LIKE '%.jpg'
+       OR lower(content) LIKE '%.jpeg' OR lower(content) LIKE '%.heic'
+       OR lower(content) LIKE '%.gif'  OR lower(content) LIKE '%.webp'
+       OR lower(content) LIKE '%.tiff' OR lower(content) LIKE '%.bmp')))`,
+      );
+      break;
+    case "link":
+      where.push("(kind = 'link' OR lower(content) LIKE 'http%')");
+      break;
+    case "file":
+      where.push("kind = 'file'");
+      break;
+  }
+  if (q && q.trim()) {
+    const like = "%" + q.trim().replace(/[%_]/g, "") + "%";
+    where.push(`(preview LIKE '${like}' OR content LIKE '${like}')`);
+  }
+  const whereSql = where.join(" AND ");
+  return withRetry(() =>
+    executeSQL<ClipRow>(
+      dbFile(),
+      `SELECT ${COLS} FROM clips WHERE ${whereSql} ORDER BY createdAt DESC LIMIT ${pageSize()};`,
+    ),
+  );
+}
+
 export async function recentImages(): Promise<ClipRow[]> {
   return withRetry(() =>
     executeSQL<ClipRow>(

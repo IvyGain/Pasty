@@ -56,30 +56,51 @@ export function ClipActions({
   const count = selectedClips.length;
   const multi = count >= 2;
 
+  // 複数選択時のペーストが終わったら選択をクリアして、
+  // 状態維持モード (⌥Enter) で再表示しても古い選択が残らないようにする。
+  const pasteDefault = () => {
+    if (multi) {
+      const targets = [...selectedClips];
+      onClearSelection();
+      pasteJoined(targets);
+    } else {
+      pasteAndClose(clip);
+    }
+  };
+  const pasteKeep = () => {
+    if (multi) {
+      const targets = [...selectedClips];
+      onClearSelection();
+      pasteJoinedAndKeepState(targets);
+    } else {
+      pasteAndKeepState(clip);
+    }
+  };
+
   return (
     <ActionPanel>
       <ActionPanel.Section title="Paste">
         <Action
           title={multi ? `Paste ${count} Clips (joined)` : "Paste"}
           icon={multi ? Icon.Stack : Icon.ArrowDownCircle}
-          onAction={() => (multi ? pasteJoined(selectedClips) : pasteAndClose(clip))}
+          onAction={pasteDefault}
         />
         <Action
           title={multi ? `Paste ${count} & Keep State` : "Paste & Keep State"}
           icon={Icon.Repeat}
           shortcut={{ modifiers: ["opt"], key: "return" } as Keyboard.Shortcut}
-          onAction={() =>
-            multi ? pasteJoinedAndKeepState(selectedClips) : pasteAndKeepState(clip)
-          }
+          onAction={pasteKeep}
         />
         <Action
-          title="Paste & Submit (append Enter)"
+          // 末尾に改行を追加して貼付。Slack / Discord / iMessage で
+          // 「貼付 → 送信」を 1 アクションで完了させるショートカット。
+          title="Paste + Send (append Return)"
           icon={Icon.Reply}
           shortcut={{ modifiers: ["shift"], key: "return" } as Keyboard.Shortcut}
           onAction={() => pasteAndSubmit(clip)}
         />
         <Action
-          title="Paste, Submit & Keep State"
+          title="Paste + Send & Keep State"
           icon={Icon.Forward}
           shortcut={{ modifiers: ["opt", "shift"], key: "return" } as Keyboard.Shortcut}
           onAction={() => pasteSubmitAndKeepState(clip)}
@@ -89,7 +110,11 @@ export function ClipActions({
             title={`Paste ${count} as a Single Block`}
             icon={Icon.Stack}
             shortcut={{ modifiers: ["cmd"], key: "return" } as Keyboard.Shortcut}
-            onAction={() => pasteJoined(selectedClips)}
+            onAction={() => {
+              const targets = [...selectedClips];
+              onClearSelection();
+              pasteJoined(targets);
+            }}
           />
         )}
       </ActionPanel.Section>
@@ -124,31 +149,19 @@ export function ClipActions({
         />
       </ActionPanel.Section>
 
-      {folders && folders.length > 1 && onChangeFolder && currentFolderId !== undefined && (
-        <ActionPanel.Section title="Folder">
+      {folders && onChangeFolder && currentFolderId !== undefined && (
+        <ActionPanel.Section title="Filter">
           <Action
-            title="Previous Folder"
+            title="Previous Filter"
             icon={Icon.ArrowLeft}
             shortcut={{ modifiers: ["cmd"], key: "[" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(prevFolderId(folders, currentFolderId))}
+            onAction={() => onChangeFolder(prevFilterId(folders, currentFolderId))}
           />
           <Action
-            title="Next Folder"
+            title="Next Filter"
             icon={Icon.ArrowRight}
             shortcut={{ modifiers: ["cmd"], key: "]" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(nextFolderId(folders, currentFolderId))}
-          />
-          <Action
-            title="Previous Folder (tab)"
-            icon={Icon.ArrowLeft}
-            shortcut={{ modifiers: ["shift"], key: "tab" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(prevFolderId(folders, currentFolderId))}
-          />
-          <Action
-            title="Next Folder (tab)"
-            icon={Icon.ArrowRight}
-            shortcut={{ modifiers: [], key: "tab" } as Keyboard.Shortcut}
-            onAction={() => onChangeFolder(nextFolderId(folders, currentFolderId))}
+            onAction={() => onChangeFolder(nextFilterId(folders, currentFolderId))}
           />
         </ActionPanel.Section>
       )}
@@ -156,14 +169,29 @@ export function ClipActions({
   );
 }
 
-function nextFolderId(folders: PinboardRow[], current: string): string {
-  const ids = ["all", ...folders.map((f) => String(f.id))];
+/**
+ * Filter ids in cycle order:
+ *   "all" → kind:text → kind:image → kind:link → kind:file → folder:<id1> → folder:<id2> ...
+ */
+function allFilterIds(folders: PinboardRow[]): string[] {
+  return [
+    "all",
+    "kind:text",
+    "kind:image",
+    "kind:link",
+    "kind:file",
+    ...folders.map((f) => `folder:${f.id}`),
+  ];
+}
+
+function nextFilterId(folders: PinboardRow[], current: string): string {
+  const ids = allFilterIds(folders);
   const idx = ids.indexOf(current);
   return ids[(idx + 1 + ids.length) % ids.length];
 }
 
-function prevFolderId(folders: PinboardRow[], current: string): string {
-  const ids = ["all", ...folders.map((f) => String(f.id))];
+function prevFilterId(folders: PinboardRow[], current: string): string {
+  const ids = allFilterIds(folders);
   const idx = ids.indexOf(current);
   return ids[(idx - 1 + ids.length) % ids.length];
 }
