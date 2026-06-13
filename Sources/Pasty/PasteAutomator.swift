@@ -35,54 +35,66 @@ final class PasteAutomator {
     }
 
     private func _doPaste(_ item: ClipItem, asPlainText: Bool, autoPaste: Bool) {
+        // 召喚時のマウス位置は「ここに貼って」の意思表示。クリック有効時は
+        // パネル dismiss → 60ms 安定待ち → 合成クリック → 60ms → ⌘V の流れ。
+        // 無効時は dismiss → restoreFocus → ⌘V のシンプル経路。
+        let savedSummon = summonMouseLocation
+        summonMouseLocation = nil
+
         Task { @MainActor in
             place(item, asPlainText: asPlainText)
             guard autoPaste else {
                 if SettingsStore.shared.toastEnabled {
-                    PasteToast.shared.show(targetApp: nil, customMessage: "クリップボードに置きました")
+                    PasteToast.shared.show(targetApp: nil,
+                                           customMessage: "クリップボードに置きました")
                 }
                 return
             }
-            // 1) 直前アプリを再アクティベート（パネルが消えた瞬間にも保険）
-            await PreviousAppTracker.shared.restoreFocus(grace: 0.12)
-            // 2) ユーザが Pasty を召喚する直前にカーソルがあった場所へ
-            //    合成クリックを送って、テキストキャレットをそこに移す。
-            //    これでユーザが「ここに貼りたい」と思っていた位置に
-            //    確実に貼り付けが入る。
-            if SettingsStore.shared.clickBeforePaste,
-               let pt = summonMouseLocation {
+
+            // パネルが完全に閉じてフォーカスが落ち着くまで 60ms 待つ。
+            // これより短いとクリックが Pasty パネルを叩いて貼付が逃げる。
+            try? await Task.sleep(nanoseconds: 60_000_000)
+
+            if SettingsStore.shared.clickBeforePaste, let pt = savedSummon {
+                // クリック → 100ms 待機（アプリのキャレット移動 + 場合により
+                // app activation 完了を待つ）→ ⌘V
                 clickAtScreenPoint(pt)
-                try? await Task.sleep(nanoseconds: 60_000_000) // 60ms
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            } else {
+                // クリックなしモードでは「直前アプリにフォーカスを戻す」
+                // という従来挙動。
+                await PreviousAppTracker.shared.restoreFocus(grace: 0.08)
             }
-            // 3) ⌘V を送出
+
             emitCommandV()
-            // 4) 記録 + トースト
+
             PasteHistory.shared.record(item)
             if SettingsStore.shared.toastEnabled {
                 let app = PreviousAppTracker.shared.previous?.localizedName
-                let toastAnchor = summonMouseLocation ?? NSEvent.mouseLocation
-                PasteToast.shared.show(targetApp: app, near: toastAnchor)
+                let anchor = savedSummon ?? NSEvent.mouseLocation
+                PasteToast.shared.show(targetApp: app, near: anchor)
             }
-            // 5) 次回召喚まで保存
-            summonMouseLocation = nil
         }
     }
 
-    /// `summonMouseLocation`（左下原点・全画面座標）に左クリックを 1 回送る。
-    /// 受信側アプリ（TextEdit / Slack / メモ など）のテキスト入力欄上を
-    /// クリックすればキャレットがそこに移動するので、続く ⌘V がそこへ貼り付く。
+    /// 与えられた **Cocoa 座標** (左下原点・y 上向き、全画面座標) に左クリック
+    /// を 1 回送る。CGEvent は **Quartz 座標** (プライマリスクリーン左上原点・
+    /// y 下向き) を使うので、ここで反転する。複数スクリーン環境でも
+    /// プライマリの高さを使えば、全画面で正しく解釈される。
     private func clickAtScreenPoint(_ point: NSPoint) {
-        // CGEvent は左上原点・y下向き。NSEvent.mouseLocation は左下原点・y上向き。
-        // ターゲットスクリーンの高さ基準で反転する。
-        let cgY: CGFloat
-        if let screen = NSScreen.screens.first(where: { NSPointInRect(point, $0.frame) })
-            ?? NSScreen.main {
-            cgY = screen.frame.maxY - point.y
-        } else {
-            cgY = point.y
-        }
-        let cgPoint = CGPoint(x: point.x, y: cgY)
+        let primaryHeight = NSScreen.screens.first?.frame.height
+            ?? NSScreen.main?.frame.height ?? 0
+        let cgPoint = CGPoint(x: point.x, y: primaryHeight - point.y)
+
         let src = CGEventSource(stateID: .combinedSessionState)
+        // mouseMove → mouseDown → mouseUp の順で送ると、対象アプリが
+        // 「マウスがここに来てクリックされた」と確実に解釈する。
+        if let move = CGEvent(mouseEventSource: src,
+                              mouseType: .mouseMoved,
+                              mouseCursorPosition: cgPoint,
+                              mouseButton: .left) {
+            move.post(tap: .cghidEventTap)
+        }
         if let down = CGEvent(mouseEventSource: src,
                               mouseType: .leftMouseDown,
                               mouseCursorPosition: cgPoint,

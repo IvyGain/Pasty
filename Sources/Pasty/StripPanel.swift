@@ -638,6 +638,8 @@ struct StripView: View {
             onEsc:          { onEsc() },
             onNumber:       { n in pasteByIndex(n) },
             onSpace:        { showQuickLook() },
+            onTab:          { cycleFolder(by: 1) },
+            onShiftTab:     { cycleFolder(by: -1) },
             onShiftUp:      { selection.extend(by: -1, in: items) },
             onShiftDown:    { selection.extend(by:  1, in: items) },
             onCmdA:         { selection.selectAll(in: items) },
@@ -659,6 +661,18 @@ struct StripView: View {
         guard items.indices.contains(selection.cursorIndex) else { return }
         let clip = items[selection.cursorIndex]
         AIActionCoordinator.shared.presentMenu(for: clip, store: store)
+    }
+
+    /// Tab / Shift+Tab で「履歴 → 各フォルダ → 履歴 …」を循環。
+    /// `direction` は +1 (Tab) または -1 (Shift+Tab)。
+    private func cycleFolder(by direction: Int) {
+        // 並び：履歴(nil) → ピンボード一覧
+        var ids: [Int64?] = [nil]
+        ids.append(contentsOf: pinboards.boards.compactMap { $0.id })
+        guard ids.count > 1 else { return }
+        let currentIdx = ids.firstIndex(of: folderID) ?? 0
+        let nextIdx = ((currentIdx + direction) % ids.count + ids.count) % ids.count
+        folderID = ids[nextIdx]
     }
 
     private func runAI(_ action: AIAction) {
@@ -694,6 +708,8 @@ struct StripView: View {
     private func handleDoubleTap(at index: Int) {
         guard items.indices.contains(index) else { return }
         let clip = items[index]
+        // dismiss → paste の順。PasteAutomator 側で 60ms 待ってからクリックを
+        // 撃つので、パネルが完全に消えるまでの猶予がある。
         onDismiss()
         PasteAutomator.shared.paste(clip)
     }
@@ -844,68 +860,83 @@ struct StripView: View {
     }
 }
 
+/// **Paste 風だが Pasty 流の Liquid Glass ニュアンス** を加えた v0.4.5 のカード。
+/// 構成:
+///   ┌────────────────────────┐
+///   │ ▮ TEXT  5 days ago   │ Safari │ ← 上部カラーバンド + 相対時刻 + ソースアプリアイコン
+///   ├────────────────────────┤
+///   │                        │
+///   │   コンテンツプレビュー │ ← 画像 / コード / Markdown / リッチテキストを最適化
+///   │                        │
+///   ├────────────────────────┤
+///   │ kvellhome.com/lookbook │ ← URL ドメインやファイル名
+///   │             175 chars  │
+///   └────────────────────────┘
 private struct StripCard: View {
     let clip: ClipItem
     let index: Int
     let isCursor: Bool
     let isSelected: Bool
 
+    private static let cardSize = CGSize(width: 220, height: 230)
+    private static let bannerHeight: CGFloat = 38
+    private static let footerHeight: CGFloat = 36
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.tint)
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: clip.kind.iconName)
-                        .foregroundStyle(.tint)
-                        .accessibilityHidden(true)
-                }
-                Text(clip.sourceAppName ?? "—")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer()
-                Text(index <= 9 ? "⌘\(index)" : "")
-                    .font(.caption2.monospaced()).foregroundStyle(.secondary)
+        ZStack(alignment: .topLeading) {
+            // === ベース：マテリアル + わずかな深み ===
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.clear],
+                            startPoint: .top, endPoint: .center
+                        ))
+                )
+                .shadow(color: .black.opacity(0.18), radius: isCursor ? 18 : 8,
+                        x: 0, y: isCursor ? 8 : 4)
+
+            VStack(spacing: 0) {
+                banner
+                content
+                footer
+            }
+
+            // === 番号バッジ ⌘N（左下）===
+            if index <= 9 {
+                Text("⌘\(index)")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(
+                        Capsule(style: .continuous).fill(.thinMaterial)
+                    )
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .bottomLeading)
+                    .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            if clip.kind == .image, let p = clip.dataPath,
-               let img = ImageBlobCache.shared.image(for: p) {
-                Image(nsImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 110)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            // === 選択チェック（右下）===
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.white, Color.accentColor)
+                    .font(.system(size: 18))
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .bottomTrailing)
                     .accessibilityHidden(true)
-            } else {
-                Text(clip.preview)
-                    .font(.caption)
-                    .lineLimit(8)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            HStack {
-                Text(clip.kind.rawValue.uppercased())
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(clip.createdAt, style: .relative)
-                    .font(.system(size: 9)).foregroundStyle(.secondary)
             }
         }
-        .padding(10)
-        .frame(width: 200, height: 200, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.06))
-        )
+        .frame(width: Self.cardSize.width, height: Self.cardSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: isCursor ? 2 : 1.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: isCursor ? 2 : 0.5)
         )
+        .scaleEffect(isCursor ? 1.035 : 1.0)
+        .animation(.easeOut(duration: 0.18), value: isCursor)
         .onHover { hovering in
             guard SettingsStore.shared.hoverPreviewEnabled else { return }
             if hovering {
@@ -924,6 +955,143 @@ private struct StripCard: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    // MARK: - Banner
+
+    private var banner: some View {
+        let kindColor = KindPalette.detectedColor(for: clip)
+        let kindLabel = KindPalette.detectedLabel(for: clip)
+        return ZStack(alignment: .leading) {
+            // カラーバンドにわずかなグラデを乗せて高級感
+            LinearGradient(
+                colors: [kindColor, kindColor.opacity(0.85)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(kindLabel)
+                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                        .tracking(0.6)
+                        .foregroundStyle(.white)
+                    Text(RelativeTimeFormatter.string(from: clip.createdAt))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.86))
+                }
+                Spacer(minLength: 4)
+                if let bid = clip.sourceBundleId,
+                   let icon = SourceAppIconCache.shared.icon(forBundleID: bid) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 22, height: 22)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                } else {
+                    Image(systemName: clip.kind.iconName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(.white.opacity(0.18))
+                        )
+                }
+            }
+            .padding(.horizontal, 10)
+        }
+        .frame(height: Self.bannerHeight)
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        Group {
+            if clip.kind == .image, let p = clip.dataPath,
+               let img = ImageBlobCache.shared.image(for: p) {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
+            } else if clip.kind == .file, let bid = clip.sourceBundleId,
+                      let icon = SourceAppIconCache.shared.icon(forBundleID: bid) {
+                VStack(spacing: 8) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 56, height: 56)
+                    Text(URL(string: clip.content ?? "")?.lastPathComponent
+                         ?? clip.preview)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(8)
+            } else {
+                // テキスト系。コードならモノスペース、それ以外は標準。
+                let isCodeLike = KindPalette.detectedLabel(for: clip)
+                    .matches(["CODE", "JSON", "HTML"])
+                Text(clip.preview)
+                    .font(isCodeLike
+                          ? .system(size: 11, weight: .medium, design: .monospaced)
+                          : .system(size: 12, weight: .regular))
+                    .foregroundStyle(.primary.opacity(0.92))
+                    .lineLimit(10)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .topLeading)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+            }
+        }
+        .frame(maxHeight: Self.cardSize.height - Self.bannerHeight - Self.footerHeight)
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(alignment: .center, spacing: 6) {
+            // 左：URL ドメイン or ファイル名
+            if let s = DomainShortener.short(for: clip) {
+                Text(s)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } else if let app = clip.sourceAppName {
+                Text(app)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            // 右：文字数 or サイズ
+            Text(rightMeta)
+                .font(.system(size: 10, weight: .regular, design: .rounded))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: Self.footerHeight)
+        .background(
+            LinearGradient(
+                colors: [Color.clear, Color.primary.opacity(0.04)],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
+    }
+
+    private var rightMeta: String {
+        switch clip.kind {
+        case .image:
+            return ByteCountFormatter.string(fromByteCount: clip.byteSize, countStyle: .file)
+        case .file:
+            return ByteCountFormatter.string(fromByteCount: clip.byteSize, countStyle: .file)
+        default:
+            return "\((clip.content ?? clip.preview).count) chars"
+        }
+    }
+
     private var accessibilityHintText: String {
         let kind = clip.kind.rawValue
         let source = clip.sourceAppName ?? ""
@@ -933,6 +1101,6 @@ private struct StripCard: View {
     private var borderColor: Color {
         if isCursor   { return Color.accentColor.opacity(0.9) }
         if isSelected { return Color.accentColor.opacity(0.55) }
-        return .clear
+        return Color.primary.opacity(0.06)
     }
 }

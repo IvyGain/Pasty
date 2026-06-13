@@ -15,6 +15,7 @@ struct KeyHandlingView: NSViewRepresentable {
     var onNumber: (Int) -> Void = { _ in }
     var onSpace: () -> Void = {}
     var onTab: () -> Void = {}
+    var onShiftTab: () -> Void = {}
     var onShiftUp: () -> Void = {}
     var onShiftDown: () -> Void = {}
     var onCmdA: () -> Void = {}
@@ -76,7 +77,7 @@ struct KeyHandlingView: NSViewRepresentable {
                 // ⌘Space は複数選択トグル、Space 単独は Quick Look
                 if cmd { v.onCmdSpace() } else { v.onSpace() }
                 return
-            case 48: v.onTab(); return
+            case 48: shift ? v.onShiftTab() : v.onTab(); return
             case 51, 117: v.onDelete(); return
             default: break
             }

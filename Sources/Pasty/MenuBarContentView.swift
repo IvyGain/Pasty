@@ -185,9 +185,8 @@ struct MenuBarContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Settings…") {
-                NSApplication.shared.activate(ignoringOtherApps: true)
-                openSettings()
+            Button("設定…") {
+                openSettingsWindowRobustly()
             }
             .buttonStyle(.borderless)
             .controlSize(.small)

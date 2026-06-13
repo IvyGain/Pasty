@@ -55,14 +55,7 @@ struct PastyApp: App {
             }
             NotificationCenter.default.addObserver(forName: .pastyOpenSettings,
                                                    object: nil, queue: .main) { _ in
-                NSApp.activate(ignoringOtherApps: true)
-                // macOS 14 互換：SwiftUI の openSettings は body 内でしか取れないので
-                // 標準セレクタを叩いて Settings シーンを開く。
-                if #available(macOS 14, *) {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                } else {
-                    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                }
+                openSettingsWindowRobustly()
             }
 
             // 初回起動時のオンボーディング
@@ -108,6 +101,51 @@ private struct MenuBarLabel: View {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+}
+
+/// accessory app では設定画面を **複数の経路** で粘り強く呼ばないと
+/// 単発で開かないことがあるので、堅牢に開くヘルパ。
+@MainActor
+func openSettingsWindowRobustly() {
+    // accessory のままだとフォーカスが安定しない時があるので、一時的に
+    // regular に切り替えてから設定を呼び、Dock アイコンが出るタイミングを
+    // 与える。最後に accessory に戻す（Dock から消える）。
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+
+    let selectors = [
+        Selector(("showSettingsWindow:")),
+        Selector(("showPreferencesWindow:")),
+        Selector(("orderFrontPreferencesPanel:"))
+    ]
+    var fired = false
+    for sel in selectors {
+        if NSApp.sendAction(sel, to: nil, from: nil) {
+            fired = true
+            break
+        }
+    }
+    if !fired {
+        // それでもダメな場合、既に開かれている Settings ウィンドウを探して前面化。
+        for w in NSApp.windows where w.title.localizedCaseInsensitiveContains("settings")
+            || w.title.localizedCaseInsensitiveContains("preferences")
+            || w.title.localizedCaseInsensitiveContains("設定") {
+            w.makeKeyAndOrderFront(nil)
+            fired = true
+            break
+        }
+    }
+    // 500ms 後に accessory に戻して Dock アイコンを片付ける。
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        if NSApp.windows.contains(where: { $0.isVisible
+            && ($0.title.localizedCaseInsensitiveContains("settings")
+            || $0.title.localizedCaseInsensitiveContains("preferences")
+            || $0.title.localizedCaseInsensitiveContains("設定")) }) {
+            // 設定が見えているなら、その間は regular のままにしておく
+            return
+        }
         NSApp.setActivationPolicy(.accessory)
     }
 }

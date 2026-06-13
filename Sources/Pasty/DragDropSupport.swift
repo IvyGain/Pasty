@@ -49,22 +49,44 @@ struct ClipReceiveDropTarget: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // ホバー中はカラフルなアクセント枠 + 軽い拡大で「ここに落とせる」を明示
+            .scaleEffect(isTargeted ? 1.05 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: isTargeted)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isTargeted ? Color.accentColor : .clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isTargeted ? Color.accentColor.opacity(0.18) : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        isTargeted ? Color.accentColor : .clear,
+                        style: StrokeStyle(lineWidth: 2, dash: isTargeted ? [4, 3] : [])
+                    )
                     .opacity(visualFeedback ? 1 : 0)
             )
             .dropDestination(for: ClipReference.self) { items, _ in
                 guard let pid = pinboardId, !items.isEmpty else { return false }
+                let boardName = pinboards.boards.first { $0.id == pid }?.name ?? "フォルダ"
                 Task { @MainActor in
+                    var added = 0
                     for ref in items where ref.clipId > 0 {
-                        try? await pinboards.pin(clipId: ref.clipId, toBoard: pid)
+                        do {
+                            try await pinboards.pin(clipId: ref.clipId, toBoard: pid)
+                            added += 1
+                        } catch {
+                            NSLog("pin failed: \(error)")
+                        }
                     }
-                    PasteToast.shared.show(
-                        targetApp: nil,
-                        customMessage: "\(items.count) 件をフォルダへ追加"
-                    )
-                    _ = store // 参照保持
+                    let msg: String
+                    if added == 1 {
+                        msg = "📌 \(boardName) に定型文として保存"
+                    } else if added > 1 {
+                        msg = "📌 \(boardName) に \(added) 件を保存"
+                    } else {
+                        msg = "保存に失敗しました"
+                    }
+                    PasteToast.shared.show(targetApp: nil, customMessage: msg)
+                    _ = store
                 }
                 return true
             } isTargeted: { hovering in
