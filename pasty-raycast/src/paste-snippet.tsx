@@ -40,13 +40,13 @@ export default function Command() {
     if (!query.trim()) return clips;
     const q = query.toLowerCase();
     return clips.filter(
-      (c) => c.preview.toLowerCase().includes(q) || (c.content ?? "").toLowerCase().includes(q)
+      (c) => c.preview.toLowerCase().includes(q) || (c.content ?? "").toLowerCase().includes(q),
     );
   }, [clips, query]);
 
   const selectedClips = useMemo(
     () => filtered.filter((c) => selectedIds.has(c.id)),
-    [filtered, selectedIds]
+    [filtered, selectedIds],
   );
 
   const toggle = useCallback((id: number) => {
@@ -58,13 +58,20 @@ export default function Command() {
     });
   }, []);
 
-  const selectAll = useCallback(() => setSelectedIds(new Set(filtered.map((c) => c.id))), [filtered]);
+  const selectAll = useCallback(
+    () => setSelectedIds(new Set(filtered.map((c) => c.id))),
+    [filtered],
+  );
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   if (!dbExists()) {
     return (
       <List>
-        <List.EmptyView title="Pasty が見つかりません" description={`DB が見つかりません: ${dbFile()}`} icon={Icon.ExclamationMark} />
+        <List.EmptyView
+          title="Pasty が見つかりません"
+          description={`DB が見つかりません: ${dbFile()}`}
+          icon={Icon.ExclamationMark}
+        />
       </List>
     );
   }
@@ -99,12 +106,16 @@ export default function Command() {
       {filtered.map((clip) => {
         const isSelected = selectedIds.has(clip.id);
         const accessories: List.Item.Accessory[] = [];
-        if (isSelected) accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
+        if (isSelected)
+          accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
         accessories.push({ text: relativeTime(clip.createdAt) });
         return (
           <List.Item
             key={clip.id}
-            icon={{ source: kindIcon(clip.kind), tintColor: isSelected ? Color.Green : Color.PrimaryText }}
+            icon={{
+              source: kindIcon(clip.kind),
+              tintColor: isSelected ? Color.Green : Color.PrimaryText,
+            }}
             title={clip.preview.split("\n")[0].slice(0, 120) || "(empty)"}
             accessories={accessories}
             detail={
@@ -113,7 +124,10 @@ export default function Command() {
                 metadata={
                   <List.Item.Detail.Metadata>
                     <List.Item.Detail.Metadata.Label title="種類" text={clip.kind} />
-                    <List.Item.Detail.Metadata.Label title="サイズ" text={shortBytes(clip.byteSize)} />
+                    <List.Item.Detail.Metadata.Label
+                      title="サイズ"
+                      text={shortBytes(clip.byteSize)}
+                    />
                   </List.Item.Detail.Metadata>
                 }
               />

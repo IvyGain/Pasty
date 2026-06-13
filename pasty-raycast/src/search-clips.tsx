@@ -15,7 +15,9 @@ export default function Command() {
 
   // Load folders once
   useEffect(() => {
-    pinboards().then(setFolders).catch(() => setFolders([]));
+    pinboards()
+      .then(setFolders)
+      .catch(() => setFolders([]));
   }, []);
 
   // Reload clips when query or folder changes
@@ -41,7 +43,7 @@ export default function Command() {
 
   const selectedClips = useMemo(
     () => clips.filter((c) => selectedIds.has(c.id)),
-    [clips, selectedIds]
+    [clips, selectedIds],
   );
 
   const toggle = useCallback((id: number) => {
@@ -94,22 +96,24 @@ export default function Command() {
           ))}
         </List.Dropdown>
       }
-      navigationTitle={
-        selectedIds.size > 0 ? `${selectedIds.size} 件を選択中` : "Pasty"
-      }
+      navigationTitle={selectedIds.size > 0 ? `${selectedIds.size} 件を選択中` : "Pasty"}
     >
       <List.EmptyView title="該当するクリップがありません" icon={Icon.MagnifyingGlass} />
       {clips.map((clip) => {
         const isSelected = selectedIds.has(clip.id);
         const accessories: List.Item.Accessory[] = [];
-        if (isSelected) accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
+        if (isSelected)
+          accessories.push({ icon: { source: Icon.CheckCircle, tintColor: Color.Green } });
         accessories.push({ text: relativeTime(clip.createdAt) });
         if (clip.sourceAppName) accessories.push({ tag: clip.sourceAppName });
         return (
           <List.Item
             key={clip.id}
             id={String(clip.id)}
-            icon={{ source: kindIcon(clip.kind), tintColor: isSelected ? Color.Green : Color.PrimaryText }}
+            icon={{
+              source: kindIcon(clip.kind),
+              tintColor: isSelected ? Color.Green : Color.PrimaryText,
+            }}
             title={clip.preview.split("\n")[0].slice(0, 120) || "(empty)"}
             accessories={accessories}
             detail={
@@ -118,7 +122,10 @@ export default function Command() {
                 metadata={
                   <List.Item.Detail.Metadata>
                     <List.Item.Detail.Metadata.Label title="種類" text={clip.kind} />
-                    <List.Item.Detail.Metadata.Label title="サイズ" text={shortBytes(clip.byteSize)} />
+                    <List.Item.Detail.Metadata.Label
+                      title="サイズ"
+                      text={shortBytes(clip.byteSize)}
+                    />
                     {clip.sourceAppName && (
                       <List.Item.Detail.Metadata.Label title="ソース" text={clip.sourceAppName} />
                     )}

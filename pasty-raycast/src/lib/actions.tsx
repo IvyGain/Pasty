@@ -1,8 +1,11 @@
 import { Action, ActionPanel, Icon, Keyboard } from "@raycast/api";
 import type { ClipRow } from "./types";
 import {
-  pasteAndClose, pasteAndStay, copyAndClose,
-  pasteJoined, pasteSequenceStay
+  pasteAndClose,
+  pasteAndStay,
+  copyAndClose,
+  pasteJoined,
+  pasteSequenceStay,
 } from "./multipaste";
 
 interface Props {
@@ -13,7 +16,13 @@ interface Props {
   onClearSelection: () => void;
 }
 
-export function ClipActions({ clip, selectedClips, onToggleSelect, onSelectAll, onClearSelection }: Props) {
+export function ClipActions({
+  clip,
+  selectedClips,
+  onToggleSelect,
+  onSelectAll,
+  onClearSelection,
+}: Props) {
   const hasSelection = selectedClips.length > 0;
   return (
     <ActionPanel>
@@ -24,14 +33,14 @@ export function ClipActions({ clip, selectedClips, onToggleSelect, onSelectAll, 
           onAction={() => pasteAndClose(clip)}
         />
         <Action
-          title="Paste & Stay (Continuous)"
+          title="Paste & Stay (continuous)"
           icon={Icon.Repeat}
           shortcut={{ modifiers: ["opt"], key: "return" }}
           onAction={() => pasteAndStay(clip)}
         />
         {hasSelection && (
           <Action
-            title={`Paste ${selectedClips.length} as Joined`}
+            title={`Paste ${selectedClips.length} as a Single Block`}
             icon={Icon.Stack}
             shortcut={{ modifiers: ["cmd"], key: "return" }}
             onAction={() => pasteJoined(selectedClips)}

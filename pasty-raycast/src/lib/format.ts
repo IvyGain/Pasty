@@ -4,13 +4,20 @@ import { blobUrl } from "./db";
 
 export function kindIcon(kind: ClipRow["kind"]): Icon {
   switch (kind) {
-    case "image": return Icon.Image;
-    case "link": return Icon.Link;
-    case "file": return Icon.Document;
-    case "code": return Icon.Code;
-    case "color": return Icon.Swatch;
-    case "richText": return Icon.Text;
-    default: return Icon.Text;
+    case "image":
+      return Icon.Image;
+    case "link":
+      return Icon.Link;
+    case "file":
+      return Icon.Document;
+    case "code":
+      return Icon.Code;
+    case "color":
+      return Icon.Swatch;
+    case "richText":
+      return Icon.Text;
+    default:
+      return Icon.Text;
   }
 }
 
@@ -45,7 +52,18 @@ export function imageFilePath(clip: ClipRow): string | null {
   return null;
 }
 
-const CODE_HINTS = ["{", "function ", "const ", "let ", "var ", "import ", "export ", "<?", "<!", "#!/"];
+const CODE_HINTS = [
+  "{",
+  "function ",
+  "const ",
+  "let ",
+  "var ",
+  "import ",
+  "export ",
+  "<?",
+  "<!",
+  "#!/",
+];
 export function looksLikeCode(s: string): boolean {
   const head = s.slice(0, 200);
   return CODE_HINTS.some((h) => head.includes(h));

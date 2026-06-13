@@ -51,6 +51,7 @@
       "required": false,
       "title": "Close after pasting",
       "label": "Close Raycast after pressing Enter to paste",
+      "description": "When checked, Raycast closes itself right after Enter pastes the selected clip. Uncheck for always-on continuous-paste mode.",
       "default": true
     },
     {

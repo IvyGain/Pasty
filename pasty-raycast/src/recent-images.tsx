@@ -31,7 +31,7 @@ export default function Command() {
 
   const filtered = query.trim()
     ? images.filter((c) =>
-        (c.preview + " " + (c.sourceAppName ?? "")).toLowerCase().includes(query.toLowerCase())
+        (c.preview + " " + (c.sourceAppName ?? "")).toLowerCase().includes(query.toLowerCase()),
       )
     : images;
 
@@ -51,7 +51,9 @@ export default function Command() {
         return (
           <Grid.Item
             key={clip.id}
-            content={path ? { source: path } : { source: Icon.Image, tintColor: Color.SecondaryText }}
+            content={
+              path ? { source: path } : { source: Icon.Image, tintColor: Color.SecondaryText }
+            }
             title={clip.preview.split("\n")[0].slice(0, 60) || "(empty)"}
             subtitle={`${relativeTime(clip.createdAt)} · ${shortBytes(clip.byteSize)}`}
             actions={
