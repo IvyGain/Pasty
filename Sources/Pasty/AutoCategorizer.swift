@@ -110,6 +110,43 @@ final class AutoCategorizer {
     }
 
     /// 解決済みの振分先 Pinboard を返す。マッピング未設定なら nil。
+    /// PinboardStore を持たない `PasteboardObserver` 系統からの呼出便利版。
+    /// ClipStore 経由で直接 pinboard_items を INSERT する。
+    func tryAutoPin(clip: ClipItem, store: ClipStore) {
+        guard let cid = clip.id else { return }
+        let cat = classifyWithoutPinboards(clip)
+        guard let pinboardId = mapping[cat] else { return }
+        Task { @MainActor in
+            try? await store.dbWriter.write { db in
+                let nextOrder = try Int.fetchOne(
+                    db,
+                    sql: "SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM pinboard_items WHERE pinboardId = ?",
+                    arguments: [pinboardId]
+                ) ?? 0
+                try db.execute(
+                    sql: """
+                        INSERT OR IGNORE INTO pinboard_items
+                        (pinboardId, clipId, sortOrder)
+                        VALUES (?, ?, ?)
+                        """,
+                    arguments: [pinboardId, cid, nextOrder]
+                )
+            }
+        }
+    }
+
+    /// PinboardStore を引かない pure 分類。
+    private func classifyWithoutPinboards(_ clip: ClipItem) -> AutoCategory {
+        if clip.kind == .image { return .image }
+        if clip.kind == .link  { return .url }
+        let content = clip.content ?? clip.preview
+        if isURL(content)   { return .url }
+        if isEmail(content) { return .email }
+        if isJSON(content)  { return .json }
+        if looksLikeCode(content) { return .code }
+        return detectLanguageCategory(content)
+    }
+
     func resolveTargetPinboard(for clip: ClipItem, pinboards: PinboardStore) -> Pinboard? {
         let category = classify(clip, pinboards: pinboards)
         guard let boardId = _mapping[category] else { return nil }

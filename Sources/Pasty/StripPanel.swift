@@ -468,11 +468,29 @@ struct StripView: View {
             onShiftDown:    { selection.extend(by:  1, in: items) },
             onCmdA:         { selection.selectAll(in: items) },
             onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
+            onCmdI:         { showAIMenu() },
             onCmdComma:     { onOpenSettings() },
             onCmdP:         { SettingsStore.shared.explorerMode.toggle() },
             onCmdSpace:     { selection.toggleCursor(in: items) },
-            onCmdQuestion:  { HelpOverlayPresenter.shared.toggle() }
+            onCmdQuestion:  { HelpOverlayPresenter.shared.toggle() },
+            onCtrlShiftR:   { runAI(.rewrite(tone: .formal)) },
+            onCtrlShiftT:   { runAI(.translate(target: .auto)) },
+            onCtrlShiftS:   { runAI(.summarize(length: .short)) },
+            onCtrlShiftJ:   { runAI(.reformat(to: .jsonPretty)) },
+            onCtrlShiftE:   { runAI(.emailify) }
         )
+    }
+
+    private func showAIMenu() {
+        guard items.indices.contains(selection.cursorIndex) else { return }
+        let clip = items[selection.cursorIndex]
+        AIActionCoordinator.shared.presentMenu(for: clip, store: store)
+    }
+
+    private func runAI(_ action: AIAction) {
+        guard items.indices.contains(selection.cursorIndex) else { return }
+        let clip = items[selection.cursorIndex]
+        AIActionCoordinator.shared.execute(action, on: clip, store: store)
     }
 
     private func showQuickLook() {

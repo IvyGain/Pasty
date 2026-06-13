@@ -65,6 +65,11 @@ struct PastyApp: App {
             OnboardingPresenter.shared.presentIfNeeded {
                 SettingsStore.shared.hasCompletedOnboarding = true
             }
+
+            // フローティング Stack ピル（Stack に積まれている時だけ表示）
+            if SettingsStore.shared.stackPillEnabled {
+                StackPillController.shared.install(stack: stack, coordinator: coordinator)
+            }
         }
     }
 
@@ -84,7 +89,7 @@ struct PastyApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: settings, pinboards: pinboards)
+            SettingsView(settings: settings, pinboards: pinboards, store: store)
         }
     }
 }

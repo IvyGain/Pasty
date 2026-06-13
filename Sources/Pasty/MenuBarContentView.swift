@@ -39,6 +39,24 @@ struct MenuBarContentView: View {
         .frame(width: 380)
         .padding(.vertical, 6)
         .onAppear { selection.clearAll() }
+        .onDrop(of: [.plainText, .url, .fileURL, .image], isTargeted: nil) { providers in
+            handleExternalDrop(providers)
+            return true
+        }
+    }
+
+    private func handleExternalDrop(_ providers: [NSItemProvider]) {
+        for provider in providers {
+            if provider.canLoadObject(ofClass: NSString.self) {
+                _ = provider.loadObject(ofClass: NSString.self) { obj, _ in
+                    guard let s = obj as? String else { return }
+                    Task { @MainActor in
+                        _ = try? await store.createTextClip(content: s, sourceAppName: "Drop")
+                        PasteToast.shared.show(targetApp: nil, customMessage: "クリップを追加")
+                    }
+                }
+            }
+        }
     }
 
     private var header: some View {

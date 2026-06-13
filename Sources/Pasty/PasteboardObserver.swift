@@ -57,6 +57,13 @@ final class PasteboardObserver: ObservableObject {
         Task { @MainActor in
             do {
                 try await store.insert(item)
+                // 自動カテゴリ分類で振分先フォルダがあれば pin する。
+                // インサート時点で id が確定しているように reloadInitial 後の
+                // `store.recent.first` を新規クリップとみなす（同じハッシュなら
+                // dedupe 済みなので問題なし）。
+                if let inserted = store.recent.first {
+                    AutoCategorizer.shared.tryAutoPin(clip: inserted, store: store)
+                }
             } catch {
                 NSLog("Pasty insert failed: \(error)")
             }

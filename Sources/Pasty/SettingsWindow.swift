@@ -5,23 +5,44 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var pinboards: PinboardStore
+    var store: ClipStore? = nil
 
     var body: some View {
         TabView {
             generalTab
-                .tabItem { Label("General", systemImage: "gear") }
+                .tabItem { Label("一般", systemImage: "gear") }
             captureTab
-                .tabItem { Label("Capture", systemImage: "doc.on.clipboard") }
+                .tabItem { Label("キャプチャ", systemImage: "doc.on.clipboard") }
             uiTab
-                .tabItem { Label("Surfaces", systemImage: "rectangle.3.group") }
+                .tabItem { Label("サーフェス", systemImage: "rectangle.3.group") }
             pinboardsTab
-                .tabItem { Label("Pinboards", systemImage: "pin") }
+                .tabItem { Label("フォルダ", systemImage: "folder") }
+            hotkeysTab
+                .tabItem { Label("ショートカット", systemImage: "command") }
+            insightsTab
+                .tabItem { Label("インサイト", systemImage: "chart.bar") }
             privacyTab
-                .tabItem { Label("Privacy", systemImage: "lock.shield") }
+                .tabItem { Label("プライバシー", systemImage: "lock.shield") }
             aboutTab
-                .tabItem { Label("About", systemImage: "info.circle") }
+                .tabItem { Label("Pastyについて", systemImage: "info.circle") }
         }
-        .frame(width: 520, height: 380)
+        .frame(width: 620, height: 460)
+    }
+
+    @ViewBuilder
+    private var hotkeysTab: some View {
+        HotkeySettingsView()
+    }
+
+    @ViewBuilder
+    private var insightsTab: some View {
+        if let store {
+            InsightsDashboard(store: store)
+        } else {
+            Text("インサイトを表示するには Pasty を再起動してください")
+                .foregroundStyle(.secondary)
+                .padding()
+        }
     }
 
     private var generalTab: some View {
@@ -129,21 +150,43 @@ struct SettingsView: View {
 
     private var privacyTab: some View {
         Form {
-            Text("Pasty keeps everything on this Mac. There is no cloud account, no telemetry, and no analytics by default.")
-                .font(.callout)
-            Divider()
-            Button("Open Application Support folder") {
-                if let appSupport = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) {
-                    NSWorkspace.shared.open(appSupport.appendingPathComponent("Pasty"))
+            Section("ローカルファースト") {
+                Text("Pasty はすべてのデータをこの Mac だけに保存します。クラウドアカウント、テレメトリ、解析は一切ありません。")
+                    .font(.callout)
+                Button("Application Support フォルダを開く") {
+                    if let appSupport = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) {
+                        NSWorkspace.shared.open(appSupport.appendingPathComponent("Pasty"))
+                    }
                 }
             }
-            Button("Wipe all clips") {
-                // Note: ClipStore is wired up at the app level; an action
-                // command/notification could trigger the wipe.
-                NotificationCenter.default.post(name: .pastyWipeAll, object: nil)
+
+            Section("バックアップと引っ越し") {
+                Button("全クリップを JSON でエクスポート") {
+                    if let store {
+                        Task {
+                            _ = try? await ImportExportManager.shared.exportWithSavePanel(
+                                store: store, pinboards: pinboards)
+                        }
+                    }
+                }
+                Button("JSON からインポート") {
+                    if let store {
+                        Task {
+                            _ = try? await ImportExportManager.shared.importWithOpenPanel(
+                                store: store, pinboards: pinboards,
+                                conflictPolicy: .skipDuplicates)
+                        }
+                    }
+                }
             }
-            .foregroundStyle(.red)
+
+            Section("削除") {
+                Button("すべての履歴を削除", role: .destructive) {
+                    NotificationCenter.default.post(name: .pastyWipeAll, object: nil)
+                }
+            }
         }
+        .formStyle(.grouped)
         .padding()
     }
 

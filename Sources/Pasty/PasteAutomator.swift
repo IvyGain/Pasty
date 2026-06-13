@@ -21,6 +21,15 @@ final class PasteAutomator {
 
     /// 1 つのクリップを貼り付ける。`autoPaste` が true なら ⌘V も送る。
     func paste(_ item: ClipItem, asPlainText: Bool = false, autoPaste: Bool = true) {
+        // テンプレに `[[name]]` プレースホルダがあれば、貼付前に値を集める。
+        // ユーザが入力を確定したら本体の `_doPaste` が呼ばれる。
+        let raw = item.content ?? item.preview
+        TemplateFieldPresenter.presentIfNeeded(for: raw) { [weak self] in
+            self?._doPaste(item, asPlainText: asPlainText, autoPaste: autoPaste)
+        }
+    }
+
+    private func _doPaste(_ item: ClipItem, asPlainText: Bool, autoPaste: Bool) {
         Task { @MainActor in
             place(item, asPlainText: asPlainText)
             guard autoPaste else {
@@ -31,6 +40,7 @@ final class PasteAutomator {
             }
             await PreviousAppTracker.shared.restoreFocus()
             emitCommandV()
+            PasteHistory.shared.record(item)
             if SettingsStore.shared.toastEnabled {
                 let app = PreviousAppTracker.shared.previous?.localizedName
                 PasteToast.shared.show(targetApp: app)
@@ -113,10 +123,11 @@ final class PasteAutomator {
         switch item.kind {
         case .text, .richText, .link, .color, .other:
             if let raw = item.content {
-                // {{date}} {{cursor}} {{uuid}} {{user}} {{clipboard}} などを貼付
-                // 直前にここで展開する。テンプレ自体は履歴に残したまま、貼付されるのは
-                // 展開後の文字列。
-                let expanded = SnippetEngine.expand(raw)
+                // Step 1: `[[name]]` mail-merge プレースホルダを (もしユーザが直近
+                // のフォームで埋めていれば) 値で置換
+                let mailMerged = TemplateFieldRuntime.applyPendingValues(to: raw)
+                // Step 2: {{date}} {{cursor}} {{uuid}} {{user}} {{clipboard}} などを展開
+                let expanded = SnippetEngine.expand(mailMerged)
                 pb.setString(expanded.text, forType: .string)
                 if item.kind == .richText, !asPlainText, let data = expanded.text.data(using: .utf8) {
                     pb.setData(data, forType: .rtf)

@@ -42,6 +42,10 @@ final class PanelCoordinator: ObservableObject {
             SettingsStore.shared.pause(forSeconds: 60)
             NSSound(named: "Tink")?.play()
         }
+        // ⌃⇧Z — 直前の貼付を取り消し
+        HotKeyManager.shared.register(.init(keyCode: 0x06, modifiers: [.control, .shift])) {
+            PasteHistory.shared.undoLast()
+        }
     }
 
     func togglePrimary() {
