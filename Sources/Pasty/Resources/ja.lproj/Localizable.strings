@@ -1,0 +1,32 @@
+/* Pasty 日本語ストリングス */
+"app.name" = "Pasty";
+"app.tagline" = "macOS用の超高速・ローカル優先・OSSクリップボードマネージャ";
+
+"menu.search" = "検索…";
+"menu.strip" = "ストリップ…";
+"menu.pause" = "60秒間 一時停止";
+"menu.resume" = "監視を再開";
+"menu.settings" = "設定…";
+"menu.quit" = "終了";
+
+"footer.watching" = "監視中";
+"footer.paused" = "停止中";
+
+"empty.title" = "何かをコピーして始めましょう";
+"empty.search" = "該当なし";
+
+"settings.general" = "一般";
+"settings.capture" = "キャプチャ";
+"settings.surfaces" = "サーフェス";
+"settings.pinboards" = "ピンボード";
+"settings.privacy" = "プライバシー";
+"settings.about" = "Pastyについて";
+
+"settings.capturing.toggle" = "クリップボードを自動キャプチャ";
+"settings.autoPaste.toggle" = "選択後に自動で貼り付け";
+"settings.notch.toggle" = "ノッチホバードロップダウン";
+"settings.strip.toggle" = "下部ストリップ (⌥⇧V)";
+
+"privacy.note" = "Pastyはすべてのデータをこのマシン内に保持します。クラウドアカウント・テレメトリ・解析は一切ありません。";
+"privacy.openFolder" = "アプリケーションサポートを開く";
+"privacy.wipe" = "全クリップを削除";

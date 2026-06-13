@@ -1,0 +1,132 @@
+import AppKit
+import SwiftUI
+
+/// Owns Pasty's three primary panels (Spotlight modal, bottom strip,
+/// notch dropdown) and routes hotkeys to them.
+@MainActor
+final class PanelCoordinator: ObservableObject {
+    private let store: ClipStore
+    private let pinboards: PinboardStore
+    private let stack: PasteStack
+
+    private var spotlight: SpotlightPanel?
+    private var strip: StripPanel?
+    let notch: NotchHoverController
+
+    init(store: ClipStore, pinboards: PinboardStore, stack: PasteStack) {
+        self.store = store
+        self.pinboards = pinboards
+        self.stack = stack
+        self.notch = NotchHoverController(store: store, pinboards: pinboards, stack: stack)
+    }
+
+    func installHotkeys() {
+        HotKeyManager.shared.register(.init(keyCode: KeyCode.v, modifiers: [.command, .shift])) {
+            [weak self] in self?.toggleSpotlight()
+        }
+        HotKeyManager.shared.register(.init(keyCode: KeyCode.v, modifiers: [.option, .shift])) {
+            [weak self] in self?.toggleStrip()
+        }
+        HotKeyManager.shared.register(.init(keyCode: KeyCode.p, modifiers: [.control, .shift])) {
+            SettingsStore.shared.pause(forSeconds: 60)
+            NSSound(named: "Tink")?.play()
+        }
+    }
+
+    func installNotchHover() {
+        if SettingsStore.shared.notchHoverEnabled {
+            notch.install()
+        }
+    }
+
+    // MARK: - Spotlight
+
+    func toggleSpotlight() {
+        if let s = spotlight, s.isVisible {
+            dismissSpotlight()
+        } else {
+            showSpotlight()
+        }
+    }
+
+    func showSpotlight() {
+        let panel = spotlight ?? makeSpotlight()
+        spotlight = panel
+        positionAtCursorScreen(panel: panel, fractionFromTop: 0.30)
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func dismissSpotlight() {
+        spotlight?.orderOut(nil)
+    }
+
+    private func makeSpotlight() -> SpotlightPanel {
+        let panel = SpotlightPanel()
+        let view = SpotlightView(
+            store: store,
+            pinboards: pinboards,
+            stack: stack,
+            onDismiss: { [weak self] in self?.dismissSpotlight() }
+        )
+        panel.contentViewController = NSHostingController(rootView: view)
+        return panel
+    }
+
+    // MARK: - Strip
+
+    func toggleStrip() {
+        guard SettingsStore.shared.stripPanelEnabled else { return }
+        if let s = strip, s.isVisible {
+            dismissStrip()
+        } else {
+            showStrip()
+        }
+    }
+
+    func showStrip() {
+        let panel = strip ?? makeStrip()
+        strip = panel
+        if let screen = NSScreen.cursorScreen() {
+            panel.position(onScreen: screen)
+        }
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func dismissStrip() {
+        strip?.orderOut(nil)
+    }
+
+    private func makeStrip() -> StripPanel {
+        let panel = StripPanel()
+        let view = StripView(
+            store: store,
+            pinboards: pinboards,
+            stack: stack,
+            onDismiss: { [weak self] in self?.dismissStrip() }
+        )
+        panel.contentViewController = NSHostingController(rootView: view)
+        return panel
+    }
+
+    // MARK: - Positioning
+
+    private func positionAtCursorScreen(panel: NSPanel, fractionFromTop: CGFloat) {
+        guard let screen = NSScreen.cursorScreen() else { return }
+        let visible = screen.visibleFrame
+        let size = panel.frame.size
+        let origin = CGPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.maxY - size.height - (visible.height * fractionFromTop)
+        )
+        panel.setFrameOrigin(origin)
+    }
+}
+
+extension NSScreen {
+    static func cursorScreen() -> NSScreen? {
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first(where: { NSPointInRect(mouse, $0.frame) }) ?? .main
+    }
+}

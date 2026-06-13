@@ -1,0 +1,32 @@
+/* Pasty English strings */
+"app.name" = "Pasty";
+"app.tagline" = "A blazing-fast, local-first, open-source clipboard manager for macOS.";
+
+"menu.search" = "Search…";
+"menu.strip" = "Strip…";
+"menu.pause" = "Pause capture for 60 s";
+"menu.resume" = "Resume capture";
+"menu.settings" = "Settings…";
+"menu.quit" = "Quit";
+
+"footer.watching" = "Watching";
+"footer.paused" = "Paused";
+
+"empty.title" = "Copy something to begin";
+"empty.search" = "No matches";
+
+"settings.general" = "General";
+"settings.capture" = "Capture";
+"settings.surfaces" = "Surfaces";
+"settings.pinboards" = "Pinboards";
+"settings.privacy" = "Privacy";
+"settings.about" = "About";
+
+"settings.capturing.toggle" = "Capture clipboard automatically";
+"settings.autoPaste.toggle" = "Auto-paste after selecting an item";
+"settings.notch.toggle" = "Notch-hover dropdown";
+"settings.strip.toggle" = "Bottom strip (⌥⇧V)";
+
+"privacy.note" = "Pasty keeps everything on this Mac. There is no cloud account, no telemetry, and no analytics by default.";
+"privacy.openFolder" = "Open Application Support folder";
+"privacy.wipe" = "Wipe all clips";

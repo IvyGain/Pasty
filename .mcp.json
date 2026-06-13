@@ -1,0 +1,81 @@
+{
+  "mcpServers": {
+    "cc-grag": {
+      "args": [
+        "mcp"
+      ],
+      "command": "/Users/mashimaro/.ccagi/bin/cc-grag",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "cc-vrag": {
+      "args": [
+        "mcp"
+      ],
+      "command": "/Users/mashimaro/.ccagi/bin/cc-vrag",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "CCMVEC_TIER": "enterprise",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "ccagi-tools": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/ccagi-tools-server",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "design-guide-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/design-guide-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "irondome-code-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/irondome-code-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "pil-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/pil-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "q-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/q-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "threejs-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/threejs-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    },
+    "xkoma-mcp": {
+      "args": [],
+      "command": "/Users/mashimaro/.ccagi/bin/xkoma-mcp",
+      "env": {
+        "ANTHROPIC_API_KEY": "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",
+        "HOME": "/Users/mashimaro"
+      }
+    }
+  }
+}
