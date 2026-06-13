@@ -35,17 +35,30 @@ struct ClipThumbnail: View {
 final class ImageBlobCache {
     static let shared = ImageBlobCache()
     private var cache: [String: NSImage] = [:]
-    private let maxItems = 64
+    private var lru: [String] = []     // 末尾が最近使用
+    private let maxItems = 256
 
     func image(for relativePath: String) -> NSImage? {
-        if let cached = cache[relativePath] { return cached }
+        if let cached = cache[relativePath] {
+            touch(relativePath)
+            return cached
+        }
         let url = ClipBlobs.blobURL(for: relativePath)
         guard FileManager.default.fileExists(atPath: url.path),
               let img = NSImage(contentsOf: url) else { return nil }
-        if cache.count >= maxItems {
-            cache.removeValue(forKey: cache.keys.first!)
+        if cache.count >= maxItems, let oldest = lru.first {
+            cache.removeValue(forKey: oldest)
+            lru.removeFirst()
         }
         cache[relativePath] = img
+        lru.append(relativePath)
         return img
+    }
+
+    private func touch(_ key: String) {
+        if let idx = lru.firstIndex(of: key) {
+            lru.remove(at: idx)
+            lru.append(key)
+        }
     }
 }

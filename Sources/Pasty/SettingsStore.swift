@@ -37,17 +37,33 @@ final class SettingsStore: ObservableObject {
     @Published var locale: String {
         didSet { defaults.set(locale, forKey: Keys.locale) }
     }
+    @Published var toastEnabled: Bool {
+        didSet { defaults.set(toastEnabled, forKey: Keys.toastEnabled) }
+    }
+    @Published var explorerMode: Bool {
+        didSet { defaults.set(explorerMode, forKey: Keys.explorerMode) }
+    }
+    @Published var hasCompletedOnboarding: Bool {
+        didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+    @Published var stackPillEnabled: Bool {
+        didSet { defaults.set(stackPillEnabled, forKey: Keys.stackPillEnabled) }
+    }
 
     private enum Keys {
-        static let primarySurface     = "pasty.primarySurface"
-        static let capturingEnabled   = "pasty.capturing"
-        static let pauseUntil         = "pasty.pauseUntil"
-        static let ignoredBundleIds   = "pasty.ignoredBundleIds"
-        static let maxRetentionDays   = "pasty.maxRetentionDays"
-        static let notchHoverEnabled  = "pasty.notchHoverEnabled"
-        static let stripPanelEnabled  = "pasty.stripPanelEnabled"
-        static let autoPaste          = "pasty.autoPaste"
-        static let locale             = "pasty.locale"
+        static let primarySurface         = "pasty.primarySurface"
+        static let capturingEnabled       = "pasty.capturing"
+        static let pauseUntil             = "pasty.pauseUntil"
+        static let ignoredBundleIds       = "pasty.ignoredBundleIds"
+        static let maxRetentionDays       = "pasty.maxRetentionDays"
+        static let notchHoverEnabled      = "pasty.notchHoverEnabled"
+        static let stripPanelEnabled      = "pasty.stripPanelEnabled"
+        static let autoPaste              = "pasty.autoPaste"
+        static let locale                 = "pasty.locale"
+        static let toastEnabled           = "pasty.toastEnabled"
+        static let explorerMode           = "pasty.explorerMode"
+        static let hasCompletedOnboarding = "pasty.hasCompletedOnboarding"
+        static let stackPillEnabled       = "pasty.stackPillEnabled"
     }
 
     private init() {
@@ -64,7 +80,11 @@ final class SettingsStore: ObservableObject {
                 "com.agilebits.onepassword7",
                 "com.1password.1password",
                 "com.bitwarden.desktop"
-            ]
+            ],
+            Keys.toastEnabled: true,
+            Keys.explorerMode: false,
+            Keys.hasCompletedOnboarding: false,
+            Keys.stackPillEnabled: true,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -85,6 +105,10 @@ final class SettingsStore: ObservableObject {
         self.stripPanelEnabled = defaults.bool(forKey: Keys.stripPanelEnabled)
         self.autoPaste = defaults.bool(forKey: Keys.autoPaste)
         self.locale = defaults.string(forKey: Keys.locale) ?? "auto"
+        self.toastEnabled = defaults.bool(forKey: Keys.toastEnabled)
+        self.explorerMode = defaults.bool(forKey: Keys.explorerMode)
+        self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        self.stackPillEnabled = defaults.bool(forKey: Keys.stackPillEnabled)
     }
 
     enum PrimarySurface: String, CaseIterable, Identifiable {

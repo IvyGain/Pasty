@@ -1,0 +1,166 @@
+import AppKit
+import SwiftUI
+
+/// 貼付直後に右下に出る一瞬のトースト。
+/// 「貼ったぞ」というフィードバックを Pasty 自身が前面化せずに伝えるための最小UI。
+@MainActor
+final class PasteToast {
+    static let shared = PasteToast()
+
+    private var panel: NSPanel?
+    private var hostingView: NSHostingView<ToastContent>?
+    private var hideWorkItem: DispatchWorkItem?
+
+    private init() {}
+
+    /// `targetApp` には `PreviousAppTracker.shared.previous?.localizedName` を渡す想定。
+    /// `customMessage` を指定するとそれが優先される。
+    func show(targetApp: String?, customMessage: String? = nil, durationSeconds: TimeInterval = 0.8) {
+        let message: String
+        if let customMessage, !customMessage.isEmpty {
+            message = customMessage
+        } else if let app = targetApp, !app.isEmpty {
+            message = "📋 \(app) に貼付"
+        } else {
+            message = "📋 貼付完了"
+        }
+
+        let panel = ensurePanel()
+        hostingView?.rootView = ToastContent(text: message)
+
+        // Hosting のレイアウトを確定させてから位置を決める。
+        panel.layoutIfNeeded()
+        let fitting = hostingView?.fittingSize ?? CGSize(width: 240, height: 44)
+        let width = min(max(fitting.width, 220), 320)
+        let height: CGFloat = 44
+
+        if let screen = NSScreen.main {
+            let visible = screen.visibleFrame
+            let origin = CGPoint(
+                x: visible.maxX - 24 - width,
+                y: visible.minY + 24
+            )
+            panel.setFrame(NSRect(origin: origin, size: CGSize(width: width, height: height)), display: false)
+        } else {
+            panel.setContentSize(CGSize(width: width, height: height))
+        }
+
+        // 連続呼び出し時は古いタイマーを破棄し、フェードを最新化。
+        hideWorkItem?.cancel()
+        hideWorkItem = nil
+
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.16
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
+
+        let work = DispatchWorkItem { [weak self] in
+            self?.hide()
+        }
+        hideWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + durationSeconds, execute: work)
+    }
+
+    func hide() {
+        hideWorkItem?.cancel()
+        hideWorkItem = nil
+        guard let panel, panel.isVisible else { return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.22
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, let panel = self.panel else { return }
+            // 完了時にまだ alpha が 0 のままなら隠す（途中で show が来ていたら触らない）。
+            if panel.alphaValue <= 0.01 {
+                panel.orderOut(nil)
+            }
+        })
+    }
+
+    // MARK: - Panel setup
+
+    private func ensurePanel() -> NSPanel {
+        if let panel { return panel }
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 44),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.level = .statusBar
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true
+        panel.isFloatingPanel = true
+        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.alphaValue = 0
+
+        let host = NSHostingView(rootView: ToastContent(text: ""))
+        host.translatesAutoresizingMaskIntoConstraints = false
+
+        let container = NSView(frame: panel.contentView?.bounds ?? .zero)
+        container.autoresizingMask = [.width, .height]
+        container.addSubview(host)
+        NSLayoutConstraint.activate([
+            host.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            host.topAnchor.constraint(equalTo: container.topAnchor),
+            host.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        panel.contentView = container
+
+        self.panel = panel
+        self.hostingView = host
+        return panel
+    }
+}
+
+// MARK: - Override key/main behavior on NSPanel
+
+// NSPanel はサブクラスを作らずプロパティで挙動を制御できるため、
+// `canBecomeKey` をブロックしたい場合はカテゴリで上書きする。
+extension NSPanel {
+    // `nonactivatingPanel` + `canBecomeKey == false` でフォーカス奪取を防ぐ。
+    // ただし既存パネル（SpotlightPanel 等）が key を必要としているので、
+    // ここでは override せずスタイルマスクのみで制御する。
+}
+
+// MARK: - SwiftUI content
+
+private struct ToastContent: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.on.clipboard.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.85))
+            Text(text)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            VisualEffectBackground()
+                .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
+                .strokeBorder(.white.opacity(PastyTheme.strokeOpacity), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
+    }
+}

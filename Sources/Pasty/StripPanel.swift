@@ -456,20 +456,28 @@ struct StripView: View {
 
     private var keyHandler: some View {
         KeyHandlingView(
-            onLeft:        { selection.moveCursor(by: -1, in: items) },
-            onRight:       { selection.moveCursor(by:  1, in: items) },
-            onReturn:      { onReturn(plain: false) },
-            onShiftReturn: { onReturn(plain: true) },
-            onOptionReturn:{ pasteSelected(join: true) },
-            onEsc:         { onEsc() },
-            onNumber:      { n in pasteByIndex(n) },
-            onSpace:       { selection.toggleCursor(in: items) },
-            onShiftUp:     { selection.extend(by: -1, in: items) },
-            onShiftDown:   { selection.extend(by:  1, in: items) },
-            onCmdA:        { selection.selectAll(in: items) },
-            onCmdN:        { showingNewSnippet = true; newSnippetText = "" },
-            onCmdComma:    { onOpenSettings() }
+            onLeft:         { selection.moveCursor(by: -1, in: items) },
+            onRight:        { selection.moveCursor(by:  1, in: items) },
+            onReturn:       { onReturn(plain: false) },
+            onShiftReturn:  { onReturn(plain: true) },
+            onOptionReturn: { pasteSelected(join: true) },
+            onEsc:          { onEsc() },
+            onNumber:       { n in pasteByIndex(n) },
+            onSpace:        { showQuickLook() },
+            onShiftUp:      { selection.extend(by: -1, in: items) },
+            onShiftDown:    { selection.extend(by:  1, in: items) },
+            onCmdA:         { selection.selectAll(in: items) },
+            onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
+            onCmdComma:     { onOpenSettings() },
+            onCmdP:         { SettingsStore.shared.explorerMode.toggle() },
+            onCmdSpace:     { selection.toggleCursor(in: items) },
+            onCmdQuestion:  { HelpOverlayPresenter.shared.toggle() }
         )
+    }
+
+    private func showQuickLook() {
+        guard !items.isEmpty else { return }
+        QuickLookPreview.shared.show(items: items, at: selection.cursorIndex)
     }
 
     private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {

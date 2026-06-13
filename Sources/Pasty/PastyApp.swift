@@ -60,6 +60,11 @@ struct PastyApp: App {
                     NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
                 }
             }
+
+            // 初回起動時のオンボーディング
+            OnboardingPresenter.shared.presentIfNeeded {
+                SettingsStore.shared.hasCompletedOnboarding = true
+            }
         }
     }
 

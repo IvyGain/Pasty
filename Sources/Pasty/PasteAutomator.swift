@@ -23,9 +23,18 @@ final class PasteAutomator {
     func paste(_ item: ClipItem, asPlainText: Bool = false, autoPaste: Bool = true) {
         Task { @MainActor in
             place(item, asPlainText: asPlainText)
-            guard autoPaste else { return }
+            guard autoPaste else {
+                if SettingsStore.shared.toastEnabled {
+                    PasteToast.shared.show(targetApp: nil, customMessage: "クリップボードに置きました")
+                }
+                return
+            }
             await PreviousAppTracker.shared.restoreFocus()
             emitCommandV()
+            if SettingsStore.shared.toastEnabled {
+                let app = PreviousAppTracker.shared.previous?.localizedName
+                PasteToast.shared.show(targetApp: app)
+            }
         }
     }
 

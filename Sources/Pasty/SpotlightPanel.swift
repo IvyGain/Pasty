@@ -201,11 +201,14 @@ struct SpotlightView: View {
                 onOptionReturn: { pasteSelected(join: true) },
                 onEsc:          { onEsc() },
                 onNumber:       { n in pasteByIndex(n) },
-                onSpace:        { selection.toggleCursor(in: results) },
+                onSpace:        { showQuickLook() },
                 onShiftUp:      { selection.extend(by: -1, in: results) },
                 onShiftDown:    { selection.extend(by:  1, in: results) },
                 onCmdA:         { selection.selectAll(in: results) },
-                onCmdComma:     { onOpenSettings() }
+                onCmdComma:     { onOpenSettings() },
+                onCmdP:         { SettingsStore.shared.explorerMode.toggle() },
+                onCmdSpace:     { selection.toggleCursor(in: results) },
+                onCmdQuestion:  { HelpOverlayPresenter.shared.toggle() }
             ))
         }
     }
@@ -342,6 +345,11 @@ struct SpotlightView: View {
         case .toggled, .noop:
             break
         }
+    }
+
+    private func showQuickLook() {
+        guard !results.isEmpty else { return }
+        QuickLookPreview.shared.show(items: results, at: selection.cursorIndex)
     }
 
     private func onReturn(plain: Bool) {

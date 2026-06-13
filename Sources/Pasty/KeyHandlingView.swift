@@ -26,6 +26,14 @@ struct KeyHandlingView: NSViewRepresentable {
     var onCmdI: () -> Void = {}
     var onCmdM: () -> Void = {}
     var onCmdComma: () -> Void = {}
+    var onCmdP: () -> Void = {}
+    var onCmdSpace: () -> Void = {}
+    var onCmdQuestion: () -> Void = {}
+    var onCtrlShiftR: () -> Void = {}
+    var onCtrlShiftT: () -> Void = {}
+    var onCtrlShiftS: () -> Void = {}
+    var onCtrlShiftJ: () -> Void = {}
+    var onCtrlShiftE: () -> Void = {}
     var onDelete: () -> Void = {}
 
     func makeNSView(context: Context) -> KeyCatcher {
@@ -53,6 +61,7 @@ struct KeyHandlingView: NSViewRepresentable {
             let cmd = event.modifierFlags.contains(.command)
             let shift = event.modifierFlags.contains(.shift)
             let opt = event.modifierFlags.contains(.option)
+            let ctrl = event.modifierFlags.contains(.control)
             switch event.keyCode {
             case 126: shift ? v.onShiftUp()   : v.onUp(); return
             case 125: shift ? v.onShiftDown() : v.onDown(); return
@@ -63,16 +72,33 @@ struct KeyHandlingView: NSViewRepresentable {
                 if shift { v.onShiftReturn();  return }
                 v.onReturn(); return
             case 53: v.onEsc(); return
-            case 49: v.onSpace(); return
+            case 49:
+                // ⌘Space は複数選択トグル、Space 単独は Quick Look
+                if cmd { v.onCmdSpace() } else { v.onSpace() }
+                return
             case 48: v.onTab(); return
             case 51, 117: v.onDelete(); return
             default: break
+            }
+            // ⌃⇧ 系（AI アクション）と ⌘? を捕捉
+            if ctrl, shift, let chars = event.charactersIgnoringModifiers?.lowercased() {
+                switch chars {
+                case "r": v.onCtrlShiftR(); return
+                case "t": v.onCtrlShiftT(); return
+                case "s": v.onCtrlShiftS(); return
+                case "j": v.onCtrlShiftJ(); return
+                case "e": v.onCtrlShiftE(); return
+                default: break
+                }
+            }
+            if cmd, shift, let chars = event.charactersIgnoringModifiers, chars == "?" {
+                v.onCmdQuestion(); return
             }
             if let chars = event.charactersIgnoringModifiers {
                 if cmd, chars.count == 1, let digit = Int(chars), (1...9).contains(digit) {
                     v.onNumber(digit); return
                 }
-                if cmd {
+                if cmd, !shift, !ctrl {
                     switch chars.lowercased() {
                     case "a": v.onCmdA(); return
                     case "e": v.onCmdE(); return
@@ -82,6 +108,7 @@ struct KeyHandlingView: NSViewRepresentable {
                     case "d": v.onCmdD(); return
                     case "i": v.onCmdI(); return
                     case "m": v.onCmdM(); return
+                    case "p": v.onCmdP(); return
                     case ",": v.onCmdComma(); return
                     default: break
                     }
