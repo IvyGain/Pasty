@@ -123,7 +123,8 @@ final class NotchHoverController: NSObject {
         if dropdownPanel != nil { return }
         let frame = screen.frame
         let targetWidth: CGFloat = min(frame.width - 32, 1320)
-        let panelHeight: CGFloat = 360
+        // Strip 本体と同じ高さに合わせる (StripPanel.init では 280pt 採用)
+        let panelHeight: CGFloat = 280
         let collapsed = NSRect(x: frame.midX - targetWidth / 2,
                                y: frame.maxY,
                                width: targetWidth, height: 0)

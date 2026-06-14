@@ -962,23 +962,43 @@ private struct StripCard: View {
                 footer
             }
 
-            // === 番号バッジ ⌘N（左下）===
+            // === 番号バッジ ⌘N (左下) — 選択時は選択順 + アクセント色に変身 ===
             if index <= 9 {
-                HStack(spacing: 2) {
-                    Text("⌘")
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    Text("\(index)")
-                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                Group {
+                    if isSelected, let order = selectionOrder {
+                        // 選択中: アクセントカラー + 選択順を内表示
+                        HStack(spacing: 2) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .heavy))
+                            Text("\(order)")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(
+                            Capsule(style: .continuous).fill(Color.accentColor)
+                        )
+                        .shadow(color: Color.accentColor.opacity(0.4),
+                                radius: 4, x: 0, y: 2)
+                    } else {
+                        // 通常: ⌘N
+                        HStack(spacing: 2) {
+                            Text("⌘")
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            Text("\(index)")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(
+                            Capsule(style: .continuous).fill(.ultraThinMaterial)
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .strokeBorder(ModernTokens.hairline, lineWidth: 0.5)
+                        )
+                    }
                 }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(
-                    Capsule(style: .continuous).fill(.ultraThinMaterial)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(ModernTokens.hairline, lineWidth: 0.5)
-                )
                 .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity,
                        alignment: .bottomLeading)
@@ -986,23 +1006,20 @@ private struct StripCard: View {
                 .accessibilityHidden(true)
             }
 
-            // === 選択チェック（右下）===
-            if isSelected {
+            // === 右下チェックは番号バッジに統合済みなので、index > 9 の時だけ表示 ===
+            if isSelected, index > 9 {
                 ZStack {
                     Circle()
                         .fill(Color.accentColor)
-                        .frame(width: 24, height: 24)
-                        .shadow(color: Color.accentColor.opacity(0.4),
-                                radius: 6, x: 0, y: 2)
-                    // 選択順番号を優先表示、無ければ checkmark フォールバック
+                        .frame(width: 22, height: 22)
                     if let order = selectionOrder {
                         Text("\(order)")
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(.white)
                     } else {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .heavy))
+                            .font(.system(size: 10, weight: .heavy))
                             .foregroundStyle(.white)
                     }
                 }
