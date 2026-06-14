@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class StripPanel: NSPanel {
     init() {
-        let rect = NSRect(x: 0, y: 0, width: 1240, height: 200)
+        let rect = NSRect(x: 0, y: 0, width: 1240, height: 280)
         super.init(
             contentRect: rect,
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -38,7 +38,7 @@ final class StripPanel: NSPanel {
         let width = max(visible.width - margin * 2, 480)
         // Explorer モード（⌘P トグル）では分割ペイン構成で縦方向の情報量が
         // 増えるので、パネル全体を背高くする。通常カルーセル時は 360。
-        let height: CGFloat = SettingsStore.shared.explorerMode ? 380 : 200
+        let height: CGFloat = SettingsStore.shared.explorerMode ? 460 : 280
         let origin = CGPoint(
             x: visible.minX + margin,
             y: visible.minY                  // ← Dock の真上
@@ -84,7 +84,6 @@ struct StripView: View {
                 explorerLayout
             } else {
                 carousel
-                    .frame(maxHeight: .infinity)
             }
             if selection.hasSelection {
                 Divider().opacity(0.25)
@@ -922,10 +921,9 @@ private struct StripCard: View {
 
     // Linear / Things 系の「カード = 240×260, 上下 4pt グリッド」を踏襲。
     // 上部バンドは少し背を低くしてシャープに、フッタはゆったり余白を取る。
-    // 高さ 220pt のウィンドウ内に収まるサイズ (header 約 55pt + 余白 ~ 25pt = 80pt 消費 → カードに残るのは ~140pt)
-    private static let cardSize = CGSize(width: 240, height: 140)
-    private static let bannerHeight: CGFloat = 34
-    private static let footerHeight: CGFloat = 30
+    private static let cardSize = CGSize(width: 240, height: 200)
+    private static let bannerHeight: CGFloat = 42
+    private static let footerHeight: CGFloat = 38
 
     var body: some View {
         ZStack(alignment: .topLeading) {
