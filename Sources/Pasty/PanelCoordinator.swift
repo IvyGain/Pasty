@@ -155,6 +155,24 @@ final class PanelCoordinator: ObservableObject {
         }
     }
 
+    /// ⇧⌘V を押した瞬間の体感を「ほぼゼロ」にするため、Strip パネルと
+    /// SwiftUI ホスティングを **起動時に裏で生成しておく**。初回呼び出しの
+    /// 200〜500ms の初期化コストが消える。
+    func prewarmStrip() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.strip == nil {
+                let panel = self.makeStrip()
+                self.strip = panel
+                // 一度 visibilityOff のまま位置だけ仕込んでおく
+                if let screen = NSScreen.cursorScreen() {
+                    panel.position(onScreen: screen)
+                }
+                // orderOut のままにして実画面には出さない
+            }
+        }
+    }
+
     /// Esc 時の共通ハンドラ。Strip / Notch ドロップダウンを全部畳んで、
     /// フォーカスを直前アプリに返す。Spotlight は Raycast 拡張に移行済み。
     func dismissAll() {
@@ -177,7 +195,10 @@ final class PanelCoordinator: ObservableObject {
         if let screen = NSScreen.cursorScreen() {
             panel.position(onScreen: screen)
         }
-        panel.makeKeyAndOrderFront(nil)
+        // orderFrontRegardless で「キー取得 + 順序昇格」のコストを節約。
+        // makeKey はその後に呼んで KeyHandlingView が動作する状態にする。
+        panel.orderFrontRegardless()
+        panel.makeKey()
     }
 
     /// パネルを召喚した瞬間のマウス座標を記録。`PasteAutomator` が貼付
@@ -203,7 +224,10 @@ final class PanelCoordinator: ObservableObject {
             onOpenSettings: { [weak self] in self?.openSettings() }
         )
         let hosting = NSHostingController(rootView: view)
-        hosting.sizingOptions = [.minSize]
+        // sizingOptions を [] にして「コンテンツの minSize が変わってもパネルが
+        // 動かない」挙動に。フォルダ切替や複数選択 bar 出現でパネルが上下に
+        // ジャンプする現象を防ぐ。
+        hosting.sizingOptions = []
         hosting.view.translatesAutoresizingMaskIntoConstraints = false
         panel.contentViewController = hosting
         return panel

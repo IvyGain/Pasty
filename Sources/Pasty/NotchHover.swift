@@ -121,15 +121,18 @@ final class NotchHoverController: NSObject {
 
     func show(on screen: NSScreen) {
         if dropdownPanel != nil { return }
-        let frame = screen.frame
-        let targetWidth: CGFloat = min(frame.width - 32, 1320)
-        // Strip 本体と同じ高さに合わせる (StripPanel.init では 280pt 採用)
+        // メニューバー直下に張り付ける。screen.frame (物理上端) だと NotchPanel が
+        // .floating level なので statusBar level のメニューバーに隠されて、ユーザー
+        // 視点では 24pt 下にズレて見える。visibleFrame の上端 = メニューバー直下
+        // に origin.y を合わせれば「謎の上余白」が消える。
+        let visible = screen.visibleFrame
+        let targetWidth: CGFloat = min(visible.width - 32, 1320)
         let panelHeight: CGFloat = 280
-        let collapsed = NSRect(x: frame.midX - targetWidth / 2,
-                               y: frame.maxY,
+        let collapsed = NSRect(x: visible.midX - targetWidth / 2,
+                               y: visible.maxY,
                                width: targetWidth, height: 0)
         let expanded = NSRect(x: collapsed.origin.x,
-                              y: frame.maxY - panelHeight,
+                              y: visible.maxY - panelHeight,
                               width: targetWidth, height: panelHeight)
 
         let panel = NotchPanel(contentRect: collapsed)
@@ -145,7 +148,11 @@ final class NotchHoverController: NSObject {
             onOpenSettings: { [weak self] in self?.onOpenSettings() }
         )
         let hosting = NSHostingController(rootView: view)
-        hosting.sizingOptions = [.minSize]
+        // sizingOptions を空にして「コンテンツが SwiftUI 内で変化してもパネルは
+        // 動かさない」挙動に固定する。これがないとフォルダ切替や複数選択 bar の
+        // 出現で SwiftUI コンテンツの minSize が変わり、その都度パネルが上下に
+        // 動いてしまう。
+        hosting.sizingOptions = []
         panel.contentViewController = hosting
         panel.orderFrontRegardless()
         // .nonactivatingPanel なので、makeKey しても直前のフォーカスアプリは

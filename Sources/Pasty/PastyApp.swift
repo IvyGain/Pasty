@@ -47,6 +47,7 @@ struct PastyApp: App {
         DispatchQueue.main.async {
             installable.installHotkeys()
             installable.installNotchHover()
+            installable.prewarmStrip()
             _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
 
             // Subscribe to settings notifications.
