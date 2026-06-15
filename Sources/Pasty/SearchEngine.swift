@@ -85,7 +85,8 @@ enum SearchEngine {
             }
 
             if let kind = q.kind {
-                rows = rows.filter { $0.kind == kind }
+                // 拡張子ベースの fuzzy 判定: kind=.file の PNG も .image フィルタにヒット
+                rows = rows.filter { $0.matchesFilter(kind) }
             }
             if let src = q.sourceApp?.lowercased(), !src.isEmpty {
                 rows = rows.filter { ($0.sourceAppName ?? "").lowercased().contains(src) }

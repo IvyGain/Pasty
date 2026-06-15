@@ -962,7 +962,8 @@ struct StripView: View {
 
     private func applyFilters(_ items: [ClipItem], q: SearchQuery) -> [ClipItem] {
         var out = items
-        if let k = q.kind { out = out.filter { $0.kind == k } }
+        // 拡張子ベースの fuzzy 判定 (例: .file の PNG は「画像」フィルタにも出る)
+        if let k = q.kind { out = out.filter { $0.matchesFilter(k) } }
         if let src = q.sourceApp?.lowercased(), !src.isEmpty {
             out = out.filter { ($0.sourceAppName ?? "").lowercased().contains(src) }
         }
@@ -1334,6 +1335,20 @@ private struct StripCard: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            // 拡張子バッジ (file/image/video kind の時のみ)。判別を強くするため
+            // フィルター結果と一致するラベルを表示する。
+            if let ext = clip.fileExtension {
+                Text(".\(ext)")
+                    .font(.system(size: 9.5, weight: .heavy, design: .monospaced))
+                    .tracking(0.2)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(extensionBadgeColor(for: ext))
+                    )
+                    .accessibilityHidden(true)
+            }
             // 右：文字数 or サイズ — トーキュラフォントで数字を整える
             Text(rightMeta)
                 .font(.system(size: 10.5, weight: .regular, design: .rounded))
@@ -1360,6 +1375,16 @@ private struct StripCard: View {
                 }
             }
         )
+    }
+
+    /// 拡張子バッジの背景色 — kind カテゴリで色分け。
+    private func extensionBadgeColor(for ext: String) -> Color {
+        let e = ext.lowercased()
+        if FileKindClass.image.contains(e) { return Color(red: 0.32, green: 0.62, blue: 0.95) }   // blue
+        if FileKindClass.video.contains(e) { return Color(red: 0.95, green: 0.33, blue: 0.30) }   // red
+        if FileKindClass.audio.contains(e) { return Color(red: 0.75, green: 0.45, blue: 0.95) }   // purple
+        if FileKindClass.document.contains(e) { return Color(red: 0.50, green: 0.50, blue: 0.55) }// gray
+        return Color.secondary.opacity(0.7)
     }
 
     private var rightMeta: String {
