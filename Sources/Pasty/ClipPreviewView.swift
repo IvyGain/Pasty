@@ -111,7 +111,7 @@ struct ClipPreviewView: View {
             if let content = clip.content {
                 chips.append("\(formattedCount(content.count)) 文字")
             }
-        case .image, .file:
+        case .image, .file, .video:
             chips.append(formattedBytes(clip.byteSize))
         }
 
@@ -142,7 +142,7 @@ struct ClipPreviewView: View {
                 richTextView()
             case .image:
                 imageView()
-            case .file:
+            case .file, .video:
                 fileView()
             case .link:
                 linkView()

@@ -9,6 +9,7 @@ enum ClipKind: String, Codable {
     case link
     case color
     case other
+    case video
 }
 
 struct ClipItem: Identifiable, Codable, FetchableRecord, MutablePersistableRecord, Equatable {
@@ -67,6 +68,7 @@ extension ClipKind {
         case .link: return "link"
         case .color: return "paintpalette"
         case .other: return "questionmark.square"
+        case .video: return "play.rectangle"
         }
     }
 }

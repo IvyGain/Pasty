@@ -135,8 +135,62 @@ struct SettingsView: View {
             Section("キャプチャ") {
                 Toggle("クリップボードを自動キャプチャ", isOn: $settings.capturingEnabled)
                 Toggle("アイテム選択後に自動で貼付", isOn: $settings.autoPaste)
-                Stepper("履歴を \(settings.maxRetentionDays) 日間保持",
-                        value: $settings.maxRetentionDays, in: 1...365)
+            }
+            Section("履歴保持期間") {
+                let presets: [(label: String, value: Int)] = [
+                    ("7 日", 7),
+                    ("30 日", 30),
+                    ("90 日", 90),
+                    ("365 日", 365),
+                    ("無期限", -1)
+                ]
+                HStack(spacing: 8) {
+                    ForEach(presets, id: \.value) { preset in
+                        Button {
+                            settings.maxRetentionDays = preset.value
+                        } label: {
+                            Text(preset.label)
+                                .font(.system(size: 12, weight: settings.maxRetentionDays == preset.value ? .semibold : .regular))
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(
+                                    Capsule().fill(
+                                        settings.maxRetentionDays == preset.value
+                                            ? Color.accentColor.opacity(0.18)
+                                            : Color.primary.opacity(0.06)
+                                    )
+                                )
+                                .overlay(
+                                    Capsule().strokeBorder(
+                                        settings.maxRetentionDays == preset.value
+                                            ? Color.accentColor.opacity(0.4)
+                                            : .clear, lineWidth: 1
+                                    )
+                                )
+                                .foregroundStyle(settings.maxRetentionDays == preset.value ? Color.accentColor : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if settings.maxRetentionDays != -1 {
+                    Stepper(value: $settings.maxRetentionDays, in: 1...3650, step: 1) {
+                        HStack(spacing: 6) {
+                            Text("カスタム:")
+                                .foregroundStyle(.secondary)
+                            Text("\(settings.maxRetentionDays) 日")
+                                .font(.system(.body, design: .monospaced))
+                                .frame(minWidth: 60, alignment: .leading)
+                        }
+                    }
+                } else {
+                    Label("無期限保持 — クリップは自動削除されません", systemImage: "infinity")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+
+                Text("プリセットボタンで素早く設定、または Stepper で日単位調整。「無期限」を選ぶと削除されません。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("言語") {
                 Picker("", selection: $settings.locale) {

@@ -370,7 +370,8 @@ struct InsightsDashboard: View {
              ClipKind.image.rawValue,
              ClipKind.file.rawValue,
              ClipKind.color.rawValue,
-             ClipKind.other.rawValue:
+             ClipKind.other.rawValue,
+             ClipKind.video.rawValue:
             return raw
         default:
             return "other"

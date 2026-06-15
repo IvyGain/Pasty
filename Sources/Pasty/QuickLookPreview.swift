@@ -63,7 +63,7 @@ final class QuickLookPreview: NSObject {
             }
             return nil
 
-        case .file:
+        case .file, .video:
             if let s = item.content, let url = URL(string: s), url.isFileURL,
                FileManager.default.fileExists(atPath: url.path) {
                 return url

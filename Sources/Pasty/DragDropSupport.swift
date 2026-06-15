@@ -25,6 +25,50 @@ enum ClipDnDPayload {
     }
 }
 
+// MARK: - Transferable wrapper
+
+/// 内部 D&D (Pasty 内のフォルダタブにドロップしてピン) と
+/// 外部 D&D (他アプリにドロップして貼付) を両立する Transferable。
+///
+/// - 内部受信側 (`dropDestination(for: String.self)`) は marker 付き文字列
+///   `PASTY|<id>|<preview>` をデコードして clip 参照を復元する。
+/// - 外部アプリ (Notion / Slack / Finder / Safari など) には marker を含まない
+///   素のテキストや URL が渡るよう、複数の `ProxyRepresentation` を登録する。
+struct ClipDragItem: Transferable {
+    let clip: ClipItem
+
+    static var transferRepresentation: some TransferRepresentation {
+        // 内部 D&D 用: marker 付き文字列。dropDestination(for: String.self) で識別される。
+        ProxyRepresentation(exporting: \ClipDragItem.markerString)
+        // 外部テキスト D&D 用: marker なしの素のテキスト。
+        ProxyRepresentation(exporting: \ClipDragItem.plainText)
+        // 外部 URL D&D 用: link kind の時のみ有意味な URL を返す。
+        ProxyRepresentation(exporting: \ClipDragItem.linkURL)
+    }
+
+    /// 既存の "PASTY|<id>|<preview>" 形式。内部 dropDestination 受信側で剥がす。
+    /// `ClipDnDPayload.decode` と互換になるよう、preview 内の `|` は空白に置換する。
+    var markerString: String {
+        let id = clip.id ?? -1
+        let preview = clip.preview.replacingOccurrences(of: "|", with: " ")
+        return "PASTY|\(id)|\(preview)"
+    }
+
+    /// 外部アプリにドロップする時の素の内容。
+    var plainText: String {
+        clip.content ?? clip.preview
+    }
+
+    /// link kind なら URL、それ以外は about:blank をダミーで返す
+    /// (Transferable の挙動上、受け手が URL を期待しなければ他の representation が選ばれる)。
+    var linkURL: URL {
+        if clip.kind == .link, let raw = clip.content, let u = URL(string: raw) {
+            return u
+        }
+        return URL(string: "about:blank")!
+    }
+}
+
 // MARK: - Draggable extension
 
 @MainActor
@@ -32,9 +76,12 @@ extension View {
     /// クリップを掴むときの draggable + ミニカード型ドラッグプレビュー。
     /// `additionalSelected` に「同時にドラッグする他のクリップ」を渡すと、
     /// 奥に重なる層として表示される（複数選択ドラッグ用）。
+    ///
+    /// Transferable は `ClipDragItem` を提供し、内部 D&D には marker 付き文字列、
+    /// 外部 D&D には素のテキスト / URL を露出する。
     func draggableClip(_ clip: ClipItem,
                        additionalSelected: [ClipItem] = []) -> some View {
-        self.draggable(ClipDnDPayload.encode(clip)) {
+        self.draggable(ClipDragItem(clip: clip)) {
             ClipDragCard(primary: clip, others: additionalSelected)
         }
     }

@@ -21,6 +21,22 @@ final class PasteStack: ObservableObject {
         items.remove(at: index)
     }
 
+    /// Removes the first occurrence of `clip` from the stack.
+    /// Used after a one-shot paste from the Pill UI so the item disappears
+    /// from the stack instead of staying available for re-paste.
+    /// Matches by DB row id when both sides have one; otherwise falls back
+    /// to value equality so synthetic / pre-insert clips still work.
+    func pop(_ clip: ClipItem) {
+        let idx: Int? = {
+            if let cid = clip.id {
+                return items.firstIndex(where: { $0.id == cid })
+            }
+            return items.firstIndex(where: { $0 == clip })
+        }()
+        guard let i = idx else { return }
+        items.remove(at: i)
+    }
+
     func clear() { items.removeAll() }
 
     /// Pops the next item per the current order and pastes it.

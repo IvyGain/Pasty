@@ -37,6 +37,7 @@ enum KindPalette {
         case .link:     return Color(hex: "#0A84FF")  // リンク = Safari ブルー
         case .color:    return Color(hex: "#BF5AF2")  // カラー = ラベンダー
         case .other:    return Color(hex: "#8E8E93")
+        case .video:    return Color(hex: "#FF453A")  // 動画 = レッド
         }
     }
 
@@ -49,6 +50,7 @@ enum KindPalette {
         case .link:     return "LINK"
         case .color:    return "COLOR"
         case .other:    return "ITEM"
+        case .video:    return "VIDEO"
         }
     }
 

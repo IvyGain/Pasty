@@ -60,10 +60,16 @@ final class StackPillController {
     private weak var coordinator: PanelCoordinator?
     private var cancellables = Set<AnyCancellable>()
     private var screenObserver: NSObjectProtocol?
+    /// Coalesces rapid-fire clicks into a single paste at the controller level.
+    /// SwiftUI Button taps can fire twice in quick succession on first activate;
+    /// without this guard we observed the Pill repeatedly pasting into the host
+    /// app. Reset on the main queue after a short cooldown.
+    private var pasteInFlight: Bool = false
 
     private let collapsedSize = CGSize(width: 96, height: 56)
     private let expandedWidth: CGFloat = 320
     private let expandedHeaderHeight: CGFloat = 88
+    private let expandedFooterHeight: CGFloat = 44
     private let expandedRowHeight: CGFloat = 52
     private let maxExpandedRows = 5
     private let edgeMargin: CGFloat = 24
@@ -130,7 +136,9 @@ final class StackPillController {
         let root = StackPillRootView(
             model: model,
             onToggle: { [weak self] in self?.toggleExpanded() },
-            onPaste: { [weak self] clip in self?.handlePaste(clip) }
+            onPaste: { [weak self] clip in self?.handlePaste(clip) },
+            onPasteAll: { [weak self] in self?.handlePasteAll() },
+            onClear: { [weak self] in self?.handleClear() }
         )
         let hosting = NSHostingController(rootView: root)
         hosting.sizingOptions = [.minSize]
@@ -147,7 +155,29 @@ final class StackPillController {
 
     private func handlePaste(_ clip: ClipItem) {
         guard coordinator != nil else { return }
+        guard !pasteInFlight else { return }
+        pasteInFlight = true
         PasteAutomator.shared.paste(clip)
+        // Pop the clip so the Stack reflects the consumed state immediately
+        // and the same item can't be re-fired by a stray repeat tap.
+        stack?.pop(clip)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.pasteInFlight = false
+        }
+    }
+
+    private func handlePasteAll() {
+        guard coordinator != nil, let stack else { return }
+        guard !pasteInFlight else { return }
+        pasteInFlight = true
+        stack.pasteAsDocument()   // pasteAsDocument() already clears the stack
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.pasteInFlight = false
+        }
+    }
+
+    private func handleClear() {
+        stack?.clear()
     }
 
     private func repositionIfVisible() {
@@ -172,7 +202,9 @@ final class StackPillController {
     private func currentSize() -> CGSize {
         guard model.expanded else { return collapsedSize }
         let rows = min(maxExpandedRows, max(1, model.items.count))
-        let height = CGFloat(rows) * expandedRowHeight + expandedHeaderHeight
+        let height = CGFloat(rows) * expandedRowHeight
+            + expandedHeaderHeight
+            + expandedFooterHeight
         return CGSize(width: expandedWidth, height: height)
     }
 }
@@ -184,14 +216,19 @@ private struct StackPillRootView: View {
     @ObservedObject var model: StackPillModel
     let onToggle: () -> Void
     let onPaste: (ClipItem) -> Void
+    let onPasteAll: () -> Void
+    let onClear: () -> Void
 
     var body: some View {
         Group {
             if model.expanded {
                 StackPillExpandedView(
                     items: Array(model.items.prefix(5)),
+                    totalCount: model.items.count,
                     onToggle: onToggle,
-                    onPaste: onPaste
+                    onPaste: onPaste,
+                    onPasteAll: onPasteAll,
+                    onClear: onClear
                 )
             } else {
                 StackPillBadgeView(count: model.items.count, onToggle: onToggle)
@@ -234,15 +271,63 @@ private struct StackPillBadgeView: View {
 @MainActor
 private struct StackPillExpandedView: View {
     let items: [ClipItem]
+    let totalCount: Int
     let onToggle: () -> Void
     let onPaste: (ClipItem) -> Void
+    let onPasteAll: () -> Void
+    let onClear: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.25)
             list
+            Divider().opacity(0.25)
+            footer
         }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 8) {
+            Button(action: onPasteAll) {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.and.arrow.down.on.square")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("すべて貼付")
+                        .font(PastyTheme.subtitleFont)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.18))
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(totalCount == 0)
+            .help("Stack の全アイテムを連結して貼付")
+
+            Spacer(minLength: 0)
+
+            Button(action: onClear) {
+                Text("クリア")
+                    .font(PastyTheme.subtitleFont)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.08))
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(totalCount == 0)
+            .help("Stack を空にする")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var header: some View {
@@ -288,9 +373,20 @@ private struct StackPillExpandedView: View {
 private struct StackPillRow: View {
     let item: ClipItem
     let onPaste: () -> Void
+    /// Local in-flight guard. Belt-and-suspenders with the controller-level
+    /// `pasteInFlight`: even if SwiftUI re-fires the Button action, the row
+    /// won't dispatch a second paste for the same item.
+    @State private var pasteInFlight: Bool = false
 
     var body: some View {
-        Button(action: onPaste) {
+        Button {
+            guard !pasteInFlight else { return }
+            pasteInFlight = true
+            onPaste()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                pasteInFlight = false
+            }
+        } label: {
             HStack(spacing: 10) {
                 ClipThumbnail(clip: item, size: 24, corner: 6)
                 Text(previewText)
@@ -316,6 +412,7 @@ private struct StackPillRow: View {
                                            style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(pasteInFlight)
     }
 
     private var previewText: String {

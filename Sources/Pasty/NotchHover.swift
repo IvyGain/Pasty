@@ -37,6 +37,12 @@ final class NotchHoverController: NSObject {
     /// マウスがパネルの矩形に「最低 1 回入った」フラグ。入る前に範囲外と
     /// 判断するとアニメーション最中に閉じてしまうので、ガードとして使う。
     private var pointerEnteredOnce: Bool = false
+    /// 右クリックで開いた NSMenu が tracking 中は dismissal を完全に停止する。
+    /// メニュー項目はパネル矩形の外に出るので、これを抑止しないと
+    /// メニューを辿った瞬間にパネルが閉じてしまう。
+    private var isContextMenuOpen: Bool = false
+    /// `installContextMenuNotifications` を 1 回だけ呼ぶための idempotency フラグ。
+    private var contextMenuObserverInstalled: Bool = false
 
     init(store: ClipStore,
          pinboards: PinboardStore,
@@ -67,9 +73,32 @@ final class NotchHoverController: NSObject {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        installContextMenuNotifications()
     }
 
     @objc private func screensChanged() { install() }
+
+    /// NSMenu の tracking 開始 / 終了を観測して `isContextMenuOpen` を切り替える。
+    /// `install()` から idempotent に 1 度だけ呼ばれる。
+    private func installContextMenuNotifications() {
+        guard !contextMenuObserverInstalled else { return }
+        contextMenuObserverInstalled = true
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.isContextMenuOpen = true }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                // 終了は少し遅延して、メニュー操作完了直後の pointer 判定を救う
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                self?.isContextMenuOpen = false
+            }
+        }
+    }
 
     private func makeTriggerPanel(for screen: NSScreen) -> NSPanel {
         let zone = notchHotZone(on: screen)
@@ -284,6 +313,10 @@ final class NotchHoverController: NSObject {
 
     private func evaluatePointer(against zone: NSRect) {
         guard dropdownPanel != nil else { return }
+        // コンテキストメニュー操作中は dismissal を完全スキップ。
+        // メニュー項目はパネル矩形の外に出るので、これを抑止しないと
+        // メニューを辿った瞬間にパネルが閉じてしまう。
+        if isContextMenuOpen { return }
         let p = NSEvent.mouseLocation
         let inside = NSPointInRect(p, zone)
         pointerInsidePanel = inside

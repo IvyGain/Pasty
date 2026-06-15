@@ -98,10 +98,15 @@ final class PasteboardObserver: ObservableObject {
             let isFile = url.isFileURL
             let preview = isFile ? url.lastPathComponent : url.absoluteString
             let size = Int64(url.absoluteString.utf8.count)
+            var kind: ClipKind = isFile ? .file : .link
+            // .file の場合のみ、拡張子で動画なら .video へ昇格。
+            if kind == .file, Self.isVideoPath(url.absoluteString) {
+                kind = .video
+            }
             return ClipItem(
                 id: nil,
                 createdAt: now,
-                kind: isFile ? .file : .link,
+                kind: kind,
                 preview: preview,
                 content: url.absoluteString,
                 dataPath: nil,
@@ -117,7 +122,13 @@ final class PasteboardObserver: ObservableObject {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
             let preview = string.firstNonEmptyLine(limit: 120)
-            let kind: ClipKind = pasteboard.data(forType: .rtf) != nil ? .richText : .text
+            var kind: ClipKind = pasteboard.data(forType: .rtf) != nil ? .richText : .text
+            // テキストが http(s):// で始まる単一 URL のみで構成されているなら
+            // .link に昇格させる(richText は維持)。
+            if kind == .text,
+               trimmed.range(of: #"^https?://\S+$"#, options: .regularExpression) != nil {
+                kind = .link
+            }
             return ClipItem(
                 id: nil,
                 createdAt: now,
@@ -155,6 +166,13 @@ final class PasteboardObserver: ObservableObject {
         }
 
         return nil
+    }
+
+    /// ファイル URL / パス文字列の拡張子が動画なら true。
+    private static func isVideoPath(_ pathOrURL: String) -> Bool {
+        let lower = pathOrURL.lowercased()
+        let exts = [".mov", ".mp4", ".m4v", ".mkv", ".avi", ".webm", ".mpg", ".mpeg"]
+        return exts.contains(where: { lower.hasSuffix($0) })
     }
 
     private static func sha256(_ string: String) -> String {

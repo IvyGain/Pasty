@@ -73,6 +73,8 @@ struct StripView: View {
     @State private var newFolderColor: String = "#7C8CF8"
     @State private var showingNewSnippet: Bool = false
     @State private var newSnippetText: String = ""
+    @State private var editingClip: ClipItem?
+    @State private var editingContent: String = ""
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -124,6 +126,12 @@ struct StripView: View {
         .background(keyHandler)
         .sheet(isPresented: $showingNewFolder) { newFolderSheet }
         .sheet(isPresented: $showingNewSnippet) { newSnippetSheet }
+        .sheet(item: $editingClip) { clip in
+            editSheet(for: clip)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pastyVideoThumbReady)) { _ in
+            reload()
+        }
         .onDisappear { HoverPreviewController.shared.dismissNow() }
     }
 
@@ -147,6 +155,7 @@ struct StripView: View {
                 kindChip(nil,    label: "All")
                 kindChip(.text,  label: "Aa", systemImage: "textformat")
                 kindChip(.image, label: "画像", systemImage: "photo")
+                kindChip(.video, label: "動画", systemImage: "play.rectangle")
                 kindChip(.link,  label: "リンク", systemImage: "link")
                 kindChip(.file,  label: "ファイル", systemImage: "doc")
             }
@@ -632,6 +641,47 @@ struct StripView: View {
         .padding(20)
     }
 
+    private func editSheet(for clip: ClipItem) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: clip.kind.iconName)
+                    .foregroundStyle(.tint)
+                Text("クリップを編集")
+                    .font(.headline)
+                Spacer()
+                Text(clip.kind.rawValue.uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(.quaternary))
+            }
+            TextEditor(text: $editingContent)
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 520, height: 360)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+            HStack {
+                Spacer()
+                Button("キャンセル") { editingClip = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button("保存") {
+                    Task {
+                        if let id = clip.id {
+                            try? await store.update(clipId: id, content: editingContent)
+                        }
+                        editingClip = nil
+                        reload()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+    }
+
     // MARK: - Actions
 
     private var keyHandler: some View {
@@ -656,6 +706,14 @@ struct StripView: View {
             onShiftLeft:    { selection.extend(by: -1, in: items) },
             onShiftRight:   { selection.extend(by:  1, in: items) },
             onCmdA:         { selection.selectAll(in: items) },
+            onCmdE:         {
+                guard items.indices.contains(selection.cursorIndex) else { return }
+                let clip = items[selection.cursorIndex]
+                // 画像 / ファイル / 動画は編集不可
+                if clip.kind == .image || clip.kind == .file || clip.kind == .video { return }
+                editingClip = clip
+                editingContent = clip.content ?? clip.preview
+            },
             onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
             onCmdD:         { selection.clearAll() },
             onCmdI:         { showAIMenu() },
@@ -1174,6 +1232,35 @@ private struct StripCard: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(8)
+            } else if clip.kind == .video,
+                      let img = VideoThumbnailCache.shared.image(for: clip) {
+                ZStack {
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                    // 中央に再生アイコン overlay
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 32, weight: .regular))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 1)
+                }
+                .accessibilityHidden(true)
+            } else if clip.kind == .video {
+                // サムネ生成中の plain アイコン fallback
+                VStack(spacing: 6) {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.tint)
+                    Text(URL(string: clip.content ?? "")?.lastPathComponent ?? clip.preview)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(8)
             } else {
                 // テキスト系。コードならモノスペース、それ以外は標準。
                 let isCodeLike = KindPalette.detectedLabel(for: clip)
@@ -1252,7 +1339,7 @@ private struct StripCard: View {
         switch clip.kind {
         case .image:
             return ByteCountFormatter.string(fromByteCount: clip.byteSize, countStyle: .file)
-        case .file:
+        case .file, .video:
             return ByteCountFormatter.string(fromByteCount: clip.byteSize, countStyle: .file)
         default:
             return "\((clip.content ?? clip.preview).count) chars"

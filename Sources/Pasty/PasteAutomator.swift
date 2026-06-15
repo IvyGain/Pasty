@@ -133,7 +133,7 @@ final class PasteAutomator {
                 switch clip.kind {
                 case .image:
                     return clip.dataPath.map { ClipBlobs.blobURL(for: $0).path }
-                case .file:
+                case .file, .video:
                     return clip.content ?? clip.preview
                 default:
                     return clip.content ?? clip.preview
@@ -202,7 +202,7 @@ final class PasteAutomator {
             } else {
                 pb.setString(item.preview, forType: .string)
             }
-        case .file:
+        case .file, .video:
             if let s = item.content, let url = URL(string: s) {
                 if url.isFileURL {
                     pb.writeObjects([url as NSURL])
@@ -211,19 +211,39 @@ final class PasteAutomator {
                 }
             }
         case .image:
-            if let p = item.dataPath {
-                let url = ClipBlobs.blobURL(for: p)
-                if let data = try? Data(contentsOf: url) {
-                    // 受信側アプリの互換性のため PNG / TIFF / fileURL を一緒に並べる。
-                    // 多くの編集アプリは PNG を最優先で読むが、Pages/Keynote のような
-                    // Cocoa 系は TIFF を期待することもあるので両方提供。
-                    pb.setData(data, forType: .png)
-                    if let image = NSImage(data: data),
-                       let tiff = image.tiffRepresentation {
-                        pb.setData(tiff, forType: .tiff)
-                    }
-                    pb.writeObjects([url as NSURL])
+            // 画像は dataPath からファイルを読んで pasteboard に NSImage として置く。
+            // テキスト系 type は一切書かない (受信側が文字列フォールバックして
+            // "PASTY|..." や preview を貼ってしまう問題を避ける)。
+            guard let p = item.dataPath else {
+                // データパスが無い image kind は壊れている。preview を text として fallback
+                let raw = item.content ?? item.preview
+                if !raw.isEmpty {
+                    pb.setString(raw, forType: .string)
                 }
+                return
+            }
+            let url = ClipBlobs.blobURL(for: p)
+            guard let nsImage = NSImage(contentsOf: url) else {
+                // ファイル読込失敗時も同様にテキスト fallback
+                pb.setString(item.preview, forType: .string)
+                return
+            }
+            // NSImage の TIFF と元データ (PNG/JPEG) を両方登録、テキスト系は登録しない。
+            // place 先頭で既に clearContents 済みだが、writeObjects は append ではなく
+            // clear→write なのでここで再度 clear して NSImage を正規に登録する。
+            pb.clearContents()
+            pb.writeObjects([nsImage])
+            if let data = try? Data(contentsOf: url) {
+                let ext = url.pathExtension.lowercased()
+                let type: NSPasteboard.PasteboardType
+                switch ext {
+                case "png": type = .png
+                case "jpg", "jpeg":
+                    type = NSPasteboard.PasteboardType(rawValue: "public.jpeg")
+                case "tiff", "tif": type = .tiff
+                default: type = .tiff
+                }
+                pb.setData(data, forType: type)
             }
         }
     }

@@ -60,12 +60,17 @@ struct OnboardingView: View {
                 body: AnyView(clipToFolderBody)
             ),
             OnboardingStep(
-                badge: "07", title: "キーボードだけで完結する",
+                badge: "07", title: "Stack — 下書きに積んでまとめて貼る",
+                subtitle: "気になるクリップを Stack に積んでおいて、画面右下の Pill から好きな順で貼り付けたり、まとめて結合貼付したり。長い文章を組み立てる時に便利。",
+                body: AnyView(stackBody)
+            ),
+            OnboardingStep(
+                badge: "08", title: "キーボードだけで完結する",
                 subtitle: "マウスを使わずに探す、選ぶ、貼る。生産性は手元から逃げない。",
                 body: AnyView(keyboardBody)
             ),
             OnboardingStep(
-                badge: "08", title: "準備完了。",
+                badge: "09", title: "準備完了。",
                 subtitle: "あとは ⇧⌘V でいつでも Pasty を呼んでください。",
                 body: AnyView(completeBody)
             )
@@ -437,6 +442,90 @@ struct OnboardingView: View {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .stroke(Color.primary.opacity(0.14), lineWidth: 0.5)
             )
+    }
+
+    private var stackBody: some View {
+        HStack(alignment: .center, spacing: 22) {
+            // 左: 操作フロー (右クリック → Stack に追加)
+            VStack(alignment: .leading, spacing: 14) {
+                stackStepRow(num: 1, icon: "cursorarrow.click.2", text: "クリップを右クリック → \"Stack に追加\"")
+                stackStepRow(num: 2, icon: "rectangle.stack.fill", text: "画面右下の Pill にスタックが積まれる")
+                stackStepRow(num: 3, icon: "arrow.down.doc", text: "Pill から好きな順に貼付、または「すべて貼付」で結合")
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+            )
+
+            // 右: Pill のモック
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.regularMaterial)
+                    .frame(width: 140, height: 180)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 14, x: 0, y: 8)
+                VStack(spacing: 6) {
+                    HStack {
+                        Image(systemName: "rectangle.stack.fill")
+                            .foregroundStyle(Color.accentColor)
+                        Text("Stack 3")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        Spacer()
+                    }
+                    ForEach(0..<3) { i in
+                        HStack {
+                            Circle().fill(Color.accentColor.opacity(0.7)).frame(width: 6, height: 6)
+                            Text(["Hello!", "Thanks", "— mash"][i])
+                                .font(.system(size: 11))
+                                .lineLimit(1)
+                            Spacer()
+                            Text("⌘V")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.primary.opacity(0.1)))
+                        }
+                    }
+                    Spacer()
+                    Button {} label: {
+                        Text("すべて貼付")
+                            .font(.system(size: 10, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.accentColor))
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(10)
+                .frame(width: 140, height: 180)
+            }
+        }
+        .frame(height: 220)
+    }
+
+    private func stackStepRow(num: Int, icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Text("\(num)")
+                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(Color.accentColor))
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(.tint)
+                .frame(width: 20)
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+        }
     }
 
     private var keyboardBody: some View {
