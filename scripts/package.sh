@@ -73,6 +73,17 @@ if [ -n "$SPARKLE_FRAMEWORK_SRC" ] && [ -d "$SPARKLE_FRAMEWORK_SRC" ]; then
   mkdir -p "$APP/Contents/Frameworks"
   ditto "$SPARKLE_FRAMEWORK_SRC" "$APP/Contents/Frameworks/Sparkle.framework"
   echo "==> Bundled Sparkle.framework from $SPARKLE_FRAMEWORK_SRC"
+
+  # SPM が出力した実行バイナリは @rpath が @executable_path/ しか持っていない
+  # (Sparkle のような同梱フレームワークを探せない)。標準 macOS アプリの慣習に
+  # 合わせて @executable_path/../Frameworks を rpath に追加。
+  # 既に同じ rpath があれば install_name_tool は error を吐くので grep で確認。
+  if ! otool -l "$APP/Contents/MacOS/${APP_NAME}" \
+       | grep -A2 LC_RPATH | grep -q "@executable_path/../Frameworks"; then
+    install_name_tool -add_rpath "@executable_path/../Frameworks" \
+                       "$APP/Contents/MacOS/${APP_NAME}"
+    echo "==> Added @executable_path/../Frameworks to rpath"
+  fi
 else
   echo "warn: Sparkle.framework が .build に見つかりません。swift build が走っていない?"
 fi
@@ -108,23 +119,26 @@ else
   echo "    self-signed cert を Keychain Access で作ると権限が維持されます。"
 fi
 
-# 1. 内部の Sparkle.framework を **先に** 署名 (Apple のガイドラインに沿った順序)。
-#    --deep フラグは framework の Versions/A/ の helper bundle まで再帰する。
+# Sparkle.framework は内部に XPCServices / Autoupdate / Updater.app を持つので、
+# 最も奥から順に署名する必要がある (Apple の Hardened Runtime 検証は再帰的)。
+# --deep フラグは notarization では deprecated だが、self-signed では実用上問題ない。
 if [ -d "$APP/Contents/Frameworks/Sparkle.framework" ]; then
-  for SUB in "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/"*.xpc \
-             "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
-             "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"; do
-    [ -e "$SUB" ] || continue
-    codesign --force --options runtime --timestamp=none \
-             --sign "$USE_IDENTITY" "$SUB" 2>/dev/null || true
-  done
-  codesign --force --options runtime --timestamp=none \
-           --sign "$USE_IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
+  # ネスト署名を一度に処理。--deep は内部のサブ bundle まで識別子付きで署名する。
+  codesign --force --deep --options runtime \
+           --sign "$USE_IDENTITY" \
+           "$APP/Contents/Frameworks/Sparkle.framework"
 fi
 
-# 2. アプリ本体を署名 (framework が先に署名済みなので --deep 不要)。
+# アプリ本体を最後に署名。framework は既に署名済み。
+# entitlements.plist で disable-library-validation を付けて、self-signed で
+# Team ID が一致しない Sparkle.framework を load できるようにする。
+ENTITLEMENTS="${ROOT}/scripts/entitlements.plist"
 if [ "$USE_IDENTITY" = "-" ]; then
   codesign --force --sign - "$APP"
+elif [ -f "$ENTITLEMENTS" ]; then
+  codesign --force --options runtime \
+           --entitlements "$ENTITLEMENTS" \
+           --sign "$USE_IDENTITY" "$APP"
 else
   codesign --force --options runtime \
            --sign "$USE_IDENTITY" "$APP"

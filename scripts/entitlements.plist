@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Self-signed code signing で Pasty 本体と同梱 Sparkle.framework の
+        Team ID が一致しないため、Hardened Runtime の Library Validation で
+        load が失敗する。Library Validation を無効化することで Sparkle を
+        含む dylib を読み込めるようにする。
+        将来 Apple Developer ID で本格署名する場合は、Sparkle 公式の
+        Team Identifier を許可する形でも対応可能。
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
