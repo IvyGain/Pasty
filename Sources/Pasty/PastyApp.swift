@@ -48,7 +48,9 @@ struct PastyApp: App {
             installable.installHotkeys()
             installable.installNotchHover()
             installable.prewarmStrip()
-            UpdateChecker.shared.start()
+            // Sparkle: SPUStandardUpdaterController(startingUpdater: true) を呼んだ時点で
+            // 自動チェッカーが起動するので、shared にアクセスするだけで初期化される。
+            _ = SparkleUpdater.shared
             _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
 
             // Subscribe to settings notifications.

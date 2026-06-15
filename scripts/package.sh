@@ -18,7 +18,7 @@ NOTARIZE="${2:-}"
 
 APP_NAME="Pasty"
 BUNDLE_ID="io.pasty.app"
-VERSION="${PASTY_VERSION:-0.5.0-beta}"
+VERSION="${PASTY_VERSION:-0.6.0-beta}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -45,10 +45,37 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/${APP_NAME}"
 chmod +x "$APP/Contents/MacOS/${APP_NAME}"
 
+# Sparkle 用 EdDSA 公開鍵を Info.plist に埋め込む。
+# 鍵は ~/.config/pasty/sparkle_public_ed_key.txt にプレーンテキスト 1 行で保存しておく
+# (リポジトリには絶対コミットしない)。無い場合はテンプレの placeholder
+# `__SU_PUBLIC_ED_KEY__` がそのまま残り、Sparkle は起動時に検証失敗で no-op になる。
+ED_KEY_FILE="${HOME}/.config/pasty/sparkle_public_ed_key.txt"
+if [ -f "$ED_KEY_FILE" ]; then
+  SU_PUBLIC_ED_KEY="$(tr -d '[:space:]' < "$ED_KEY_FILE")"
+  echo "==> Embedded SUPublicEDKey (length ${#SU_PUBLIC_ED_KEY})"
+else
+  SU_PUBLIC_ED_KEY="__SU_PUBLIC_ED_KEY__"
+  echo "warn: $ED_KEY_FILE が見つかりません。Sparkle の自動アップデートは無効になります。"
+  echo "      './Sparkle/bin/generate_keys' で鍵を作成後、Public Key を上記ファイルに保存してください。"
+fi
+
 # Stamp the Info.plist with the chosen version.
 sed -e "s/__VERSION__/${VERSION}/g" \
     -e "s/__BUNDLE_ID__/${BUNDLE_ID}/g" \
+    -e "s|__SU_PUBLIC_ED_KEY__|${SU_PUBLIC_ED_KEY}|g" \
     "scripts/Info.plist.template" > "$APP/Contents/Info.plist"
+
+# Sparkle.framework を bundle に同梱 (SwiftPM で取得済みの .build/checkouts から)
+# Sparkle は AutoUpdate.app / Updater.app などの helper を Frameworks/Sparkle.framework
+# 配下に持つので、ディレクトリごとコピーする必要がある。
+SPARKLE_FRAMEWORK_SRC="$(find "${ROOT}/.build" -type d -name "Sparkle.framework" -print -quit 2>/dev/null || true)"
+if [ -n "$SPARKLE_FRAMEWORK_SRC" ] && [ -d "$SPARKLE_FRAMEWORK_SRC" ]; then
+  mkdir -p "$APP/Contents/Frameworks"
+  ditto "$SPARKLE_FRAMEWORK_SRC" "$APP/Contents/Frameworks/Sparkle.framework"
+  echo "==> Bundled Sparkle.framework from $SPARKLE_FRAMEWORK_SRC"
+else
+  echo "warn: Sparkle.framework が .build に見つかりません。swift build が走っていない?"
+fi
 
 # Bundle the .icns so Finder/Dock pick up the GPT-Image-2 designed icon.
 ICNS_SRC="${ROOT}/Sources/Pasty/Resources/Assets/Pasty.icns"
@@ -59,14 +86,48 @@ else
   echo "warn: no Pasty.icns found at $ICNS_SRC — Finder will show the generic app icon"
 fi
 
-# Ad-hoc sign (or Developer-ID sign if DEV_ID set).
+# 署名方針 (優先順):
+#   1. PASTY_SIGN_IDENTITY (環境変数で明示)
+#   2. Apple Developer ID ($DEV_ID 設定時、Notarize 経路)
+#   3. 自前 Self-signed cert (Keychain Access で作成、デフォルト名 "Pasty Self-Signed")
+#   4. ad-hoc 署名 (最終フォールバック、TCC 権限が毎回失効する点に注意)
+#
+# Self-signed cert を使うと code signing identity が安定するため、再ビルド時にも
+# アクセシビリティ権限が維持されやすい。Sparkle 経由の自動アップデートでも
+# 同じ identity で署名された dmg であれば TCC が継続できる。
+SIGN_IDENTITY="${PASTY_SIGN_IDENTITY:-Pasty Self-Signed}"
 if [ -n "${DEV_ID:-}" ]; then
+  USE_IDENTITY="$DEV_ID"
   echo "==> Codesigning with Developer ID"
-  codesign --force --options runtime --timestamp \
-           --sign "$DEV_ID" "$APP"
+elif security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$SIGN_IDENTITY\""; then
+  USE_IDENTITY="$SIGN_IDENTITY"
+  echo "==> Codesigning with self-signed identity: $SIGN_IDENTITY"
 else
-  echo "==> Codesigning ad-hoc (Gatekeeper will warn once on first run)"
+  USE_IDENTITY="-"
+  echo "==> Codesigning ad-hoc (TCC permissions will reset on each build)"
+  echo "    self-signed cert を Keychain Access で作ると権限が維持されます。"
+fi
+
+# 1. 内部の Sparkle.framework を **先に** 署名 (Apple のガイドラインに沿った順序)。
+#    --deep フラグは framework の Versions/A/ の helper bundle まで再帰する。
+if [ -d "$APP/Contents/Frameworks/Sparkle.framework" ]; then
+  for SUB in "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/"*.xpc \
+             "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
+             "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"; do
+    [ -e "$SUB" ] || continue
+    codesign --force --options runtime --timestamp=none \
+             --sign "$USE_IDENTITY" "$SUB" 2>/dev/null || true
+  done
+  codesign --force --options runtime --timestamp=none \
+           --sign "$USE_IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
+fi
+
+# 2. アプリ本体を署名 (framework が先に署名済みなので --deep 不要)。
+if [ "$USE_IDENTITY" = "-" ]; then
   codesign --force --sign - "$APP"
+else
+  codesign --force --options runtime \
+           --sign "$USE_IDENTITY" "$APP"
 fi
 
 # Build dmg.

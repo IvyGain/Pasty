@@ -8,7 +8,6 @@ struct MenuBarContentView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var selection: SelectionModel
     @Environment(\.openSettings) private var openSettings
-    @State private var availableUpdate: UpdateChecker.AvailableUpdate?
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -75,10 +74,6 @@ struct MenuBarContentView: View {
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let update = availableUpdate {
-                updateRow(update)
-                Divider().padding(.vertical, 2)
-            }
             row(title: "ストリップを開く  ⇧⌘V",
                 systemImage: SettingsStore.PrimarySurface.strip.iconName) {
                 coordinator.togglePrimary()
@@ -89,6 +84,10 @@ struct MenuBarContentView: View {
                     NSWorkspace.shared.open(url)
                 }
             }
+            row(title: "アップデートを確認…",
+                systemImage: "arrow.down.circle") {
+                SparkleUpdater.shared.checkForUpdates()
+            }
             row(title: settings.isPaused ? "キャプチャを再開" : "60 秒間 一時停止",
                 systemImage: settings.isPaused ? "play.circle" : "pause.circle") {
                 if settings.isPaused { settings.resume() }
@@ -96,63 +95,6 @@ struct MenuBarContentView: View {
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .onAppear {
-            availableUpdate = UpdateChecker.shared.available
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .pastyUpdateAvailable)) { _ in
-            availableUpdate = UpdateChecker.shared.available
-        }
-    }
-
-    /// 新バージョン検出時に最上段に表示する目立つ行。
-    private func updateRow(_ update: UpdateChecker.AvailableUpdate) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .foregroundStyle(.white)
-                    .padding(6)
-                    .background(Circle().fill(Color.accentColor))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("アップデートあり: v\(update.version)")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(update.isPrerelease ? "Beta · ダウンロードして手動入れ替え" : "ダウンロードして手動入れ替え")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            HStack(spacing: 6) {
-                Button {
-                    UpdateChecker.shared.openDownload()
-                } label: {
-                    Label("dmg をダウンロード", systemImage: "arrow.down.to.line")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                Button {
-                    UpdateChecker.shared.openReleasePage()
-                } label: {
-                    Label("リリースノート", systemImage: "doc.text")
-                        .font(.system(size: 11))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 4).padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.accentColor.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1)
-        )
     }
 
     private func row(title: String, systemImage: String, action: @escaping () -> Void) -> some View {

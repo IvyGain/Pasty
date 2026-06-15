@@ -477,7 +477,7 @@ struct SettingsView: View {
                 .controlSize(.regular)
 
                 Button {
-                    _ = UpdateChecker.shared.check(force: true)
+                    SparkleUpdater.shared.checkForUpdates()
                 } label: {
                     Label("アップデートを確認", systemImage: "arrow.clockwise")
                 }

@@ -21,9 +21,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.5.0-beta</string>
+    <string>0.6.0-beta</string>
     <key>CFBundleVersion</key>
-    <string>23</string>
+    <string>24</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>
@@ -38,5 +38,19 @@
     <string>Pasty pastes the selected clip into the frontmost app via ⌘V.</string>
     <key>NSAccessibilityUsageDescription</key>
     <string>Pasty needs Accessibility permission to post ⌘V into the app you were just using.</string>
+
+    <!-- Sparkle 2 自動アップデート設定 -->
+    <key>SUFeedURL</key>
+    <string>https://ivygain.github.io/Pasty/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>__SU_PUBLIC_ED_KEY__</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUEnableInstallerLauncherService</key>
+    <false/>
 </dict>
 </plist>

@@ -15,13 +15,16 @@ let package = Package(
         // Xcode is installed but its license has not been accepted yet.
         // Switch back to `.package(url: ...)` once the user accepts the
         // Xcode license; see Vendor/GRDB.swift for the pinned source.
-        .package(path: "Vendor/GRDB.swift")
+        .package(path: "Vendor/GRDB.swift"),
+        // Sparkle 2: 起動時の自動アップデートと EdDSA 署名検証。
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4")
     ],
     targets: [
         .executableTarget(
             name: "Pasty",
             dependencies: [
-                .product(name: "GRDB", package: "GRDB.swift")
+                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources/Pasty",
             exclude: [],
