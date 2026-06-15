@@ -297,6 +297,12 @@ struct StripView: View {
                         .onTapGesture { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
                         .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                         .contextMenu {
+                            if canEdit(clip) {
+                                Button("内容を編集…  ⌘E") {
+                                    startEdit(clip)
+                                }
+                                Divider()
+                            }
                             // 「フォルダ内表示中」ならその場で名前変更が可能
                             if let bid = folderID {
                                 Button("このフォルダでの名前を変更…") {
@@ -386,6 +392,10 @@ struct StripView: View {
                                 }
                                 .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                                 .contextMenu {
+                                    if canEdit(clip) {
+                                        Button("内容を編集…  ⌘E") { startEdit(clip) }
+                                        Divider()
+                                    }
                                     Section("フォルダに振り分け") {
                                         ForEach(pinboards.boards) { board in
                                             Button(board.name) {
@@ -641,6 +651,21 @@ struct StripView: View {
         .padding(20)
     }
 
+    /// 編集対象として開ける kind か (画像 / ファイル / 動画はテキスト内容を持たないので不可)。
+    private func canEdit(_ clip: ClipItem) -> Bool {
+        switch clip.kind {
+        case .image, .file, .video: return false
+        default: return true
+        }
+    }
+
+    /// 編集 sheet を起動する。⌘E / コンテキストメニュー双方の共通入口。
+    private func startEdit(_ clip: ClipItem) {
+        guard canEdit(clip) else { return }
+        editingContent = clip.content ?? clip.preview
+        editingClip = clip
+    }
+
     private func editSheet(for clip: ClipItem) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -662,6 +687,12 @@ struct StripView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                 )
+                // sheet が表示された瞬間に元のクリップ内容を確実にセット。
+                // onCmdE 配線時の代入だけだと SwiftUI のレンダリングサイクル次第で
+                // 初回 sheet を空のまま開くケースがあるため、ここで保険を入れる。
+                .onAppear {
+                    editingContent = clip.content ?? clip.preview
+                }
             HStack {
                 Spacer()
                 Button("キャンセル") { editingClip = nil }
@@ -708,11 +739,7 @@ struct StripView: View {
             onCmdA:         { selection.selectAll(in: items) },
             onCmdE:         {
                 guard items.indices.contains(selection.cursorIndex) else { return }
-                let clip = items[selection.cursorIndex]
-                // 画像 / ファイル / 動画は編集不可
-                if clip.kind == .image || clip.kind == .file || clip.kind == .video { return }
-                editingClip = clip
-                editingContent = clip.content ?? clip.preview
+                startEdit(items[selection.cursorIndex])
             },
             onCmdN:         { showingNewSnippet = true; newSnippetText = "" },
             onCmdD:         { selection.clearAll() },
