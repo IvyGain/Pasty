@@ -475,6 +475,14 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+
+                Button {
+                    _ = UpdateChecker.shared.check(force: true)
+                } label: {
+                    Label("アップデートを確認", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
             .padding(.top, 6)
 

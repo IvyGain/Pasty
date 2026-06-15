@@ -48,6 +48,7 @@ struct PastyApp: App {
             installable.installHotkeys()
             installable.installNotchHover()
             installable.prewarmStrip()
+            UpdateChecker.shared.start()
             _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
 
             // Subscribe to settings notifications.
