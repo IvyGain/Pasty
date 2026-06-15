@@ -1012,9 +1012,9 @@
           Pasty.dmg をダウンロード
           <small>· 4.0 MB · macOS 14 以降</small>
         </a>
-        <a class="btn ghost" href="https://www.raycast.com/ivygain/pasty" target="_blank" rel="noopener">
+        <a class="btn ghost" href="#download">
           Raycast 拡張をインストール
-          <small>· or sideload from GitHub</small>
+          <small>· ワンライナーで簡単セットアップ</small>
         </a>
       </div>
 
@@ -1647,24 +1647,31 @@ $ open .build/release/Pasty.app</pre>
           </div>
         </div>
         <p class="lede">Raycast 内で履歴検索 → タブで複数選択 → <code style="font-family:var(--mono);font-size:0.9em">⌘↩</code> で連続貼付。Pasty 本体と同じ履歴・フォルダ・定型文を共有します。</p>
+        <p class="lede" style="font-size:13px;color:var(--text-soft);margin-top:-10px">
+          <strong style="color:#FF8E8E">Raycast Store 公開準備中</strong>。当面は下のワンライナーで簡単にセットアップできます。
+        </p>
         <div class="ctas">
-          <a class="btn primary" href="https://www.raycast.com/ivygain/pasty" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#FF6363,#FF3D3D);box-shadow:0 12px 30px -8px rgba(255,99,99,0.55)">
-            Raycast Store で開く
-            <small>· ワンクリック</small>
-          </a>
+          <button class="btn primary" id="copy-raycast-install" style="background:linear-gradient(135deg,#FF6363,#FF3D3D);box-shadow:0 12px 30px -8px rgba(255,99,99,0.55);cursor:pointer;border:none;color:#fff">
+            <span id="copy-raycast-install-label">📋 インストールコマンドをコピー</span>
+            <small>· ターミナルに貼って実行</small>
+          </button>
         </div>
+        <pre style="margin-top:14px;padding:14px;background:rgba(0,0,0,0.45);border-radius:10px;font-size:12px;line-height:1.6;color:#FFD7D7;overflow-x:auto"><code id="raycast-install-cmd">curl -fsSL https://raw.githubusercontent.com/IvyGain/Pasty/main/pasty-raycast/scripts/install.sh | bash</code></pre>
         <div class="badge-row">
           <span>Raycast 1.60 以降</span>
+          <span>Node.js 20+</span>
           <span>Pasty v0.5.0-beta+ 推奨</span>
-          <span>MIT</span>
         </div>
         <details>
-          <summary>GitHub からサイドロード</summary>
-          <pre>$ git clone https://github.com/IvyGain/Pasty.git
-$ cd Pasty/raycast-extension
+          <summary>手動セットアップ (上のコマンドが使えない場合)</summary>
+          <pre>$ git clone --depth 1 https://github.com/IvyGain/Pasty.git
+$ cd Pasty/pasty-raycast
 $ npm install
 $ npx ray develop
-# Raycast Preferences → Extensions に登場します</pre>
+# Raycast を起動して「Pasty」と入力すると 4 つのコマンドが見つかります</pre>
+          <p style="font-size:12px;color:var(--text-dim);margin-top:8px">
+            <code style="font-family:var(--mono);font-size:0.9em">npx ray develop</code> を実行している間だけ Raycast に拡張が登録されます。ターミナルを開いたままにしてください。Raycast Store 公開後は通常のワンクリックインストールに切り替わります。
+          </p>
         </details>
       </div>
     </div>
@@ -2013,6 +2020,24 @@ $ npx ray develop
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { threshold: 0.12 });
     els.forEach(el => io.observe(el));
+  })();
+
+  // Raycast 拡張インストールコマンドのワンクリックコピー
+  (function () {
+    const btn = document.getElementById('copy-raycast-install');
+    const label = document.getElementById('copy-raycast-install-label');
+    const cmd = document.getElementById('raycast-install-cmd');
+    if (!btn || !label || !cmd) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(cmd.textContent.trim());
+        const original = label.textContent;
+        label.textContent = '✅ コピーしました — ターミナルに貼り付けて実行';
+        setTimeout(() => { label.textContent = original; }, 2400);
+      } catch (e) {
+        label.textContent = '❌ コピー失敗 — 下のコマンドを手動で選択してください';
+      }
+    });
   })();
 </script>
 

@@ -16,16 +16,29 @@ Pasty（macOS 向けクリップボードマネージャー）の Raycast 拡張
 
 ## インストール
 
-### Raycast Store からインストール（公開後）
+### 一発インストール (推奨)
+
+ターミナルに以下を貼り付けて実行するだけ。`~/.pasty-raycast/` にリポジトリを clone し、依存をインストールし、`ray develop` まで自動で起動します。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/IvyGain/Pasty/main/pasty-raycast/scripts/install.sh | bash
+```
+
+要件: `git` (Xcode コマンドラインツール) + `node` 20+ + `npm` + Raycast 1.86+ がインストール済みであること。
+
+実行中はターミナルを閉じないでください (Raycast に拡張機能が登録されている間だけ、`ray develop` プロセスが動き続けます)。
+
+### Raycast Store からインストール (公開後)
 
 1. Raycast を開く。
 2. Store コマンドから "Pasty" を検索。
 3. Install を押す。
 
-### サイドロード（開発・先行利用）
+### 手動セットアップ (上のコマンドが使えない場合)
 
 ```bash
-cd pasty-raycast
+git clone --depth 1 https://github.com/IvyGain/Pasty.git
+cd Pasty/pasty-raycast
 npm install
 npx ray develop
 ```
