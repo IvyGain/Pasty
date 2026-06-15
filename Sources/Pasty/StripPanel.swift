@@ -74,7 +74,6 @@ struct StripView: View {
     @State private var showingNewSnippet: Bool = false
     @State private var newSnippetText: String = ""
     @State private var editingClip: ClipItem?
-    @State private var editingContent: String = ""
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -127,7 +126,17 @@ struct StripView: View {
         .sheet(isPresented: $showingNewFolder) { newFolderSheet }
         .sheet(isPresented: $showingNewSnippet) { newSnippetSheet }
         .sheet(item: $editingClip) { clip in
-            editSheet(for: clip)
+            ClipEditSheet(clip: clip) { newContent in
+                Task {
+                    if let id = clip.id {
+                        try? await store.update(clipId: id, content: newContent)
+                    }
+                    editingClip = nil
+                    reload()
+                }
+            } onCancel: {
+                editingClip = nil
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .pastyVideoThumbReady)) { _ in
             reload()
@@ -662,55 +671,9 @@ struct StripView: View {
     /// 編集 sheet を起動する。⌘E / コンテキストメニュー双方の共通入口。
     private func startEdit(_ clip: ClipItem) {
         guard canEdit(clip) else { return }
-        editingContent = clip.content ?? clip.preview
+        // sheet の表示は `editingClip` をセットするだけ。実際の初期値は
+        // `ClipEditSheet` 側の init で確実に取り込まれる。
         editingClip = clip
-    }
-
-    private func editSheet(for clip: ClipItem) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Image(systemName: clip.kind.iconName)
-                    .foregroundStyle(.tint)
-                Text("クリップを編集")
-                    .font(.headline)
-                Spacer()
-                Text(clip.kind.rawValue.uppercased())
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(.quaternary))
-            }
-            TextEditor(text: $editingContent)
-                .font(.system(.body, design: .monospaced))
-                .frame(width: 520, height: 360)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-                )
-                // sheet が表示された瞬間に元のクリップ内容を確実にセット。
-                // onCmdE 配線時の代入だけだと SwiftUI のレンダリングサイクル次第で
-                // 初回 sheet を空のまま開くケースがあるため、ここで保険を入れる。
-                .onAppear {
-                    editingContent = clip.content ?? clip.preview
-                }
-            HStack {
-                Spacer()
-                Button("キャンセル") { editingClip = nil }
-                    .keyboardShortcut(.cancelAction)
-                Button("保存") {
-                    Task {
-                        if let id = clip.id {
-                            try? await store.update(clipId: id, content: editingContent)
-                        }
-                        editingClip = nil
-                        reload()
-                    }
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(20)
     }
 
     // MARK: - Actions
@@ -1409,4 +1372,80 @@ private struct StripCard: View {
         if isSelected { return Color.accentColor.opacity(0.55) }
         return Color.primary.opacity(0.06)
     }
+}
+
+// MARK: - Clip Edit Sheet
+
+/// クリップ内容を編集する独立した sheet。`@State` の初期値を `init` で確実に
+/// 受け取るために独立 struct に切り出している。SwiftUI の `@State String = ""`
+/// を外から代入するパターンは、`.sheet(item:)` のクロージャ実行タイミングと
+/// 競合して「初回 sheet が空のまま開く」事故が起きやすいため。
+///
+/// 加えて、sheet が表示されている間は ノッチ自動 dismiss を抑止するため、
+/// `pastyClipEditOpen` 通知を post して `NotchHoverController` 側のフラグを
+/// 立てる (Notification 経由でラフに連携)。
+@MainActor
+private struct ClipEditSheet: View {
+    let clip: ClipItem
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+
+    @State private var content: String
+
+    init(clip: ClipItem,
+         onSave: @escaping (String) -> Void,
+         onCancel: @escaping () -> Void) {
+        self.clip = clip
+        self.onSave = onSave
+        self.onCancel = onCancel
+        // _content で State の初期値を init 時点で確定。これで TextEditor の
+        // 初回レンダリングで必ず元のクリップ内容が表示される。
+        _content = State(initialValue: clip.content ?? clip.preview)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: clip.kind.iconName)
+                    .foregroundStyle(.tint)
+                Text("クリップを編集")
+                    .font(.headline)
+                Spacer()
+                Text(clip.kind.rawValue.uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(.quaternary))
+            }
+            TextEditor(text: $content)
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 520, height: 360)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+            HStack {
+                Spacer()
+                Button("キャンセル", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("保存") { onSave(content) }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .onAppear {
+            NotificationCenter.default.post(name: .pastyClipEditOpen, object: nil)
+        }
+        .onDisappear {
+            NotificationCenter.default.post(name: .pastyClipEditClose, object: nil)
+        }
+    }
+}
+
+extension Notification.Name {
+    /// クリップ編集 sheet が開いた / 閉じた通知。`NotchHoverController` が
+    /// 購読し、編集中は自動 dismissal を停止する。
+    static let pastyClipEditOpen  = Notification.Name("pasty.clipEdit.open")
+    static let pastyClipEditClose = Notification.Name("pasty.clipEdit.close")
 }

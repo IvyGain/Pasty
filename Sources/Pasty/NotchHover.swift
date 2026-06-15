@@ -47,6 +47,8 @@ final class NotchHoverController: NSObject {
     /// メニュー項目はパネル矩形の外に出るので、これを抑止しないと
     /// メニューを辿った瞬間にパネルが閉じてしまう。
     private var isContextMenuOpen: Bool = false
+    /// クリップ編集 sheet が開いている間も同様に自動 dismissal を抑止する。
+    private var isClipEditOpen: Bool = false
     /// `installContextMenuNotifications` を 1 回だけ呼ぶための idempotency フラグ。
     private var contextMenuObserverInstalled: Bool = false
 
@@ -103,6 +105,17 @@ final class NotchHoverController: NSObject {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 self?.isContextMenuOpen = false
             }
+        }
+        // 編集 sheet open/close 通知も同じく購読 → dismissal 抑止
+        NotificationCenter.default.addObserver(
+            forName: .pastyClipEditOpen, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.isClipEditOpen = true }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .pastyClipEditClose, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.isClipEditOpen = false }
         }
     }
 
@@ -347,6 +360,7 @@ final class NotchHoverController: NSObject {
         // メニュー項目はパネル矩形の外に出るので、これを抑止しないと
         // メニューを辿った瞬間にパネルが閉じてしまう。
         if isContextMenuOpen { return }
+        if isClipEditOpen { return }
         let p = NSEvent.mouseLocation
         let inside = NSPointInRect(p, zone)
         pointerInsidePanel = inside

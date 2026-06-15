@@ -49,7 +49,7 @@
     <key>SUAutomaticallyUpdate</key>
     <false/>
     <key>SUScheduledCheckInterval</key>
-    <integer>86400</integer>
+    <integer>21600</integer>
     <key>SUEnableInstallerLauncherService</key>
     <false/>
 </dict>
