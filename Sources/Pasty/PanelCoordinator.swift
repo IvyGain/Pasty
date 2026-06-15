@@ -152,6 +152,9 @@ final class PanelCoordinator: ObservableObject {
     func installNotchHover() {
         if SettingsStore.shared.notchHoverEnabled {
             notch.install()
+            // SwiftUI + NSHostingController の初回ビルド (~150ms) を起動時に
+            // 払っておき、実際のホバー時は瞬時に表示できるようにする。
+            notch.prewarm()
         }
     }
 

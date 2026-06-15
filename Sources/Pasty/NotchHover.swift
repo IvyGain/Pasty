@@ -17,8 +17,14 @@ final class NotchHoverController: NSObject {
 
     private var triggerPanels: [NSPanel] = []
     private var dropdownPanel: NSPanel?
+    /// `show()` で構築した SwiftUI ホスティング + パネルを **再利用** するための
+    /// キャッシュ。最初の 1 度だけ構築コスト (~150ms) を払い、以降は
+    /// `orderFrontRegardless` + `setFrame` だけで瞬時に表示できる。
+    private var cachedPanel: NSPanel?
     private var hoverWorkItem: DispatchWorkItem?
-    private var dwellDelay: TimeInterval = 0.22
+    /// ホバー検出から show までの待ち時間。ノッチに「ふっと触れただけ」では
+    /// 開かないギリギリの値に抑え、体感を「ほぼ即」に近づける。
+    private var dwellDelay: TimeInterval = 0.08
 
     /// パネルが開いている間だけ動くマウス位置の見張り役。`NSPanel` の
     /// `mouseExited` は、プログラマティックに `NSHostingController` を
@@ -148,25 +154,22 @@ final class NotchHoverController: NSObject {
         hoverWorkItem = nil
     }
 
-    func show(on screen: NSScreen) {
-        if dropdownPanel != nil { return }
-        // メニューバー直下に張り付ける。screen.frame (物理上端) だと NotchPanel が
-        // .floating level なので statusBar level のメニューバーに隠されて、ユーザー
-        // 視点では 24pt 下にズレて見える。visibleFrame の上端 = メニューバー直下
-        // に origin.y を合わせれば「謎の上余白」が消える。
+    /// パネルと SwiftUI を 1 度だけ構築して使い回す。`install()` 直後に呼ぶと
+    /// 起動時に投資できる (約 150ms の SwiftUI 初期化コスト)。
+    func prewarm() {
+        guard cachedPanel == nil else { return }
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        cachedPanel = buildPanel(on: screen)
+    }
+
+    private func buildPanel(on screen: NSScreen) -> NSPanel {
         let visible = screen.visibleFrame
         let targetWidth: CGFloat = min(visible.width - 32, 1320)
         let panelHeight: CGFloat = 280
         let collapsed = NSRect(x: visible.midX - targetWidth / 2,
                                y: visible.maxY,
                                width: targetWidth, height: 0)
-        let expanded = NSRect(x: collapsed.origin.x,
-                              y: visible.maxY - panelHeight,
-                              width: targetWidth, height: panelHeight)
-
         let panel = NotchPanel(contentRect: collapsed)
-        // Strip と同じカルーセル/フォルダ UI を再利用。表示位置が違うだけで、
-        // 操作感は完全に同じ。
         let view = StripView(
             store: store,
             pinboards: pinboards,
@@ -177,12 +180,35 @@ final class NotchHoverController: NSObject {
             onOpenSettings: { [weak self] in self?.onOpenSettings() }
         )
         let hosting = NSHostingController(rootView: view)
-        // sizingOptions を空にして「コンテンツが SwiftUI 内で変化してもパネルは
-        // 動かさない」挙動に固定する。これがないとフォルダ切替や複数選択 bar の
-        // 出現で SwiftUI コンテンツの minSize が変わり、その都度パネルが上下に
-        // 動いてしまう。
         hosting.sizingOptions = []
         panel.contentViewController = hosting
+        return panel
+    }
+
+    func show(on screen: NSScreen) {
+        if dropdownPanel != nil { return }
+        // メニューバー直下に張り付ける。
+        let visible = screen.visibleFrame
+        let targetWidth: CGFloat = min(visible.width - 32, 1320)
+        let panelHeight: CGFloat = 280
+        let collapsed = NSRect(x: visible.midX - targetWidth / 2,
+                               y: visible.maxY,
+                               width: targetWidth, height: 0)
+        let expanded = NSRect(x: collapsed.origin.x,
+                              y: visible.maxY - panelHeight,
+                              width: targetWidth, height: panelHeight)
+
+        // キャッシュ済みパネルを優先的に再利用。初回 hover 時のみ
+        // ビルドコスト (~150ms) が発生する。
+        let panel: NSPanel
+        if let cached = cachedPanel {
+            panel = cached
+            panel.setFrame(collapsed, display: false)
+        } else {
+            panel = buildPanel(on: screen)
+            cachedPanel = panel
+        }
+
         panel.orderFrontRegardless()
         // .nonactivatingPanel なので、makeKey しても直前のフォーカスアプリは
         // 入れ替わらない (ユーザー視点では元のアプリがアクティブのまま)。
@@ -194,7 +220,8 @@ final class NotchHoverController: NSObject {
         pointerEnteredOnce = false
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
+            // 体感を「ほぼ即」に近づけるため、180ms → 120ms に短縮。
+            ctx.duration = 0.12
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(expanded, display: true)
         }
@@ -212,13 +239,16 @@ final class NotchHoverController: NSObject {
                                y: frame.origin.y + frame.size.height,
                                width: frame.size.width, height: 0)
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.18
+            // 閉じるアニメも 120ms に短縮。
+            ctx.duration = 0.12
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(collapsed, display: true)
         }, completionHandler: { [weak self] in
             panel.orderOut(nil)
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                // パネルは `cachedPanel` に保持したまま、`dropdownPanel` だけ
+                // クリアする。次回 show() で同じ panel が即時再表示される。
                 self.dropdownPanel = nil
                 // ドロップダウン終了後に trigger panel を復活させて
                 // 次のホバー検出を再開できるようにする。
