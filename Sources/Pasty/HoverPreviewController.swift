@@ -17,9 +17,10 @@ final class HoverPreviewController {
     // MARK: - Tunables
 
     /// Delay between `scheduleShow` and actual presentation.
-    private let showDelay: TimeInterval = 0.6
-    /// Auto dismiss after this much wall-clock time on screen.
-    private let autoDismissAfter: TimeInterval = 0.8
+    private let showDelay: TimeInterval = 0.5
+    /// Auto dismiss safety net. ホバー解除は `cancel()` 側で即時消すので、
+    /// これは「もしホバー終了通知を取り逃した場合の保険」。長めの 30 秒。
+    private let autoDismissAfter: TimeInterval = 30
     /// Fade in / fade out duration.
     private let fadeDuration: TimeInterval = 0.16
     /// Offset applied to the cursor point. Positive X moves right, positive Y moves up

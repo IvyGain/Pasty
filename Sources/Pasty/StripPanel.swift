@@ -1088,7 +1088,20 @@ private struct StripCard: View {
         .scaleEffect(isCursor ? 1.025 : 1.0)
         .offset(y: isCursor ? -2 : 0)
         .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isCursor)
-        // ホバー pill はクリックの邪魔になるため撤去。プレビューは ⌘Y / Space。
+        // 約 600ms ホバー → 全文プレビュー pill。クリックには干渉しないよう
+        // ディレイを長めに、また pill 自体はマウスイベントを取らない。
+        .onHover { hovering in
+            guard SettingsStore.shared.hoverPreviewEnabled else { return }
+            if hovering {
+                HoverPreviewController.shared.scheduleShow(
+                    for: clip,
+                    near: NSEvent.mouseLocation,
+                    on: NSScreen.main
+                )
+            } else {
+                HoverPreviewController.shared.cancel()
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(clip.preview)
         .accessibilityHint(accessibilityHintText)
