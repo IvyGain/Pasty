@@ -213,24 +213,51 @@ enum AIEngine {
     static func perform(_ action: AIAction, on text: String) async throws -> AIResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw AIEngineError.invalidInput }
+        let ctx = SettingsStore.shared.aiPromptContext
 
         switch action {
         case .rewrite(let tone):
-            return try await runRewrite(text: trimmed, tone: tone)
+            return try await runRewrite(text: trimmed, tone: tone, ctx: ctx)
         case .translate(let target):
-            return try await runTranslate(text: trimmed, target: target)
+            return try await runTranslate(text: trimmed, target: target, ctx: ctx)
         case .summarize(let length):
-            return try await runSummarize(text: trimmed, length: length)
+            return try await runSummarize(text: trimmed, length: length, ctx: ctx)
         case .reformat(let target):
-            return try await runReformat(text: trimmed, target: target)
+            return try await runReformat(text: trimmed, target: target, ctx: ctx)
         case .emailify:
-            return try await runEmailify(text: trimmed)
+            return try await runEmailify(text: trimmed, ctx: ctx)
         }
+    }
+
+    /// ユーザーの style guide / email template を prompt 前段に注入する。
+    /// 空ならそのまま `core` を返す。
+    private static func decoratePrompt(_ core: String,
+                                       ctx: SettingsStore.AIPromptContext,
+                                       includeEmailTemplate: Bool = false) -> String {
+        var pieces: [String] = []
+        if !ctx.styleGuide.isEmpty {
+            pieces.append("""
+            [フォーマット規約]
+            You must follow these style rules in every response:
+            \(ctx.styleGuide)
+            """)
+        }
+        if includeEmailTemplate && !ctx.emailTemplate.isEmpty {
+            pieces.append("""
+            [メール出力フォーマット]
+            Use this template for the email body. Where `{{body}}` appears, insert the rewritten body. Keep the rest of the template verbatim (including signature placeholders such as 〔担当者名〕):
+            \(ctx.emailTemplate)
+            """)
+        }
+        pieces.append(core)
+        return pieces.joined(separator: "\n\n")
     }
 
     // MARK: - Action implementations
 
-    private static func runRewrite(text: String, tone: RewriteTone) async throws -> AIResult {
+    private static func runRewrite(text: String,
+                                   tone: RewriteTone,
+                                   ctx: SettingsStore.AIPromptContext) async throws -> AIResult {
         let toneDescription: String
         switch tone {
         case .formal:   toneDescription = "formal, professional"
@@ -238,11 +265,12 @@ enum AIEngine {
         case .friendly: toneDescription = "friendly, warm"
         case .concise:  toneDescription = "concise, terse"
         }
-        let prompt = """
+        let core = """
         Rewrite the following text in a \(toneDescription) tone. Preserve the original meaning and language. Reply with only the rewritten text, with no preamble.
 
         \(text)
         """
+        let prompt = decoratePrompt(core, ctx: ctx)
         if isFoundationModelsAvailable {
             let response = try await runFoundationModels(prompt: prompt)
             return AIResult(text: response, backend: .foundationModels)
@@ -251,7 +279,9 @@ enum AIEngine {
         return AIResult(text: text, backend: .heuristic)
     }
 
-    private static func runTranslate(text: String, target: TranslateTarget) async throws -> AIResult {
+    private static func runTranslate(text: String,
+                                     target: TranslateTarget,
+                                     ctx: SettingsStore.AIPromptContext) async throws -> AIResult {
         let resolved: TranslateTarget
         if target == .auto {
             let lang = detectLanguage(text) ?? "en"
@@ -269,11 +299,12 @@ enum AIEngine {
         case .auto:              languageName = "English" // unreachable
         }
 
-        let prompt = """
+        let core = """
         Translate the following text to \(languageName). Preserve meaning and tone. Reply with only the translated text, with no preamble.
 
         \(text)
         """
+        let prompt = decoratePrompt(core, ctx: ctx)
         if isFoundationModelsAvailable {
             let response = try await runFoundationModels(prompt: prompt)
             return AIResult(text: response, backend: .foundationModels)
@@ -283,18 +314,21 @@ enum AIEngine {
         return AIResult(text: message, backend: .heuristic)
     }
 
-    private static func runSummarize(text: String, length: SummaryLength) async throws -> AIResult {
+    private static func runSummarize(text: String,
+                                     length: SummaryLength,
+                                     ctx: SettingsStore.AIPromptContext) async throws -> AIResult {
         let instruction: String
         switch length {
         case .short:  instruction = "Summarize the following text in 1 concise sentence."
         case .medium: instruction = "Summarize the following text in 2-3 sentences."
         case .long:   instruction = "Summarize the following text in detail, in at most 5 sentences."
         }
-        let prompt = """
+        let core = """
         \(instruction) Preserve the original language. Reply with only the summary, with no preamble.
 
         \(text)
         """
+        let prompt = decoratePrompt(core, ctx: ctx)
         if isFoundationModelsAvailable {
             let response = try await runFoundationModels(prompt: prompt)
             return AIResult(text: response, backend: .foundationModels)
@@ -310,7 +344,9 @@ enum AIEngine {
         return AIResult(text: summary, backend: .heuristic)
     }
 
-    private static func runReformat(text: String, target: ReformatTarget) async throws -> AIResult {
+    private static func runReformat(text: String,
+                                    target: ReformatTarget,
+                                    ctx: SettingsStore.AIPromptContext) async throws -> AIResult {
         switch target {
         case .jsonPretty:
             return AIResult(text: prettyPrintJSON(text) ?? text, backend: .heuristic)
@@ -319,20 +355,21 @@ enum AIEngine {
         case .plainText:
             return AIResult(text: stripFormatting(text), backend: .heuristic)
         case .markdownToHTML, .htmlToMarkdown:
-            let prompt: String
+            let core: String
             if target == .markdownToHTML {
-                prompt = """
+                core = """
                 Convert the following Markdown to clean, valid HTML. Reply with only the HTML, with no preamble.
 
                 \(text)
                 """
             } else {
-                prompt = """
+                core = """
                 Convert the following HTML to clean Markdown. Reply with only the Markdown, with no preamble.
 
                 \(text)
                 """
             }
+            let prompt = decoratePrompt(core, ctx: ctx)
             if isFoundationModelsAvailable {
                 let response = try await runFoundationModels(prompt: prompt)
                 return AIResult(text: response, backend: .foundationModels)
@@ -346,15 +383,22 @@ enum AIEngine {
         }
     }
 
-    private static func runEmailify(text: String) async throws -> AIResult {
-        let prompt = """
+    private static func runEmailify(text: String,
+                                    ctx: SettingsStore.AIPromptContext) async throws -> AIResult {
+        let core = """
         Format the following text as a polite, professional email. Include a greeting, body, and sign-off. Preserve the original language. Reply with only the email body, with no preamble.
 
         \(text)
         """
+        let prompt = decoratePrompt(core, ctx: ctx, includeEmailTemplate: true)
         if isFoundationModelsAvailable {
             let response = try await runFoundationModels(prompt: prompt)
             return AIResult(text: response, backend: .foundationModels)
+        }
+        // Heuristic: ユーザーが email template を持っていればそれを最低限尊重する。
+        if !ctx.emailTemplate.isEmpty {
+            let filled = ctx.emailTemplate.replacingOccurrences(of: "{{body}}", with: text)
+            return AIResult(text: filled, backend: .heuristic)
         }
         let template = "Dear ,\n\n\(text)\n\nBest regards,\n"
         return AIResult(text: template, backend: .heuristic)

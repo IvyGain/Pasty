@@ -63,6 +63,30 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(previewFontSize.rawValue, forKey: Keys.previewFontSize) }
     }
 
+    /// 全 AI アクションの system prompt 前段に注入される文体ルール。
+    /// 例: "常に丁寧語で。文章は簡潔に。" など。空ならハードコード prompt のみ。
+    @Published var aiStyleGuide: String {
+        didSet { defaults.set(aiStyleGuide, forKey: Keys.aiStyleGuide) }
+    }
+    /// `.emailify` 専用テンプレ。署名・敬語スタイル・件名規約など。
+    /// `{{body}}` プレースホルダがあれば、そこに整形後の本文が差し込まれる。
+    @Published var aiEmailTemplate: String {
+        didSet { defaults.set(aiEmailTemplate, forKey: Keys.aiEmailTemplate) }
+    }
+    /// AI アクション完了時にシステムサウンドを鳴らす。
+    @Published var aiSoundEnabled: Bool {
+        didSet { defaults.set(aiSoundEnabled, forKey: Keys.aiSoundEnabled) }
+    }
+    /// 成功時に鳴らすサウンド名 (macOS 標準音: Glass / Tink / Pop / Ping /
+    /// Sosumi / Submarine)。
+    @Published var aiSoundName: String {
+        didSet { defaults.set(aiSoundName, forKey: Keys.aiSoundName) }
+    }
+    /// 画面端のグロー (実行中=青パルス / 成功=緑 / 失敗=赤) を表示する。
+    @Published var aiGlowEnabled: Bool {
+        didSet { defaults.set(aiGlowEnabled, forKey: Keys.aiGlowEnabled) }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -80,6 +104,11 @@ final class SettingsStore: ObservableObject {
         static let hoverPreviewEnabled    = "pasty.hoverPreviewEnabled"
         static let previewFontSize        = "pasty.previewFontSize"
         static let clickBeforePaste       = "pasty.clickBeforePaste"
+        static let aiStyleGuide           = "pasty.aiStyleGuide"
+        static let aiEmailTemplate        = "pasty.aiEmailTemplate"
+        static let aiSoundEnabled         = "pasty.aiSoundEnabled"
+        static let aiSoundName            = "pasty.aiSoundName"
+        static let aiGlowEnabled          = "pasty.aiGlowEnabled"
     }
 
     private init() {
@@ -104,6 +133,11 @@ final class SettingsStore: ObservableObject {
             Keys.hoverPreviewEnabled: true,
             Keys.previewFontSize: PreviewFontSize.medium.rawValue,
             Keys.clickBeforePaste: true,
+            Keys.aiStyleGuide: "",
+            Keys.aiEmailTemplate: "",
+            Keys.aiSoundEnabled: true,
+            Keys.aiSoundName: "Glass",
+            Keys.aiGlowEnabled: true,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -132,6 +166,25 @@ final class SettingsStore: ObservableObject {
         let rawFontSize = defaults.string(forKey: Keys.previewFontSize) ?? PreviewFontSize.medium.rawValue
         self.previewFontSize = PreviewFontSize(rawValue: rawFontSize) ?? .medium
         self.clickBeforePaste = defaults.bool(forKey: Keys.clickBeforePaste)
+        self.aiStyleGuide = defaults.string(forKey: Keys.aiStyleGuide) ?? ""
+        self.aiEmailTemplate = defaults.string(forKey: Keys.aiEmailTemplate) ?? ""
+        self.aiSoundEnabled = defaults.bool(forKey: Keys.aiSoundEnabled)
+        self.aiSoundName = defaults.string(forKey: Keys.aiSoundName) ?? "Glass"
+        self.aiGlowEnabled = defaults.bool(forKey: Keys.aiGlowEnabled)
+    }
+
+    /// AIEngine が prompt 組み立て時に参照する、ユーザー設定のスナップショット。
+    /// MainActor から非 MainActor へ渡すために値型でコピーする。
+    struct AIPromptContext: Sendable {
+        let styleGuide: String
+        let emailTemplate: String
+    }
+
+    var aiPromptContext: AIPromptContext {
+        AIPromptContext(
+            styleGuide: aiStyleGuide.trimmingCharacters(in: .whitespacesAndNewlines),
+            emailTemplate: aiEmailTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
     }
 
     enum PreviewFontSize: String, CaseIterable, Identifiable {

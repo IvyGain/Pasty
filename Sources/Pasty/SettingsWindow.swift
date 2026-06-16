@@ -376,11 +376,133 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Toggle("完了音を鳴らす", isOn: $settings.aiSoundEnabled)
+                if settings.aiSoundEnabled {
+                    Picker("完了音", selection: $settings.aiSoundName) {
+                        ForEach(["Glass", "Tink", "Pop", "Ping", "Sosumi", "Submarine"], id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                    }
+                    Button("試聴") {
+                        NSSound(named: NSSound.Name(settings.aiSoundName))?.play()
+                    }
+                    .controlSize(.small)
+                }
+
+                Toggle("画面端グロー (青パルス / 緑成功 / 赤失敗)", isOn: $settings.aiGlowEnabled)
+                if settings.aiGlowEnabled {
+                    HStack(spacing: 8) {
+                        Button("プレビュー: 成功") {
+                            ScreenGlowController.shared.showSuccess()
+                        }
+                        .controlSize(.small)
+                        Button("プレビュー: 失敗") {
+                            ScreenGlowController.shared.showFailure()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
+                aiPromptSection
             }
         }
         .formStyle(.grouped)
         .padding()
     }
+
+    @ViewBuilder
+    private var aiPromptSection: some View {
+        DisclosureGroup("カスタムプロンプト (文体ガイド + メールテンプレ)") {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("文体ガイド (全 AI アクションに適用)")
+                    .font(.caption.weight(.semibold))
+                TextEditor(text: $settings.aiStyleGuide)
+                    .font(.system(size: 12))
+                    .frame(minHeight: 70)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                Text("例: 常に丁寧語で。一文を短く。専門用語には括弧で平易な言い換えを添える。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.bottom, 6)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("メールテンプレート (⌃⇧L 専用)")
+                    .font(.caption.weight(.semibold))
+                TextEditor(text: $settings.aiEmailTemplate)
+                    .font(.system(size: 12))
+                    .frame(minHeight: 100)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                Text("`{{body}}` をテンプレ内に書いておくと、整形後の本文がそこに差し込まれます。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 6) {
+                    Button("ビジネス標準") {
+                        settings.aiEmailTemplate = Self.emailPresetBusiness
+                    }
+                    .controlSize(.small)
+                    Button("社内向け") {
+                        settings.aiEmailTemplate = Self.emailPresetInternal
+                    }
+                    .controlSize(.small)
+                    Button("フォーマル (英)") {
+                        settings.aiEmailTemplate = Self.emailPresetFormalEnglish
+                    }
+                    .controlSize(.small)
+                    Button("カジュアル") {
+                        settings.aiEmailTemplate = Self.emailPresetCasual
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private static let emailPresetBusiness = """
+    お世話になっております。〔差出人名〕です。
+
+    {{body}}
+
+    お手数をおかけしますが、何卒よろしくお願いいたします。
+
+    〔差出人名〕
+    〔会社名 / 部署〕
+    """
+
+    private static let emailPresetInternal = """
+    お疲れさまです。〔差出人名〕です。
+
+    {{body}}
+
+    引き続き、どうぞよろしくお願いいたします。
+    〔差出人名〕
+    """
+
+    private static let emailPresetFormalEnglish = """
+    Dear 〔Recipient〕,
+
+    {{body}}
+
+    Sincerely,
+    〔Your Name〕
+    """
+
+    private static let emailPresetCasual = """
+    お疲れさま！
+
+    {{body}}
+
+    よろしくお願いします〜
+    """
 
     private var pinboardsTab: some View {
         VStack(alignment: .leading) {

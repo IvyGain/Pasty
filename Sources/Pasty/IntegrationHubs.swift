@@ -103,12 +103,20 @@ enum TemplateFieldPresenter {
 // パネルから ⌘I / ⌃⇧R-E で呼ばれる AI アクションの実行と、結果の新クリップ
 // 化、エラーハンドリングまで面倒を見るハブ。
 
+/// borderless だけど key window になれる NSPanel。これがないと内部の
+/// `KeyHandlingView.onEsc` クロージャが発火せず、Esc でも閉じられない。
+final class AIActionPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 @MainActor
 final class AIActionCoordinator {
     static let shared = AIActionCoordinator()
     private init() {}
 
     private var activePanel: NSPanel?
+    private var escMonitor: Any?
 
     func presentMenu(for clip: ClipItem,
                      store: ClipStore,
@@ -121,9 +129,9 @@ final class AIActionCoordinator {
                                 },
                                 onDismiss: { [weak self] in self?.dismissMenu() })
         let hosting = NSHostingController(rootView: view)
-        let p = NSPanel(
+        let p = AIActionPanel(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 480),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -134,18 +142,46 @@ final class AIActionCoordinator {
         p.backgroundColor = .clear
         p.isOpaque = false
         p.hasShadow = true
-        p.makeKeyAndOrderFront(nil)
+        // Activate first so the new key window actually receives keyDown.
         NSApp.activate(ignoringOtherApps: true)
+        p.makeKeyAndOrderFront(nil)
+        p.makeKey()
         activePanel = p
+
+        // SwiftUI 内の KeyHandlingView がフォーカスから外れていても確実に
+        // Esc を捕まえる保険。Pasty にフォーカスが乗っている間だけ動く。
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // keyCode 53 = Esc
+            if event.keyCode == 53 {
+                Task { @MainActor in self?.dismissMenu() }
+                return nil
+            }
+            return event
+        }
     }
 
     func dismissMenu() {
+        if let monitor = escMonitor {
+            NSEvent.removeMonitor(monitor)
+            escMonitor = nil
+        }
         activePanel?.orderOut(nil)
         activePanel = nil
     }
 
     func execute(_ action: AIAction, on clip: ClipItem, store: ClipStore) {
         let source = clip.content ?? clip.preview
+        let label = actionLabel(for: action)
+        let settings = SettingsStore.shared
+        let useGlow = settings.aiGlowEnabled
+        let useSound = settings.aiSoundEnabled
+        let successSound = settings.aiSoundName
+
+        // 0 ms フィードバック: 走り始めたことを画面端の青パルスで伝える。
+        if useGlow {
+            ScreenGlowController.shared.showRunning()
+        }
+
         Task {
             do {
                 let result = try await AIEngine.perform(action, on: source)
@@ -154,11 +190,19 @@ final class AIActionCoordinator {
                     sourceAppName: "Pasty AI"
                 )
                 PasteToast.shared.show(targetApp: nil,
-                                       customMessage: actionLabel(for: action) + " 完了")
+                                       customMessage: label + " 完了")
                 _ = newClip
+                if useGlow { ScreenGlowController.shared.showSuccess() }
+                if useSound, let s = NSSound(named: NSSound.Name(successSound)) {
+                    s.play()
+                }
             } catch {
                 PasteToast.shared.show(targetApp: nil,
                                        customMessage: "AI 失敗: \(error.localizedDescription)")
+                if useGlow { ScreenGlowController.shared.showFailure() }
+                if useSound, let s = NSSound(named: NSSound.Name("Funk")) {
+                    s.play()
+                }
             }
         }
     }
