@@ -181,6 +181,7 @@ struct ClipPreviewView: View {
             if isCompact {
                 Text(raw)
                     .font(PastyTheme.monoFont)
+                    .lineSpacing(3)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)

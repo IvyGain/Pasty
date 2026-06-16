@@ -1267,9 +1267,9 @@ private struct StripCard: View {
                 .padding(8)
             } else {
                 // テキスト系。コードならモノスペース、それ以外は標準。
-                // 限界ギリギリまで表示するため、preview ではなく content を優先し、
-                // 行数制限は外して .frame の clipping に任せる。padding と
-                // lineSpacing も最小限に抑える。
+                // 改行を確実に視認できるように `\n` のままの content を Text へ
+                // 渡し、lineSpacing を 2 に戻して行間も広めに保つ。
+                // word wrap よりも明示的な改行が優先される。
                 let isCodeLike = KindPalette.detectedLabel(for: clip)
                     .matches(["CODE", "JSON", "HTML"])
                 let body = clip.content ?? clip.preview
@@ -1277,13 +1277,12 @@ private struct StripCard: View {
                     .font(isCodeLike
                           ? .system(size: 11, weight: .medium, design: .monospaced)
                           : .system(size: 12, weight: .regular))
-                    .tracking(isCodeLike ? 0 : -0.1)
-                    .lineSpacing(1)
+                    .tracking(isCodeLike ? 0 : -0.05)
+                    .lineSpacing(2)
                     .foregroundStyle(.primary.opacity(0.9))
                     .lineLimit(nil)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: false)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .topLeading)
                     .padding(.horizontal, 10).padding(.vertical, 6)
