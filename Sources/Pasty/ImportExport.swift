@@ -40,6 +40,9 @@ public struct ExportedPinboardItem: Codable {
     public let pinboardId: Int64
     public let clipId: Int64
     public let sortOrder: Int
+    /// フォルダ内でユーザーが付けたカード名 (`pinboard_items.title`)。
+    /// 旧アーカイブ (v1.0) には無いので optional。
+    public let title: String?
 }
 
 // MARK: - Policy / Summary
@@ -147,7 +150,8 @@ final class ImportExportManager {
             ExportedPinboardItem(
                 pinboardId: $0.pinboardId,
                 clipId: $0.clipId,
-                sortOrder: $0.sortOrder
+                sortOrder: $0.sortOrder,
+                title: $0.title
             )
         }
 
@@ -363,7 +367,8 @@ final class ImportExportManager {
                     id: nil,
                     pinboardId: newBoardId,
                     clipId: newClipId,
-                    sortOrder: nextOrder
+                    sortOrder: nextOrder,
+                    title: exp.title?.isEmpty == false ? exp.title : nil
                 )
                 try item.insert(db)
                 r.pinboardItemsAdded += 1

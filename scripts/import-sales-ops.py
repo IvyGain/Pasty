@@ -155,10 +155,14 @@ def main() -> None:
                 sourceBundleId="io.cc.sales-ops",
             )
             clips.append(clip)
+            # フォルダ内表示名 (`pinboard_items.title`)。ファイル名から拡張子と
+            # 連番を取り除いた値を使う。これが Strip カードのバナーに表示される。
+            display_title = title_from_filename(md)
             pinboard_items.append({
                 "pinboardId": pin_id,
                 "clipId": next_clip_id,
                 "sortOrder": sort_order,
+                "title": display_title,
             })
             sort_order += 1
             next_clip_id += 1
