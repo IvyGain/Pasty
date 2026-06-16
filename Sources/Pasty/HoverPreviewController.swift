@@ -220,11 +220,13 @@ private final class HoverPreviewPanel: NSPanel {
     }
 
     /// Ask SwiftUI what size it'd prefer, clamped to a reasonable pill range.
+    /// 「一発で全文を見せる」優先のため大きく取る。クリップが極端に大きくても
+    /// 画面外に出ない安全範囲だけ残す。
     func preferredContentSize() -> NSSize {
-        guard let hosting else { return NSSize(width: 320, height: 160) }
+        guard let hosting else { return NSSize(width: 480, height: 280) }
         let fitting = hosting.fittingSize
-        let width = min(max(fitting.width, 220), 420)
-        let height = min(max(fitting.height, 80), 320)
+        let width = min(max(fitting.width, 320), 760)
+        let height = min(max(fitting.height, 120), 620)
         return NSSize(width: width, height: height)
     }
 

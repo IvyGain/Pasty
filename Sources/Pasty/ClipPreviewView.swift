@@ -55,9 +55,13 @@ struct ClipPreviewView: View {
             maxHeight: isCompact ? nil : .infinity,
             alignment: .topLeading
         )
+        // ホバープレビュー (isCompact) では固定 frame をやめて intrinsic に追随
+        // させ、本文量に合わせて高さが伸びるようにする。HoverPreviewController
+        // 側で max 760×620 にクランプされるので、巨大なクリップは ScrollView
+        // でカバー、小さいクリップはぴったりサイズで出る。
         .frame(
-            width: isCompact ? 300 : nil,
-            height: isCompact ? 200 : nil,
+            maxWidth: isCompact ? 700 : nil,
+            maxHeight: isCompact ? 580 : nil,
             alignment: .topLeading
         )
         .background(
@@ -171,15 +175,27 @@ struct ClipPreviewView: View {
     @ViewBuilder
     private func plainTextView(raw: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            ScrollView {
+            // ホバープレビュー (isCompact) では「一発で全文を見せる」優先で
+            // ScrollView をやめ、Text 自体を縦に伸ばす (fixedSize)。長文時は
+            // 親の maxHeight でクリップされるが、まずは全文表示を狙う。
+            if isCompact {
                 Text(raw)
                     .font(PastyTheme.monoFont)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 2)
-            }
-            if !isCompact, raw.contains("{{") {
-                snippetExpansionCard(template: raw)
+            } else {
+                ScrollView {
+                    Text(raw)
+                        .font(PastyTheme.monoFont)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                }
+                if raw.contains("{{") {
+                    snippetExpansionCard(template: raw)
+                }
             }
         }
     }
