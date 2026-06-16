@@ -183,9 +183,19 @@ final class PasteAutomator {
 
     // MARK: - private
 
+    /// Pasty が自分で書き込んだ pasteboard 項目に付与する private marker type。
+    /// PasteboardObserver 側でこの type を見つけたら新規クリップ取り込みをスキップする。
+    static let suppressTypeRaw = "io.pasty.suppress"
+
     private func place(_ item: ClipItem, asPlainText: Bool) {
         let pb = NSPasteboard.general
         pb.clearContents()
+        // 先に suppress marker を仕込んでおく (clearContents の後・実コンテンツの前)。
+        // 画像 case など内部で再 clearContents する分岐があるので、最後の `defer` でも
+        // 再付与して "Pasty 由来" の印を必ず残す。
+        defer {
+            pb.setString("1", forType: NSPasteboard.PasteboardType(Self.suppressTypeRaw))
+        }
 
         switch item.kind {
         case .text, .richText, .link, .color, .other:
