@@ -68,6 +68,30 @@ struct MenuBarContentView: View {
             Text("\(store.totalCount) clips")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            // 設定 + Quit はテキストよりアイコンの方が見つけやすい。
+            // ストリップヘッダーの並び (gearshape + xmark) と揃える。
+            Button {
+                openSettingsWindowRobustly()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("設定…  ⌘,")
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("q")
+            .help("Pasty を終了  ⌘Q")
         }
         .padding(.horizontal, 12).padding(.bottom, 6)
     }
@@ -188,17 +212,13 @@ struct MenuBarContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("設定…") {
-                openSettingsWindowRobustly()
+            // 設定 / Quit はヘッダー右上のアイコンに移行済み。
+            // 現在のクリップ件数と最終キャプチャ時刻だけ静かに表示。
+            if let last = store.recent.first {
+                Text(Self.timeFormatter.string(from: last.createdAt))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q")
-            .buttonStyle(.borderless)
-            .controlSize(.small)
         }
         .padding(.horizontal, 12).padding(.top, 6)
     }

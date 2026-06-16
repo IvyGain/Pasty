@@ -9,7 +9,7 @@
             <sparkle:shortVersionString>0.6.0-beta</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.6.0-beta/Pasty-0.6.0-beta.dmg" length="5668422" type="application/octet-stream" sparkle:edSignature="6MhK8yJFhAKrtVP9QQm0W+etSQngQB+POqBKRscmZQnb+9DYdBAYpLDI+L6QdWOSp6N7bVZ9qJ2LTdUDv6ySDQ=="/>
+            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.6.0-beta/Pasty-0.6.0-beta.dmg" length="5675849" type="application/octet-stream" sparkle:edSignature="dAUauj8BdJDize0rGKiflS9vvYKtDsYRW3Ne8q6aJlzXk9kuyLYV4JjzZOZ3iT0/YNZGSrjUBzkLpgnWddBeAw=="/>
         </item>
     </channel>
 </rss>
