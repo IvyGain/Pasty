@@ -334,7 +334,8 @@ struct SettingsView: View {
             Section("サーフェス") {
                 Toggle("下部ストリップ (⌥⇧V)", isOn: $settings.stripPanelEnabled)
                 Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
-                Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。カードを下方向にドラッグするとマウスでペーストできます。")
+                Toggle("ホイールで横スクロール", isOn: $settings.notchScrollWheelEnabled)
+                Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。カードを下方向にドラッグするとマウスでペーストできます。マウスホイールを縦に回すと、カルーセルが横方向にスクロールします。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -552,6 +553,14 @@ struct SettingsView: View {
                         NSWorkspace.shared.open(appSupport.appendingPathComponent("Pasty"))
                     }
                 }
+            }
+
+            Section("iCloud 同期 (実験的・未実装)") {
+                Toggle("iCloud 同期を有効化", isOn: $settings.cloudSyncEnabled)
+                    .disabled(true)
+                Text("複数の Mac 間で履歴を同期する機能の設計フェーズが完了しました。実装は v0.9 で予定されています。詳細は .ai/decisions/c1-icloud-sync-*.md を参照してください。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("バックアップと引っ越し") {

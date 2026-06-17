@@ -28,6 +28,10 @@ final class SettingsStore: ObservableObject {
     @Published var notchHoverEnabled: Bool {
         didSet { defaults.set(notchHoverEnabled, forKey: Keys.notchHoverEnabled) }
     }
+    /// v0.8: マウスホイール (or トラックパッド縦) をストリップ/ノッチの横スクロールに変換する。
+    @Published var notchScrollWheelEnabled: Bool {
+        didSet { defaults.set(notchScrollWheelEnabled, forKey: Keys.notchScrollWheelEnabled) }
+    }
     @Published var stripPanelEnabled: Bool {
         didSet { defaults.set(stripPanelEnabled, forKey: Keys.stripPanelEnabled) }
     }
@@ -103,6 +107,12 @@ final class SettingsStore: ObservableObject {
         didSet { persistAIMacros() }
     }
 
+    /// v0.8 (C1 phase 1): iCloud 同期。phase 2 で実装される予定の足場。
+    /// デフォルト OFF。設定画面で「実験的・未実装」とラベル付けして公開。
+    @Published var cloudSyncEnabled: Bool {
+        didSet { defaults.set(cloudSyncEnabled, forKey: Keys.cloudSyncEnabled) }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -110,6 +120,7 @@ final class SettingsStore: ObservableObject {
         static let ignoredBundleIds       = "pasty.ignoredBundleIds"
         static let maxRetentionDays       = "pasty.maxRetentionDays"
         static let notchHoverEnabled      = "pasty.notchHoverEnabled"
+        static let notchScrollWheelEnabled = "pasty.notchScrollWheelEnabled"
         static let stripPanelEnabled      = "pasty.stripPanelEnabled"
         static let autoPaste              = "pasty.autoPaste"
         static let locale                 = "pasty.locale"
@@ -129,6 +140,7 @@ final class SettingsStore: ObservableObject {
         static let lastStripQuery         = "pasty.lastStripQuery"
         static let lastStripFilterKindRaw = "pasty.lastStripFilterKindRaw"
         static let aiMacros               = "pasty.aiMacros.v1"
+        static let cloudSyncEnabled       = "pasty.cloudSyncEnabled"
     }
 
     private init() {
@@ -137,6 +149,7 @@ final class SettingsStore: ObservableObject {
             Keys.capturingEnabled: true,
             Keys.maxRetentionDays: 30,
             Keys.notchHoverEnabled: true,
+            Keys.notchScrollWheelEnabled: true,
             Keys.stripPanelEnabled: true,
             Keys.autoPaste: true,
             Keys.locale: "ja",
@@ -161,6 +174,7 @@ final class SettingsStore: ObservableObject {
             Keys.stripRememberFilters: true,
             Keys.lastStripQuery: "",
             Keys.lastStripFilterKindRaw: "",
+            Keys.cloudSyncEnabled: false,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -178,6 +192,7 @@ final class SettingsStore: ObservableObject {
         self.ignoredBundleIds = Set(defaults.array(forKey: Keys.ignoredBundleIds) as? [String] ?? [])
         self.maxRetentionDays = defaults.integer(forKey: Keys.maxRetentionDays)
         self.notchHoverEnabled = defaults.bool(forKey: Keys.notchHoverEnabled)
+        self.notchScrollWheelEnabled = defaults.bool(forKey: Keys.notchScrollWheelEnabled)
         self.stripPanelEnabled = defaults.bool(forKey: Keys.stripPanelEnabled)
         self.autoPaste = defaults.bool(forKey: Keys.autoPaste)
         self.locale = defaults.string(forKey: Keys.locale) ?? "ja"
@@ -198,6 +213,7 @@ final class SettingsStore: ObservableObject {
         self.stripRememberFilters = defaults.bool(forKey: Keys.stripRememberFilters)
         self.lastStripQuery = defaults.string(forKey: Keys.lastStripQuery) ?? ""
         self.lastStripFilterKindRaw = defaults.string(forKey: Keys.lastStripFilterKindRaw) ?? ""
+        self.cloudSyncEnabled = defaults.bool(forKey: Keys.cloudSyncEnabled)
         // B2: AI マクロの初期化。データが無ければデフォルトを seed する。
         if let data = defaults.data(forKey: Keys.aiMacros),
            let decoded = try? JSONDecoder().decode([AIMacro].self, from: data) {

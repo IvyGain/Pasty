@@ -112,7 +112,64 @@ final class ClipStore: ObservableObject {
             try db.execute(sql: "ALTER TABLE pinboard_items ADD COLUMN title TEXT")
         }
 
+        // v0.8 (C1 phase 1): iCloud 同期足場。実際の同期ロジックは phase 2 で
+        // 入る。ここでは journal テーブル + 全エンティティへの soft delete /
+        // entity_uuid / provenance カラムだけを足す。詳しくは
+        // `.ai/decisions/c1-icloud-sync-{architecture,security,schema}.md` を参照。
+        migrator.registerMigration("v5.sync_journal") { db in
+            try db.execute(sql: """
+                CREATE TABLE sync_journal (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    op TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_uuid TEXT NOT NULL,
+                    lamport INTEGER NOT NULL,
+                    device_id TEXT NOT NULL,
+                    encrypted_payload BLOB,
+                    nonce BLOB NOT NULL,
+                    schema_version INTEGER NOT NULL DEFAULT 1,
+                    created_at REAL NOT NULL,
+                    synced_at REAL
+                )
+                """)
+            try db.execute(sql: "CREATE INDEX idx_sync_journal_device_lamport ON sync_journal(device_id, lamport)")
+            try db.execute(sql: "CREATE INDEX idx_sync_journal_entity_uuid ON sync_journal(entity_uuid)")
+            try db.execute(sql: "CREATE INDEX idx_sync_journal_unsynced ON sync_journal(synced_at) WHERE synced_at IS NULL")
+        }
+
+        migrator.registerMigration("v5.soft_delete_columns") { db in
+            for table in ["clips", "pinboards", "pinboard_items"] {
+                try db.execute(sql: "ALTER TABLE \(table) ADD COLUMN deleted_at REAL")
+                try db.execute(sql: "ALTER TABLE \(table) ADD COLUMN updated_at REAL NOT NULL DEFAULT 0")
+                try db.execute(sql: "ALTER TABLE \(table) ADD COLUMN origin_device_id TEXT")
+                try db.execute(sql: "ALTER TABLE \(table) ADD COLUMN entity_uuid TEXT")
+            }
+        }
+
+        migrator.registerMigration("v5.entity_uuid_backfill") { db in
+            for table in ["clips", "pinboards", "pinboard_items"] {
+                // SQLite の randomblob を使った in-place UUID 生成。
+                try db.execute(sql: """
+                    UPDATE \(table)
+                    SET entity_uuid = lower(hex(randomblob(16)))
+                    WHERE entity_uuid IS NULL OR entity_uuid = ''
+                    """)
+            }
+        }
+
         try migrator.migrate(dbWriter)
+    }
+
+    /// 現在の端末を識別する UUID。Keychain に置きたいが、phase 1 では
+    /// `UserDefaults` の `pasty.deviceId` キーに保存する暫定実装。
+    static var currentDeviceId: String {
+        let key = "pasty.deviceId"
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
+        }
+        let fresh = UUID().uuidString
+        UserDefaults.standard.set(fresh, forKey: key)
+        return fresh
     }
 
     private func reloadInitial() throws {
@@ -130,6 +187,7 @@ final class ClipStore: ObservableObject {
 
     @discardableResult
     func insert(_ item: ClipItem) async throws -> ClipItem? {
+        let deviceId = Self.currentDeviceId
         let inserted: ClipItem? = try await dbWriter.write { db in
             // Dedupe against the most recent matching hash.
             if let last = try ClipItem
@@ -141,6 +199,17 @@ final class ClipStore: ObservableObject {
             }
             var copy = item
             try copy.insert(db)
+            // v0.8 (C1 phase 1): origin_device_id と entity_uuid を最終行に
+            // 刻む。実際の同期は CloudSyncEngine 側で phase 2 で実装。
+            if let rowId = copy.id {
+                try db.execute(sql: """
+                    UPDATE clips
+                    SET origin_device_id = ?,
+                        updated_at = ?,
+                        entity_uuid = COALESCE(NULLIF(entity_uuid, ''), lower(hex(randomblob(16))))
+                    WHERE id = ?
+                    """, arguments: [deviceId, Date().timeIntervalSince1970, rowId])
+            }
             return copy
         }
         if inserted != nil {

@@ -356,6 +356,12 @@ struct StripView: View {
             .onChange(of: selection.cursorIndex) { _, n in
                 withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(n, anchor: .center) }
             }
+            // v0.8: ホイール (or トラックパッド縦) を横スクロールに変換。
+            // 設定で OFF にすれば従来通り。
+            .background(
+                WheelToHorizontalCatcher(isEnabled: settings.notchScrollWheelEnabled)
+                    .allowsHitTesting(false)
+            )
         }
     }
 
@@ -1480,4 +1486,119 @@ extension Notification.Name {
     /// 購読し、編集中は自動 dismissal を停止する。
     static let pastyClipEditOpen  = Notification.Name("pasty.clipEdit.open")
     static let pastyClipEditClose = Notification.Name("pasty.clipEdit.close")
+}
+
+// MARK: - Wheel-to-horizontal scroll converter
+//
+// SwiftUI の horizontal `ScrollView` はトラックパッドの2本指横スワイプには
+// 反応するが、純粋なマウスホイール（縦回転のみ）には反応しない。
+// ノッチや下部ストリップに置かれたカルーセルではここがフリクションになる。
+//
+// `WheelToHorizontalCatcher` は SwiftUI ビューの背面に zero-frame の
+// `NSView` を仕込み、`scrollWheel(with:)` をオーバーライドして
+// `deltaY → deltaX` 変換した後、親 NSScrollView に再ディスパッチする。
+//
+// - `event.scrollingDeltaY` を優先 (連続的 / トラックパッド)
+// - 0 ならクラシックホイールの `event.deltaY * detentSpeed` を使う
+// - `deltaX` が非ゼロ (= ユーザーが既に横スクロール意図) なら一切触らない
+// - スクロール開始時にホバープレビューを dismiss して overlap を避ける
+@MainActor
+struct WheelToHorizontalCatcher: NSViewRepresentable {
+    let isEnabled: Bool
+
+    func makeNSView(context: Context) -> WheelCatcherNSView {
+        let v = WheelCatcherNSView()
+        v.isEnabledForCatching = isEnabled
+        return v
+    }
+
+    func updateNSView(_ nsView: WheelCatcherNSView, context: Context) {
+        nsView.isEnabledForCatching = isEnabled
+    }
+}
+
+final class WheelCatcherNSView: NSView {
+    var isEnabledForCatching: Bool = true
+
+    override var acceptsFirstResponder: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil } // pass-through
+
+    /// 直近 NSScrollView (水平) を探して、独自 CGEvent を流す代わりに
+    /// `setContentOffset` 相当を直接行う。SwiftUI の ScrollView は
+    /// 内部 NSScrollView を持っているので、それを階層から探し当てる。
+    private func enclosingHorizontalScrollView() -> NSScrollView? {
+        // 自分の祖先を辿る (SwiftUI ScrollView の中に置いた背景なので、
+        // documentView 配下にいるはず)
+        var v: NSView? = self.superview
+        while let cur = v {
+            if let sv = cur as? NSScrollView, sv.hasHorizontalScroller || sv.documentView?.bounds.width ?? 0 > sv.bounds.width {
+                return sv
+            }
+            v = cur.superview
+        }
+        // 兄弟 / 親階層に NSScrollView がなければ window の contentView から
+        // 最初に見つかった horizontal NSScrollView を返す。
+        if let root = window?.contentView {
+            return Self.findHorizontalScrollView(in: root)
+        }
+        return nil
+    }
+
+    private static func findHorizontalScrollView(in view: NSView) -> NSScrollView? {
+        if let sv = view as? NSScrollView,
+           let doc = sv.documentView,
+           doc.bounds.width > sv.bounds.width + 1 {
+            return sv
+        }
+        for sub in view.subviews {
+            if let found = findHorizontalScrollView(in: sub) { return found }
+        }
+        return nil
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard isEnabledForCatching else {
+            super.scrollWheel(with: event)
+            return
+        }
+        // 既に横方向の入力なら触らない
+        let horizontalIntent = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+        if horizontalIntent {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        // 縦のスクロール量を取得
+        let dyContinuous = event.scrollingDeltaY     // トラックパッド
+        let dyClassic    = event.deltaY              // 旧式マウス (整数刻み)
+        var deltaY: CGFloat = 0
+        if event.hasPreciseScrollingDeltas, dyContinuous != 0 {
+            deltaY = dyContinuous
+        } else if dyClassic != 0 {
+            // クラシックホイールは 1 detent = 60〜80pt が体感心地良い
+            deltaY = dyClassic * 64
+        }
+        guard deltaY != 0 else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        // ホバープレビューと衝突しないように消す
+        Task { @MainActor in
+            HoverPreviewController.shared.dismissNow()
+        }
+
+        // 直近の水平 NSScrollView を見つけて contentOffset を直接動かす
+        guard let scrollView = enclosingHorizontalScrollView(),
+              let clipView = scrollView.contentView as NSClipView? else {
+            return
+        }
+        let docView = scrollView.documentView
+        let maxX = max(0, (docView?.bounds.width ?? 0) - clipView.bounds.width)
+        var newX = clipView.bounds.origin.x - deltaY  // 上回し=右、下回し=左
+        newX = max(0, min(maxX, newX))
+        let newOrigin = NSPoint(x: newX, y: clipView.bounds.origin.y)
+        clipView.scroll(to: newOrigin)
+        scrollView.reflectScrolledClipView(clipView)
+    }
 }
