@@ -165,9 +165,11 @@ private let flattenedActions: [AIAction] = aiActionSections.flatMap(\.actions)
 struct AIActionMenu: View {
     let clip: ClipItem
     let onSelect: (AIAction) -> Void
+    var onSelectMacro: ((AIMacro) -> Void)? = nil
     let onDismiss: () -> Void
 
     @State private var selectedIndex: Int = 0
+    @State private var macros: [AIMacro] = SettingsStore.shared.aiMacros
 
     var body: some View {
         ZStack {
@@ -180,6 +182,9 @@ struct AIActionMenu: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 6) {
+                            if !macros.isEmpty, let cb = onSelectMacro {
+                                macroSection(callback: cb)
+                            }
                             ForEach(Array(aiActionSections.enumerated()), id: \.element.id) { _, section in
                                 sectionView(section)
                             }
@@ -267,6 +272,62 @@ struct AIActionMenu: View {
                     }
             }
         }
+    }
+
+    // MARK: - Macro section (B2)
+
+    @ViewBuilder
+    private func macroSection(callback: @escaping (AIMacro) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("マイマクロ")
+                .font(PastyTheme.subtitleFont)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.top, 4)
+                .padding(.bottom, 2)
+            ForEach(macros) { macro in
+                macroRow(macro)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        callback(macro)
+                    }
+            }
+        }
+    }
+
+    private func macroRow(_ macro: AIMacro) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 13, weight: .regular))
+                .frame(width: 18, alignment: .center)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(macro.name)
+                    .font(PastyTheme.titleFont)
+                    .lineLimit(1)
+                Text(macro.stepSummary)
+                    .font(PastyTheme.subtitleFont)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 6)
+            Text("\(macro.actions.count) 段")
+                .font(PastyTheme.subtitleFont.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.primary.opacity(0.07))
+                )
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
+                .fill(Color.clear)
+        )
     }
 
     // MARK: - Row

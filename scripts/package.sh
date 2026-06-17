@@ -18,7 +18,7 @@ NOTARIZE="${2:-}"
 
 APP_NAME="Pasty"
 BUNDLE_ID="io.pasty.app"
-VERSION="${PASTY_VERSION:-0.6.1-beta}"
+VERSION="${PASTY_VERSION:-0.7.0-beta}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"

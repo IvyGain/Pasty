@@ -38,6 +38,7 @@ private struct LongLivedClip: Identifiable, Equatable {
 private struct InsightsSnapshot: Equatable {
     var todayCount: Int = 0
     var weekCount: Int = 0
+    var totalPasteEvents: Int = 0
     var daily: [DailyCount] = []
     var kinds: [KindCount] = []
     var apps: [AppCount] = []
@@ -103,6 +104,7 @@ struct InsightsDashboard: View {
                     unit: "件",
                     accent: .blue
                 )
+                SavedTimeTile(pasteEvents: snapshot.totalPasteEvents)
             }
         }
     }
@@ -276,6 +278,11 @@ struct InsightsDashboard: View {
                 arguments: [startOfWeek]
             ) ?? 0
 
+            // B7: 累計 paste_events 件数 (節約時間タイル用)
+            snap.totalPasteEvents = try Int.fetchOne(db,
+                sql: "SELECT COUNT(*) FROM paste_events"
+            ) ?? 0
+
             // 直近 14 日 (日別集計)
             let from = calendar.date(byAdding: .day, value: -13, to: startOfToday) ?? startOfToday
             let dailyRows = try Row.fetchAll(db, sql: """
@@ -433,6 +440,53 @@ private struct StatTile: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(accent.opacity(0.08))
         )
+    }
+}
+
+/// B7: paste_events 件数 × 28 秒で「累計節約時間」をざっくり可視化するタイル。
+/// 28 秒は「手動で履歴を辿って 1 件を貼り付けるのにかかる平均時間」のヒューリスティック。
+private struct SavedTimeTile: View {
+    let pasteEvents: Int
+
+    private static let secondsPerPaste: Int = 28
+
+    private var totalSeconds: Int { pasteEvents * Self.secondsPerPaste }
+
+    private var formatted: String {
+        let f = DateComponentsFormatter()
+        f.allowedUnits = [.hour, .minute]
+        f.unitsStyle = .short
+        if totalSeconds < 60 {
+            return "\(totalSeconds) 秒"
+        }
+        return f.string(from: TimeInterval(totalSeconds)) ?? "0 分"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "clock.badge.checkmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.green)
+                Text("節約時間")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+            }
+            Text(formatted)
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(.green)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.green.opacity(0.08))
+        )
+        .help("1 回の貼付を約 \(Self.secondsPerPaste) 秒節約として換算した累計 (paste_events ベース)")
     }
 }
 

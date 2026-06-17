@@ -321,6 +321,12 @@ struct SettingsView: View {
             }
             .frame(maxHeight: 220)
         }
+        Section("カスタムルール (デフォルト判定より優先)") {
+            Text("ルールが上から順に評価され、最初に一致したものが適用されます。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            CustomRulesEditor(pinboards: pinboards)
+        }
     }
 
     private var uiTab: some View {
@@ -329,6 +335,13 @@ struct SettingsView: View {
                 Toggle("下部ストリップ (⌥⇧V)", isOn: $settings.stripPanelEnabled)
                 Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
                 Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。カードを下方向にドラッグするとマウスでペーストできます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("検索とフィルタ") {
+                Toggle("ストリップの検索クエリとフィルタを記憶", isOn: $settings.stripRememberFilters)
+                Text("ON にすると、ストリップを開き直しても直前の検索文字列と種類フィルタが復元されます。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -605,6 +618,14 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+
+                Button {
+                    WhatsNewPresenter.shared.presentForce()
+                } label: {
+                    Label("リリースノート", systemImage: "sparkles.rectangle.stack")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
             .padding(.top, 6)
 
@@ -699,6 +720,139 @@ private struct SettingsTabButton: View {
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isSelected)
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+// MARK: - A7: Custom Category Rules Editor
+
+@MainActor
+private struct CustomRulesEditor: View {
+    @ObservedObject var pinboards: PinboardStore
+    @State private var rules: [CustomCategoryRule] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach($rules) { $rule in
+                ruleRow($rule)
+            }
+            if rules.isEmpty {
+                Text("ルールはまだありません")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 4)
+            }
+            HStack {
+                Button {
+                    addNewRule()
+                } label: {
+                    Label("新しいルール", systemImage: "plus.circle")
+                }
+                .disabled(rules.count >= AutoCategorizer.maxCustomRules)
+                Spacer()
+                if rules.count >= AutoCategorizer.maxCustomRules {
+                    Text("上限: \(AutoCategorizer.maxCustomRules) 件").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .onAppear { rules = AutoCategorizer.shared.customRules }
+        .onChange(of: rules) { _, newValue in
+            AutoCategorizer.shared.customRules = newValue
+        }
+    }
+
+    private func ruleRow(_ rule: Binding<CustomCategoryRule>) -> some View {
+        HStack(spacing: 6) {
+            Toggle("", isOn: rule.enabled).labelsHidden()
+            TextField("ラベル", text: rule.label)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 110)
+            Picker("", selection: Binding(
+                get: { rule.wrappedValue.condition.kind },
+                set: { newKind in
+                    let current = rule.wrappedValue.condition
+                    let str = current.stringValue
+                    switch newKind {
+                    case .contentContains: rule.wrappedValue.condition = .contentContains(str)
+                    case .domainContains:  rule.wrappedValue.condition = .domainContains(str)
+                    case .sourceApp:       rule.wrappedValue.condition = .sourceApp(str)
+                    case .kindIs:          rule.wrappedValue.condition = .kindIs(ClipKind(rawValue: str) ?? .text)
+                    }
+                }
+            )) {
+                ForEach(RuleCondition.Kind.allCases) { k in
+                    Text(k.japaneseLabel).tag(k)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 130)
+            conditionValueField(rule)
+                .frame(maxWidth: .infinity)
+            Picker("", selection: Binding(
+                get: { rule.wrappedValue.pinboardId },
+                set: { rule.wrappedValue.pinboardId = $0 }
+            )) {
+                ForEach(pinboards.boards) { board in
+                    if let bid = board.id {
+                        Text(board.name).tag(bid)
+                    }
+                }
+            }
+            .labelsHidden()
+            .frame(width: 140)
+            Button(role: .destructive) {
+                if let idx = rules.firstIndex(where: { $0.id == rule.wrappedValue.id }) {
+                    rules.remove(at: idx)
+                }
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help("このルールを削除")
+        }
+        .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func conditionValueField(_ rule: Binding<CustomCategoryRule>) -> some View {
+        switch rule.wrappedValue.condition {
+        case .contentContains, .domainContains, .sourceApp:
+            TextField("値", text: Binding(
+                get: { rule.wrappedValue.condition.stringValue },
+                set: { newVal in
+                    switch rule.wrappedValue.condition {
+                    case .contentContains: rule.wrappedValue.condition = .contentContains(newVal)
+                    case .domainContains:  rule.wrappedValue.condition = .domainContains(newVal)
+                    case .sourceApp:       rule.wrappedValue.condition = .sourceApp(newVal)
+                    case .kindIs:          break
+                    }
+                }
+            ))
+            .textFieldStyle(.roundedBorder)
+        case .kindIs:
+            Picker("", selection: Binding(
+                get: {
+                    if case .kindIs(let k) = rule.wrappedValue.condition { return k }
+                    return ClipKind.text
+                },
+                set: { rule.wrappedValue.condition = .kindIs($0) }
+            )) {
+                ForEach(ClipKind.allCases, id: \.self) { k in
+                    Text(k.rawValue).tag(k)
+                }
+            }
+            .labelsHidden()
+        }
+    }
+
+    private func addNewRule() {
+        guard rules.count < AutoCategorizer.maxCustomRules,
+              let firstBoardId = pinboards.boards.first?.id else { return }
+        rules.append(CustomCategoryRule(
+            label: "新規ルール",
+            condition: .contentContains(""),
+            pinboardId: firstBoardId
+        ))
     }
 }
 

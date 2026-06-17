@@ -149,6 +149,12 @@ public enum HotkeyAction: String, CaseIterable, Identifiable, Codable {
     case aiSummarize         // ⌃⇧S
     case aiReformat          // ⌃⇧J
     case aiEmailify          // ⌃⇧E
+    case quickPaste1         // ⌃⌥1
+    case quickPaste2         // ⌃⌥2
+    case quickPaste3         // ⌃⌥3
+    case quickPaste4         // ⌃⌥4
+    case quickPaste5         // ⌃⌥5
+    case confidentialMode    // ⌃⌥⇧P
 
     public var id: String { rawValue }
 
@@ -163,6 +169,12 @@ public enum HotkeyAction: String, CaseIterable, Identifiable, Codable {
         case .aiSummarize:      return "AI: 要約"
         case .aiReformat:       return "AI: 整形"
         case .aiEmailify:       return "AI: メール調"
+        case .quickPaste1:      return "直近 1 件目を即貼付"
+        case .quickPaste2:      return "直近 2 件目を即貼付"
+        case .quickPaste3:      return "直近 3 件目を即貼付"
+        case .quickPaste4:      return "直近 4 件目を即貼付"
+        case .quickPaste5:      return "直近 5 件目を即貼付"
+        case .confidentialMode: return "機密モード (60 秒キャプチャ停止)"
         }
     }
 
@@ -186,6 +198,18 @@ public enum HotkeyAction: String, CaseIterable, Identifiable, Codable {
             return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_J), modifiers: ["control", "shift"])
         case .aiEmailify:
             return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_E), modifiers: ["control", "shift"])
+        case .quickPaste1:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_1), modifiers: ["control", "option"])
+        case .quickPaste2:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_2), modifiers: ["control", "option"])
+        case .quickPaste3:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_3), modifiers: ["control", "option"])
+        case .quickPaste4:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_4), modifiers: ["control", "option"])
+        case .quickPaste5:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_5), modifiers: ["control", "option"])
+        case .confidentialMode:
+            return HotkeyDescriptor(keyCode: UInt32(kVK_ANSI_P), modifiers: ["control", "option", "shift"])
         }
     }
 }

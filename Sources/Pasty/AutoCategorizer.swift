@@ -1,6 +1,71 @@
 import Foundation
 import NaturalLanguage
 
+// MARK: - Custom Category Rules (A7)
+
+/// ユーザーが定義する任意の振分ルール。デフォルトの 8 カテゴリ判定より優先される。
+struct CustomCategoryRule: Identifiable, Codable, Equatable {
+    var id: UUID
+    var label: String
+    var condition: RuleCondition
+    var pinboardId: Int64
+    var enabled: Bool
+
+    init(id: UUID = UUID(),
+         label: String,
+         condition: RuleCondition,
+         pinboardId: Int64,
+         enabled: Bool = true) {
+        self.id = id
+        self.label = label
+        self.condition = condition
+        self.pinboardId = pinboardId
+        self.enabled = enabled
+    }
+}
+
+/// ルール評価の述語。
+enum RuleCondition: Codable, Equatable {
+    case contentContains(String)
+    case domainContains(String)
+    case sourceApp(String)
+    case kindIs(ClipKind)
+
+    enum Kind: String, CaseIterable, Identifiable, Codable {
+        case contentContains
+        case domainContains
+        case sourceApp
+        case kindIs
+
+        var id: String { rawValue }
+        var japaneseLabel: String {
+            switch self {
+            case .contentContains: return "本文に含む"
+            case .domainContains:  return "ドメインに含む"
+            case .sourceApp:       return "アプリ名に一致"
+            case .kindIs:          return "種類が"
+            }
+        }
+    }
+
+    var kind: Kind {
+        switch self {
+        case .contentContains: return .contentContains
+        case .domainContains:  return .domainContains
+        case .sourceApp:       return .sourceApp
+        case .kindIs:          return .kindIs
+        }
+    }
+
+    var stringValue: String {
+        switch self {
+        case .contentContains(let s), .domainContains(let s), .sourceApp(let s):
+            return s
+        case .kindIs(let k): return k.rawValue
+        }
+    }
+}
+
 // MARK: - AutoCategory
 
 /// Auto-classified category for an incoming clipboard item.
@@ -58,7 +123,11 @@ final class AutoCategorizer {
     // MARK: Persistence
 
     private let defaultsKey = "pasty.autoCategoryMapping"
+    private let customRulesKey = "pasty.customCategoryRules.v1"
     private let defaults: UserDefaults
+
+    /// 1 ユーザーあたりのカスタムルール上限。UI が「上限に到達」表示を出すために公開。
+    static let maxCustomRules = 20
 
     /// カテゴリ → Pinboard ID のマッピング。setter は即時に UserDefaults に保存する。
     var mapping: [AutoCategory: Int64] {
@@ -71,9 +140,21 @@ final class AutoCategorizer {
 
     private var _mapping: [AutoCategory: Int64] = [:]
 
+    /// ユーザーが定義したカスタムルール。setter は即時に UserDefaults に保存。
+    var customRules: [CustomCategoryRule] {
+        get { _customRules }
+        set {
+            _customRules = newValue
+            persistCustomRules(newValue)
+        }
+    }
+
+    private var _customRules: [CustomCategoryRule] = []
+
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self._mapping = Self.load(from: defaults, key: defaultsKey)
+        self._customRules = Self.loadCustomRules(from: defaults, key: "pasty.customCategoryRules.v1")
     }
 
     // MARK: Public API
@@ -114,8 +195,15 @@ final class AutoCategorizer {
     /// ClipStore 経由で直接 pinboard_items を INSERT する。
     func tryAutoPin(clip: ClipItem, store: ClipStore) {
         guard let cid = clip.id else { return }
-        let cat = classifyWithoutPinboards(clip)
-        guard let pinboardId = mapping[cat] else { return }
+        // A7: ユーザー定義のカスタムルールが既定カテゴリ判定より優先される。
+        let pinboardId: Int64
+        if let customId = matchCustomRule(for: clip) {
+            pinboardId = customId
+        } else {
+            let cat = classifyWithoutPinboards(clip)
+            guard let mappedId = mapping[cat] else { return }
+            pinboardId = mappedId
+        }
         Task { @MainActor in
             try? await store.dbWriter.write { db in
                 let nextOrder = try Int.fetchOne(
@@ -148,9 +236,51 @@ final class AutoCategorizer {
     }
 
     func resolveTargetPinboard(for clip: ClipItem, pinboards: PinboardStore) -> Pinboard? {
+        // A7: カスタムルールが既定判定より優先。
+        if let customId = matchCustomRule(for: clip),
+           let board = pinboards.boards.first(where: { $0.id == customId }) {
+            return board
+        }
         let category = classify(clip, pinboards: pinboards)
         guard let boardId = _mapping[category] else { return nil }
         return pinboards.boards.first { $0.id == boardId }
+    }
+
+    /// ユーザーカスタムルールに一致した最初の pinboardId を返す。
+    /// 既定の 8 カテゴリ判定より優先する。
+    func matchCustomRule(for clip: ClipItem) -> Int64? {
+        for rule in _customRules where rule.enabled {
+            if evaluate(rule.condition, against: clip) {
+                return rule.pinboardId
+            }
+        }
+        return nil
+    }
+
+    private func evaluate(_ condition: RuleCondition, against clip: ClipItem) -> Bool {
+        switch condition {
+        case .contentContains(let needle):
+            let trimmed = needle.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            let body = (clip.content ?? clip.preview).lowercased()
+            return body.contains(trimmed.lowercased())
+        case .domainContains(let needle):
+            let trimmed = needle.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            // URL らしき文字列からホスト部を抜き出して比較。失敗時は全文比較。
+            let body = clip.content ?? clip.preview
+            if let url = URL(string: body.trimmingCharacters(in: .whitespacesAndNewlines)),
+               let host = url.host {
+                return host.lowercased().contains(trimmed.lowercased())
+            }
+            return body.lowercased().contains(trimmed.lowercased())
+        case .sourceApp(let needle):
+            let trimmed = needle.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            return (clip.sourceAppName ?? "").lowercased().contains(trimmed.lowercased())
+        case .kindIs(let k):
+            return clip.kind == k
+        }
     }
 
     // MARK: - Heuristics
@@ -246,5 +376,20 @@ final class AutoCategorizer {
             }
         }
         return result
+    }
+
+    // MARK: - Custom rules persistence
+
+    private func persistCustomRules(_ rules: [CustomCategoryRule]) {
+        if let data = try? JSONEncoder().encode(rules) {
+            defaults.set(data, forKey: customRulesKey)
+        }
+    }
+
+    private static func loadCustomRules(from defaults: UserDefaults, key: String) -> [CustomCategoryRule] {
+        guard let data = defaults.data(forKey: key),
+              let rules = try? JSONDecoder().decode([CustomCategoryRule].self, from: data)
+        else { return [] }
+        return rules
     }
 }

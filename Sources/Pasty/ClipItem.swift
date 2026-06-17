@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-enum ClipKind: String, Codable {
+enum ClipKind: String, Codable, CaseIterable {
     case text
     case richText
     case image

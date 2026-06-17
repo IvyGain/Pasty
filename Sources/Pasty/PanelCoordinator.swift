@@ -107,6 +107,18 @@ final class PanelCoordinator: ObservableObject {
             return { [weak self] in self?.runAIActionFromGlobalHotkey(.reformat(to: .plainText)) }
         case .aiEmailify:
             return { [weak self] in self?.runAIActionFromGlobalHotkey(.emailify) }
+        case .quickPaste1:
+            return { [weak self] in self?.quickPaste(index: 0) }
+        case .quickPaste2:
+            return { [weak self] in self?.quickPaste(index: 1) }
+        case .quickPaste3:
+            return { [weak self] in self?.quickPaste(index: 2) }
+        case .quickPaste4:
+            return { [weak self] in self?.quickPaste(index: 3) }
+        case .quickPaste5:
+            return { [weak self] in self?.quickPaste(index: 4) }
+        case .confidentialMode:
+            return { [weak self] in self?.toggleConfidentialMode() }
         }
     }
 
@@ -137,6 +149,34 @@ final class PanelCoordinator: ObservableObject {
         }
 
         AIActionCoordinator.shared.execute(action, on: clip, store: store)
+    }
+
+    /// 直近 N 件目 (0-indexed) のクリップをパネルを開かずに即貼付する。
+    /// 範囲外なら Funk を鳴らしてユーザーに知らせる。
+    private func quickPaste(index: Int) {
+        let items = store.recent
+        guard items.indices.contains(index) else {
+            NSSound(named: "Funk")?.play()
+            PasteToast.shared.show(targetApp: nil,
+                                   customMessage: "履歴に \(index + 1) 件目はありません")
+            return
+        }
+        PasteAutomator.shared.paste(items[index], autoPaste: true)
+    }
+
+    /// 機密モード: 60 秒間キャプチャを止めて視覚/聴覚で通知。再度押すと即解除。
+    private func toggleConfidentialMode() {
+        let settings = SettingsStore.shared
+        if settings.isPaused {
+            settings.resume()
+            PasteToast.shared.show(targetApp: nil, customMessage: "機密モード解除")
+            NSSound(named: "Pop")?.play()
+        } else {
+            settings.pause(forSeconds: 60)
+            PasteToast.shared.show(targetApp: nil,
+                                   customMessage: "🔒 機密モード ON (60 秒)")
+            NSSound(named: "Tink")?.play()
+        }
     }
 
     func togglePrimary() {

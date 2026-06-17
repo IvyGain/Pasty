@@ -58,6 +58,12 @@ struct HotkeySettingsView: View {
         case .aiSummarize:      return "text.append"
         case .aiReformat:       return "arrow.left.arrow.right"
         case .aiEmailify:       return "envelope"
+        case .quickPaste1:      return "1.circle"
+        case .quickPaste2:      return "2.circle"
+        case .quickPaste3:      return "3.circle"
+        case .quickPaste4:      return "4.circle"
+        case .quickPaste5:      return "5.circle"
+        case .confidentialMode: return "lock.shield"
         }
     }
 }

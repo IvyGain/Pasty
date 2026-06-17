@@ -102,6 +102,9 @@ struct StripView: View {
             selection.clearAll()
             // 初期表示は常に履歴 (= folderID == nil) から始める
             folderID = nil
+            // A1: 前回のクエリ/フィルタを復元 (設定 ON のときだけ)
+            query = SettingsStore.shared.restoredStripQuery()
+            filterKind = SettingsStore.shared.restoredStripFilterKind()
             reload()
             // ノッチパネル経由の Tab/Shift+Tab 通知を購読。
             NotificationCenter.default.addObserver(
@@ -118,8 +121,18 @@ struct StripView: View {
             }
         }
         .onChange(of: store.recent) { _, _ in reload() }
-        .onChange(of: query) { _, _ in reload() }
-        .onChange(of: filterKind) { _, _ in reload() }
+        .onChange(of: query) { _, newValue in
+            if SettingsStore.shared.stripRememberFilters {
+                SettingsStore.shared.lastStripQuery = newValue
+            }
+            reload()
+        }
+        .onChange(of: filterKind) { _, newValue in
+            if SettingsStore.shared.stripRememberFilters {
+                SettingsStore.shared.lastStripFilterKindRaw = newValue?.rawValue ?? ""
+            }
+            reload()
+        }
         .onChange(of: folderID) { _, _ in reload() }
         .onChange(of: pinboards.boards.count) { _, _ in reload() }
         .background(keyHandler)

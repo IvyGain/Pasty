@@ -87,6 +87,22 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(aiGlowEnabled, forKey: Keys.aiGlowEnabled) }
     }
 
+    // A1: ストリップの検索 / フィルタ状態の永続化
+    @Published var stripRememberFilters: Bool {
+        didSet { defaults.set(stripRememberFilters, forKey: Keys.stripRememberFilters) }
+    }
+    @Published var lastStripQuery: String {
+        didSet { defaults.set(lastStripQuery, forKey: Keys.lastStripQuery) }
+    }
+    @Published var lastStripFilterKindRaw: String {
+        didSet { defaults.set(lastStripFilterKindRaw, forKey: Keys.lastStripFilterKindRaw) }
+    }
+
+    // B2: AI マクロのリスト。永続化は didSet で UserDefaults に JSON 保存。
+    @Published var aiMacros: [AIMacro] {
+        didSet { persistAIMacros() }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -109,6 +125,10 @@ final class SettingsStore: ObservableObject {
         static let aiSoundEnabled         = "pasty.aiSoundEnabled"
         static let aiSoundName            = "pasty.aiSoundName"
         static let aiGlowEnabled          = "pasty.aiGlowEnabled"
+        static let stripRememberFilters   = "pasty.stripRememberFilters"
+        static let lastStripQuery         = "pasty.lastStripQuery"
+        static let lastStripFilterKindRaw = "pasty.lastStripFilterKindRaw"
+        static let aiMacros               = "pasty.aiMacros.v1"
     }
 
     private init() {
@@ -138,6 +158,9 @@ final class SettingsStore: ObservableObject {
             Keys.aiSoundEnabled: true,
             Keys.aiSoundName: "Glass",
             Keys.aiGlowEnabled: true,
+            Keys.stripRememberFilters: true,
+            Keys.lastStripQuery: "",
+            Keys.lastStripFilterKindRaw: "",
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -171,6 +194,41 @@ final class SettingsStore: ObservableObject {
         self.aiSoundEnabled = defaults.bool(forKey: Keys.aiSoundEnabled)
         self.aiSoundName = defaults.string(forKey: Keys.aiSoundName) ?? "Glass"
         self.aiGlowEnabled = defaults.bool(forKey: Keys.aiGlowEnabled)
+        // A1: ストリップ検索/フィルタ復元
+        self.stripRememberFilters = defaults.bool(forKey: Keys.stripRememberFilters)
+        self.lastStripQuery = defaults.string(forKey: Keys.lastStripQuery) ?? ""
+        self.lastStripFilterKindRaw = defaults.string(forKey: Keys.lastStripFilterKindRaw) ?? ""
+        // B2: AI マクロの初期化。データが無ければデフォルトを seed する。
+        if let data = defaults.data(forKey: Keys.aiMacros),
+           let decoded = try? JSONDecoder().decode([AIMacro].self, from: data) {
+            self.aiMacros = decoded
+        } else {
+            self.aiMacros = AIMacro.defaultMacros
+            // 直接 persist (didSet は init 中は走らない)
+            if let data = try? JSONEncoder().encode(AIMacro.defaultMacros) {
+                defaults.set(data, forKey: Keys.aiMacros)
+            }
+        }
+    }
+
+    private func persistAIMacros() {
+        if let data = try? JSONEncoder().encode(aiMacros) {
+            defaults.set(data, forKey: Keys.aiMacros)
+        }
+    }
+
+    /// 復元する種類フィルタ。stripRememberFilters が OFF か未保存なら nil。
+    func restoredStripFilterKind() -> ClipKind? {
+        guard stripRememberFilters else { return nil }
+        let raw = lastStripFilterKindRaw
+        guard !raw.isEmpty else { return nil }
+        return ClipKind(rawValue: raw)
+    }
+
+    /// 復元する検索クエリ。stripRememberFilters が OFF なら空文字。
+    func restoredStripQuery() -> String {
+        guard stripRememberFilters else { return "" }
+        return lastStripQuery
     }
 
     /// AIEngine が prompt 組み立て時に参照する、ユーザー設定のスナップショット。

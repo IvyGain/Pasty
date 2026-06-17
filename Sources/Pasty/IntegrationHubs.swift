@@ -121,13 +121,19 @@ final class AIActionCoordinator {
     func presentMenu(for clip: ClipItem,
                      store: ClipStore,
                      onPick: ((AIAction) -> Void)? = nil) {
-        let view = AIActionMenu(clip: clip,
-                                onSelect: { [weak self] action in
-                                    self?.dismissMenu()
-                                    self?.execute(action, on: clip, store: store)
-                                    onPick?(action)
-                                },
-                                onDismiss: { [weak self] in self?.dismissMenu() })
+        let view = AIActionMenu(
+            clip: clip,
+            onSelect: { [weak self] action in
+                self?.dismissMenu()
+                self?.execute(action, on: clip, store: store)
+                onPick?(action)
+            },
+            onSelectMacro: { [weak self] macro in
+                self?.dismissMenu()
+                self?.executeMacro(macro, on: clip, store: store)
+            },
+            onDismiss: { [weak self] in self?.dismissMenu() }
+        )
         let hosting = NSHostingController(rootView: view)
         let p = AIActionPanel(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 480),
@@ -199,6 +205,60 @@ final class AIActionCoordinator {
             } catch {
                 PasteToast.shared.show(targetApp: nil,
                                        customMessage: "AI 失敗: \(error.localizedDescription)")
+                if useGlow { ScreenGlowController.shared.showFailure() }
+                if useSound, let s = NSSound(named: NSSound.Name("Funk")) {
+                    s.play()
+                }
+            }
+        }
+    }
+
+    /// B2: AI マクロを順次実行する。各ステップの出力が次ステップの入力になる。
+    /// 成功時は新規クリップ 1 件 (`sourceAppName = "Pasty AI · <macro name>"`) を作成。
+    /// 中断/失敗時はトーストでステップを通知し、それ以降を打ち切る。
+    func executeMacro(_ macro: AIMacro, on clip: ClipItem, store: ClipStore) {
+        let resolvedActions = macro.actions.compactMap { $0.resolved() }
+        guard !resolvedActions.isEmpty else {
+            PasteToast.shared.show(targetApp: nil,
+                                   customMessage: "マクロにアクションがありません")
+            NSSound(named: "Funk")?.play()
+            return
+        }
+
+        let settings = SettingsStore.shared
+        let useGlow = settings.aiGlowEnabled
+        let useSound = settings.aiSoundEnabled
+        let successSound = settings.aiSoundName
+
+        if useGlow {
+            ScreenGlowController.shared.showRunning()
+        }
+
+        let source = clip.content ?? clip.preview
+        let macroName = macro.name
+
+        Task {
+            var current = source
+            do {
+                for (idx, action) in resolvedActions.enumerated() {
+                    let result = try await AIEngine.perform(action, on: current)
+                    current = result.text
+                    let stepLabel = "ステップ \(idx + 1)/\(resolvedActions.count) 完了"
+                    PasteToast.shared.show(targetApp: nil, customMessage: stepLabel)
+                }
+                _ = try await store.createTextClip(
+                    content: current,
+                    sourceAppName: "Pasty AI · \(macroName)"
+                )
+                PasteToast.shared.show(targetApp: nil,
+                                       customMessage: "マクロ「\(macroName)」完了")
+                if useGlow { ScreenGlowController.shared.showSuccess() }
+                if useSound, let s = NSSound(named: NSSound.Name(successSound)) {
+                    s.play()
+                }
+            } catch {
+                PasteToast.shared.show(targetApp: nil,
+                                       customMessage: "マクロ失敗: \(error.localizedDescription)")
                 if useGlow { ScreenGlowController.shared.showFailure() }
                 if useSound, let s = NSSound(named: NSSound.Name("Funk")) {
                     s.play()

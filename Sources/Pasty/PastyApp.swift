@@ -66,6 +66,12 @@ struct PastyApp: App {
             // 初回起動時のオンボーディング
             OnboardingPresenter.shared.presentIfNeeded {
                 SettingsStore.shared.hasCompletedOnboarding = true
+                // A8: オンボーディング完了後の起動回でリリースノートを表示
+                WhatsNewPresenter.shared.presentIfNeeded()
+            }
+            // オンボーディングを既に終えているユーザー向け: 起動直後に評価
+            if SettingsStore.shared.hasCompletedOnboarding {
+                WhatsNewPresenter.shared.presentIfNeeded()
             }
 
             // フローティング Stack ピル（Stack に積まれている時だけ表示）
