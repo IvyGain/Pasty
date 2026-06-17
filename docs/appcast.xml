@@ -3,6 +3,15 @@
     <channel>
         <title>Pasty</title>
         <item>
+            <title>0.8.0-beta</title>
+            <pubDate>Wed, 17 Jun 2026 15:44:22 +0900</pubDate>
+            <sparkle:version>27</sparkle:version>
+            <sparkle:shortVersionString>0.8.0-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.0-beta/Pasty-0.8.0-beta.dmg" length="5853867" type="application/octet-stream" sparkle:edSignature="u+y4D2AIoUR1PI+GAvdGliZ7P4sinBMxsP5aEuKQ+q+TLxeMmWutrHFJRhGymEgXlD3j2fGCZT7E5T2QSAR7DQ=="/>
+        </item>
+        <item>
             <title>0.7.0-beta</title>
             <pubDate>Wed, 17 Jun 2026 13:26:15 +0900</pubDate>
             <sparkle:version>26</sparkle:version>
