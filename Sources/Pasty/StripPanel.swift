@@ -314,9 +314,18 @@ struct StripView: View {
                         )
                         .id(idx)
                         // ダブルクリック = 貼付 / シングルクリック = 選択。
-                        // SwiftUI の onTapGesture は count 大きい方を先に書く。
-                        .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
-                        .onTapGesture { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
+                        // v0.8.1: 2 つの onTapGesture を並べると SwiftUI が
+                        // ~250ms 待って double-tap を見送ってからシングルを発火
+                        // させるため、クリックがもっさり感じる。simultaneousGesture
+                        // を 2 つ重ねれば single-tap は即時、double は first-tap も
+                        // 含めて発火する (handleTap は cursorIndex を動かすだけで
+                        // 後続の paste に対して無害)。
+                        .simultaneousGesture(
+                            TapGesture(count: 2).onEnded { handleDoubleTap(at: idx) }
+                        )
+                        .simultaneousGesture(
+                            TapGesture(count: 1).onEnded { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
+                        )
                         .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                         .contextMenu {
                             if canEdit(clip) {
@@ -353,8 +362,14 @@ struct StripView: View {
                 }
                 .padding(.horizontal, 14).padding(.vertical, 12)
             }
-            .onChange(of: selection.cursorIndex) { _, n in
-                withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(n, anchor: .center) }
+            .onChange(of: selection.cursorIndex) { old, n in
+                // v0.8.1: 隣接カードクリックでも 120ms スクロールアニメが
+                // 走るのを抑制。3 カード以上ジャンプした時だけアニメする。
+                if abs(n - old) > 2 {
+                    withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(n, anchor: .center) }
+                } else {
+                    proxy.scrollTo(n, anchor: .center)
+                }
             }
             // v0.8: ホイール (or トラックパッド縦) を横スクロールに変換。
             // 設定で OFF にすれば従来通り。
@@ -414,10 +429,16 @@ struct StripView: View {
                         ForEach(Array(items.enumerated()), id: \.element.id) { idx, clip in
                             explorerRow(clip: clip, index: idx)
                                 .id(idx)
-                                .onTapGesture(count: 2) { handleDoubleTap(at: idx) }
-                                .onTapGesture {
-                                    handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
-                                }
+                                // v0.8.1: see carousel comment — simultaneousGesture
+                                // で single-tap の 250ms 待ちを潰す。
+                                .simultaneousGesture(
+                                    TapGesture(count: 2).onEnded { handleDoubleTap(at: idx) }
+                                )
+                                .simultaneousGesture(
+                                    TapGesture(count: 1).onEnded {
+                                        handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
+                                    }
+                                )
                                 .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                                 .contextMenu {
                                     if canEdit(clip) {
@@ -445,8 +466,13 @@ struct StripView: View {
                 }
                 .padding(.horizontal, 8).padding(.vertical, 8)
             }
-            .onChange(of: selection.cursorIndex) { _, n in
-                withAnimation(.easeOut(duration: 0.12)) {
+            .onChange(of: selection.cursorIndex) { old, n in
+                // v0.8.1: 隣接行クリックではアニメをスキップして即時スクロール。
+                if abs(n - old) > 2 {
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        proxy.scrollTo(n, anchor: .center)
+                    }
+                } else {
                     proxy.scrollTo(n, anchor: .center)
                 }
             }
@@ -771,6 +797,10 @@ struct StripView: View {
     /// AI アクションやプレビューを使う前段なので、誤って貼付しないように
     /// 「クリック ≠ 即貼付」のメンタルモデルに揃える。
     private func handleTap(at index: Int, modifiers: NSEvent.ModifierFlags) {
+        // v0.8.1: クリック時に hover プレビュー pill を同期で閉じる。
+        // pending DispatchWorkItem が残っているとクリック直後に pill が
+        // 一瞬出てちらつくので、ここで先に潰しておく。
+        HoverPreviewController.shared.dismissNow()
         if modifiers.contains(.shift) {
             selection.shiftTap(at: index, in: items); return
         }
@@ -787,6 +817,8 @@ struct StripView: View {
 
     /// ダブルクリック: 即時貼付（従来のシングルクリックの挙動）。
     private func handleDoubleTap(at index: Int) {
+        // v0.8.1: 貼付直前に hover プレビューを完全に消す。
+        HoverPreviewController.shared.dismissNow()
         guard items.indices.contains(index) else { return }
         let clip = items[index]
         // dismiss → paste の順。PasteAutomator 側で 60ms 待ってからクリックを
@@ -1019,10 +1051,10 @@ private struct StripCard: View {
                 .shadow(color: .black.opacity(isCursor ? 0.22 : 0.14),
                         radius: isCursor ? 14 : 8,
                         x: 0, y: isCursor ? 8 : 4)
-                // Layer 3: アンビエント影 — 遠くに広がる柔らかい影、空気感
-                .shadow(color: .black.opacity(isCursor ? 0.28 : 0.16),
-                        radius: isCursor ? 36 : 20,
-                        x: 0, y: isCursor ? 18 : 10)
+                // v0.8.1: 3 層目のアンビエント影 (radius 36/20) は GPU blur
+                // パスを 1 枚増やし、クリックでの isCursor 変化のたびに
+                // 全カードが再描画されるためフレームレートが落ちる原因に
+                // なっていた。視覚効果はほぼ Layer 2 で代替できるので削除。
 
             VStack(spacing: 0) {
                 banner
@@ -1106,7 +1138,8 @@ private struct StripCard: View {
         // Linear 風スプリング微小モーション
         .scaleEffect(isCursor ? 1.025 : 1.0)
         .offset(y: isCursor ? -2 : 0)
-        .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isCursor)
+        // v0.8.1: クリックの体感レスポンスを上げるため response を 0.28 → 0.18 に短縮
+        .animation(.spring(response: 0.18, dampingFraction: 0.85), value: isCursor)
         // 約 600ms ホバー → 全文プレビュー pill。クリックには干渉しないよう
         // ディレイを長めに、また pill 自体はマウスイベントを取らない。
         .onHover { hovering in
@@ -1520,26 +1553,43 @@ struct WheelToHorizontalCatcher: NSViewRepresentable {
 final class WheelCatcherNSView: NSView {
     var isEnabledForCatching: Bool = true
 
+    /// v0.8.1: 直近 NSScrollView ルックアップは subview ツリーの再帰探索を
+    /// 含むので、scroll イベント毎に走ると重い。最初のヒットをキャッシュし、
+    /// `viewDidMoveToWindow` で無効化する。
+    private weak var cachedScrollView: NSScrollView?
+
     override var acceptsFirstResponder: Bool { false }
     override func hitTest(_ point: NSPoint) -> NSView? { nil } // pass-through
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // window が変わったらキャッシュは捨てる (subview ツリーも変わる)
+        cachedScrollView = nil
+    }
 
     /// 直近 NSScrollView (水平) を探して、独自 CGEvent を流す代わりに
     /// `setContentOffset` 相当を直接行う。SwiftUI の ScrollView は
     /// 内部 NSScrollView を持っているので、それを階層から探し当てる。
     private func enclosingHorizontalScrollView() -> NSScrollView? {
+        if let cached = cachedScrollView, cached.window != nil {
+            return cached
+        }
         // 自分の祖先を辿る (SwiftUI ScrollView の中に置いた背景なので、
         // documentView 配下にいるはず)
         var v: NSView? = self.superview
         while let cur = v {
             if let sv = cur as? NSScrollView, sv.hasHorizontalScroller || sv.documentView?.bounds.width ?? 0 > sv.bounds.width {
+                cachedScrollView = sv
                 return sv
             }
             v = cur.superview
         }
         // 兄弟 / 親階層に NSScrollView がなければ window の contentView から
         // 最初に見つかった horizontal NSScrollView を返す。
-        if let root = window?.contentView {
-            return Self.findHorizontalScrollView(in: root)
+        if let root = window?.contentView,
+           let found = Self.findHorizontalScrollView(in: root) {
+            cachedScrollView = found
+            return found
         }
         return nil
     }
@@ -1583,10 +1633,10 @@ final class WheelCatcherNSView: NSView {
             return
         }
 
-        // ホバープレビューと衝突しないように消す
-        Task { @MainActor in
-            HoverPreviewController.shared.dismissNow()
-        }
+        // ホバープレビューと衝突しないように消す。
+        // v0.8.1: scrollWheel(with:) は main thread で呼ばれるので
+        // Task を挟まず直接呼ぶ (Task hop による 1 frame 遅延を回避)。
+        HoverPreviewController.shared.dismissNow()
 
         // 直近の水平 NSScrollView を見つけて contentOffset を直接動かす
         guard let scrollView = enclosingHorizontalScrollView(),

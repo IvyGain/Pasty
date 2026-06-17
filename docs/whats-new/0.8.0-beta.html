@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Pasty v0.8.0-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.8.0-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
+<style>
+:root {
+  --bg: #fbfbfd;
+  --bg-soft: #f5f5f7;
+  --bg-card: rgba(255,255,255,0.7);
+  --text: #1d1d1f;
+  --text-soft: #6e6e73;
+  --line: rgba(0,0,0,0.08);
+  --line-strong: rgba(0,0,0,0.18);
+  --accent: #6366f1;
+  --accent-2: #a855f7;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+          "Helvetica Neue", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000;
+    --bg-soft: #0a0a0a;
+    --bg-card: rgba(28,28,30,0.65);
+    --text: #f5f5f7;
+    --text-soft: #c7c7cc;
+    --line: rgba(255,255,255,0.10);
+    --line-strong: rgba(255,255,255,0.22);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  letter-spacing: -0.011em;
+  padding: 48px 24px 80px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vw 50vh at 80% -20%, rgba(99,102,241,0.15), transparent 60%),
+    radial-gradient(50vw 50vh at -10% 30%, rgba(168,85,247,0.12), transparent 60%);
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-soft); font-size: 14px; text-decoration: none;
+  margin-bottom: 28px;
+}
+.back:hover { color: var(--text); }
+.eyebrow {
+  display: inline-block;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 5px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 36px 36px 44px;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,0.18);
+}
+@media (max-width: 600px) { .card { padding: 28px 22px 36px; } }
+.card h1 {
+  font-size: clamp(28px, 5vw, 40px);
+  letter-spacing: -0.02em; line-height: 1.15;
+  margin-bottom: 8px;
+}
+.card .meta {
+  color: var(--text-soft); font-size: 13px; margin-bottom: 28px;
+}
+.card h2 {
+  font-size: 22px; letter-spacing: -0.015em;
+  margin: 32px 0 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.card h3 { font-size: 17px; margin: 22px 0 8px; }
+.card h4 { font-size: 15px; margin: 18px 0 6px; }
+.card p { margin: 10px 0; color: var(--text); }
+.card ul { margin: 10px 0 10px 22px; }
+.card li { margin: 4px 0; }
+.card a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.card a:hover { border-bottom-style: solid; }
+.card code {
+  font-family: var(--mono); font-size: 0.9em;
+  background: var(--bg-soft);
+  padding: 1px 6px; border-radius: 5px;
+}
+.card pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 18px; overflow-x: auto;
+  margin: 14px 0;
+}
+.card pre code { background: transparent; padding: 0; font-size: 13px; }
+.card hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+.dl {
+  display: inline-flex; gap: 8px; align-items: center;
+  margin-top: 28px;
+  padding: 12px 22px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white; font-weight: 600; text-decoration: none;
+  box-shadow: 0 12px 30px -8px rgba(99,102,241,0.5);
+}
+.dl:hover { transform: translateY(-1px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../index.html">← Pasty トップへ</a>
+  <article class="card">
+    <span class="eyebrow">v0.8.0-beta</span>
+    <h1>Pasty v0.8.0-beta</h1>
+    <div class="meta">2026-06-17 リリース</div>
+    <h1>Pasty v0.8.0-beta — ノッチが「もう一段」便利に。</h1>
+<p>「マウスでもサクサク、これから iCloud 同期。」</p>
+<h2>✨ 新機能</h2>
+<h3>1. マウスホイールでカルーセル横スクロール</h3>
+<p>ストリップ／ノッチホバーの上でマウスホイールを縦に回すと、カルーセルが横にスクロールします。 トラックパッドはもちろん、Magic Mouse やクラシックなホイールマウスでも快適に切り替えられるようになりました。</p>
+<ul>
+<li>既に横スワイプしている時はそのままパススルー</li>
+<li>スクロール開始時にホバープレビューを自動 dismiss して被りを防止</li>
+<li>設定 → サーフェス → 「ホイールで横スクロール」でいつでも OFF にできます</li>
+</ul>
+<h3>2. C1 iCloud 同期 — 設計フェーズ完了 🛠️</h3>
+<p>複数の Mac 間でクリップ履歴を同期する大型機能の <strong>設計フェーズが完了</strong> しました。 今リリースでは UI 上の設定項目は「実験的・未実装」として無効化されており、実装は v0.9 で進めます。</p>
+<p>設計ドキュメント (3 本) は <code>.ai/decisions/c1-icloud-sync-*.md</code> に格納:</p>
+<ul>
+<li><strong>architecture</strong>: CloudKit Private DB ベース、Lamport クロック、LWW + content-hash dedupe</li>
+<li><strong>security</strong>: STRIDE スレッドモデル、CryptoKit AES-GCM-256 / HKDF-SHA256 / ECDH P-256 / Ed25519、E2E 必須、CVSS タグ付き脆弱性 4 件</li>
+<li><strong>schema</strong>: <code>sync_journal</code> テーブル DDL、各テーブルへの soft delete + <code>entity_uuid</code> + <code>origin_device_id</code> カラム追加</li>
+</ul>
+<p>ReviewAgent によるクロスドキュメント整合性チェックも完了し (Score 88/100)、<strong>Go 判定</strong> で実装フェーズへ進みます。</p>
+<h3>3. DB スキーマ足場 (前方互換)</h3>
+<p>v0.9 で本実装される iCloud 同期に備えて、<strong>今リリースで DB スキーマだけ先に拡張</strong> しました。 既存ユーザーの DB は起動時に自動でマイグレーションされます。</p>
+<p>具体的に増えるもの:</p>
+<ul>
+<li><code>sync_journal</code> テーブル (Lamport / device_id / encrypted_payload / nonce / schema_version)</li>
+<li><code>clips</code> / <code>pinboards</code> / <code>pinboard_items</code> に <code>deleted_at</code> / <code>updated_at</code> / <code>origin_device_id</code> / <code>entity_uuid</code> カラム</li>
+<li>新規クリップ挿入時、自動で <code>origin_device_id</code> と <code>entity_uuid</code> がスタンプされます</li>
+</ul>
+<p>CloudSyncEngine 自体は phase 2 で稼働します。今は no-op スタブ — 既存の動作には一切影響しません。</p>
+<h2>🛠 内部改善</h2>
+<ul>
+<li>WhatsNewPresenter のリリースノート表示パスを 0.8.0-beta に対応</li>
+<li>ClipStore マイグレーションが v4 → v5 系列に拡張 (<code>v5.sync_journal</code> / <code>v5.soft_delete_columns</code> / <code>v5.entity_uuid_backfill</code>)</li>
+<li>設定画面プライバシータブに「iCloud 同期」セクションを追加 (現状は disabled トグル)</li>
+<li>Settings の「サーフェス」ヒント文を更新</li>
+</ul>
+<h2>🔧 既知の制約 / 注意</h2>
+<ul>
+<li>C1 iCloud 同期の <strong>データ送信は一切行いません</strong>。phase 2 までは完全ローカル動作です。</li>
+<li>設定の「iCloud 同期を有効化」トグルは UI 上のプレビューであり、現状は無効化されています。</li>
+<li>マウスホイール横スクロールはデフォルト ON です。気に入らなければ設定からすぐ OFF にできます。</li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.0-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.8.0-beta</a></p>
+    <a class="dl"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.0-beta"
+       target="_blank" rel="noopener">
+      GitHub Releases で詳細を見る ↗
+    </a>
+  </article>
+</div>
+</body>
+</html>

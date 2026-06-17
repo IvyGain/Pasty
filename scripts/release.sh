@@ -78,6 +78,18 @@ echo "==> Generating appcast.xml"
   --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
   -o "${ROOT}/docs/appcast.xml"
 
+# --- 3b. GitHub Pages refresh ---
+echo "==> Refreshing GitHub Pages (docs/index.html + docs/whats-new/)"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "✗ python3 not found — required for docs/index.html regeneration"
+  exit 1
+fi
+if ! python3 "${ROOT}/scripts/build-pages.py" --latest-version "${VERSION}"; then
+  echo "✗ scripts/build-pages.py failed — Pages would be out of sync. Aborting release."
+  exit 1
+fi
+echo "==> Pages rebuilt"
+
 # --- 4. git commit + tag + push ---
 if [ "$SKIP_TAG" = "--skip-tag" ]; then
   echo "==> --skip-tag 指定のため git tag / gh release はスキップ"
@@ -85,11 +97,11 @@ if [ "$SKIP_TAG" = "--skip-tag" ]; then
 fi
 
 echo "==> Committing appcast.xml"
-git add docs/appcast.xml
+git add docs/appcast.xml docs/index.html docs/whats-new/
 if git diff --cached --quiet; then
   echo "    (no appcast change to commit)"
 else
-  git commit -m "release: ${TAG} — refresh appcast.xml"
+  git commit -m "release: ${TAG} — refresh appcast + pages"
 fi
 
 # 既に tag がある場合は再作成しない

@@ -46,6 +46,11 @@ final class PreviousAppTracker {
     func restoreFocus(grace: TimeInterval = 0.08) async -> Bool {
         guard let app = previous else { return false }
         if app.isTerminated { return false }
+        // v0.8.1: 既に対象アプリがアクティブなら grace を全部スキップ。
+        // パネルが nonactivating だとフォーカスがそもそも奪われていない
+        // ケースが多く、不要な grace を払うとクリック→ペーストの体感が
+        // もっさりする。
+        if app.isActive { return true }
         app.activate(options: [])
         // 直後に CGEvent を叩くと「Pasty がまだ前面」と扱われることがある。
         // 80ms 程度待ってからキー送信すると 95%+ のターゲットアプリで安定。

@@ -52,9 +52,11 @@ final class PasteAutomator {
                 return
             }
 
-            // パネルが完全に閉じてフォーカスが落ち着くまで 60ms 待つ。
-            // これより短いとクリックが Pasty パネルを叩いて貼付が逃げる。
-            try? await Task.sleep(nanoseconds: 60_000_000)
+            // v0.8.1: パネル dismiss 後の安定待ちを 60ms → 30ms に短縮。
+            // orderOut 直後でも CGEvent の合成タップは概ね 30ms あれば
+            // 安全にターゲットアプリへ届く。短すぎる場合のみ次の Sleep で
+            // 補完される。
+            try? await Task.sleep(nanoseconds: 30_000_000)
 
             if SettingsStore.shared.clickBeforePaste {
                 // クリック前に **必ず** 直前アプリにフォーカスを戻しておく。
@@ -62,10 +64,11 @@ final class PasteAutomator {
                 // 一瞬フォーカスが Pasty に残り、続く ⌘V が Pasty に
                 // 送られて消えるケースがある。
                 await PreviousAppTracker.shared.restoreFocus(grace: 0.04)
-                // クリック → 100ms 待機（アプリのキャレット移動 + 場合により
-                // app activation 完了を待つ）→ ⌘V
+                // v0.8.1: クリック後の待機を 100ms → 50ms に短縮。
+                // 50ms あれば多くのアプリでキャレット位置が確定するので、
+                // ペースト体感の遅さを大きく削減。
                 clickAtScreenPoint(savedSummon)
-                try? await Task.sleep(nanoseconds: 100_000_000)
+                try? await Task.sleep(nanoseconds: 50_000_000)
             } else {
                 // クリックなしモードでは「直前アプリにフォーカスを戻す」
                 // という従来挙動。
