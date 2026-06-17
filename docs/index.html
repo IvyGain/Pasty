@@ -1916,10 +1916,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.8.0-beta</div>
+        <div class="ver">v0.8.1-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.8.0-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.8.1-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -1932,8 +1932,49 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.8.0-beta</span>
+        <span class="v">v0.8.1-beta</span>
         <span class="badge">最新</span>
+        
+      </summary>
+      <div class="body">
+<h1>Pasty v0.8.1-beta — クリックが「指に追いつく」リズムに。</h1>
+<p>「触れた瞬間に応答する。」</p>
+<h2>⚡️ クリック反応速度を大幅改善</h2>
+<p>v0.8.0 のリリース後、複数のユーザーから「クリックしてからクリップが選ばれるまでがもっさりする」という声をいただきました。 徹底的に hot path を計測した結果、<strong>3 系統の遅延</strong> が積み重なっていたことがわかり、すべて潰しました。</p>
+<h3>根本原因と対策</h3>
+<p>1. <strong>シングルクリックとダブルクリックの判別待ち (約 250ms)</strong> <code>onTapGesture(count: 2)</code> と <code>onTapGesture(count: 1)</code> を二段重ねていたため、SwiftUI が「次のタップが来ないか」を約 1/4 秒待ってからシングルタップを発火していました。これが「もっさり」の主因です。 対策: <code>simultaneousGesture</code> ペアに置き換え、シングルタップは <strong>タッチダウン直後に即発火</strong> するように変更。ダブルクリック (= 貼付) も従来通り動作します。</p>
+<p>2. <strong>paste 経路の不要な sleep を削減</strong> <code>PasteAutomator</code> の前後 sleep を 60ms→30ms / 100ms→50ms に短縮 (合計 80ms カット)。 貼付先アプリが既にアクティブな場合は <code>restoreFocus</code> のグレース期間を完全スキップするようにしました。</p>
+<p>3. <strong>カードのアニメーションを軽量化</strong> StripCard の 3 段重ねシャドウを 2 段に減らし、スプリング応答を <code>response: 0.18</code> に短縮。 隣接カードへのクリック時は scrollTo アニメーションをスキップ (3 枚以上離れた場合のみアニメ)。</p>
+<p>4. <strong>ホバープレビューのキャンセル &amp; スクロールキャッシュ</strong> タップ時に保留中のホバープレビュー (500ms 遅延ポップ) を即座にキャンセル。 <code>WheelToHorizontalCatcher</code> が毎回サブビューツリーを歩いていた処理をキャッシュ化。</p>
+<h3>体感</h3>
+<p>ローカル計測で、クリックからクリップ選択の視覚フィードバックまで <strong>約 250ms 短縮</strong>、貼付完了までも <strong>約 80ms 短縮</strong> されました。 「触れたら反応する」リズムに戻っています。</p>
+<h2>🌐 公式インストールページ公開</h2>
+<p><a href="https://ivygain.github.io/Pasty/" target="_blank" rel="noopener">https://ivygain.github.io/Pasty/</a> で <strong>常に最新版の DMG を 1 クリックダウンロード</strong> できるようになりました。 ページ下部には <strong>全リリースノートが折りたたみ式で一覧表示</strong> され、過去のバージョン履歴も追えます。</p>
+<p>各バージョンには専用パーマリンク (<code>/Pasty/whats-new/&lt;version&gt;.html</code>) も用意され、特定リリースのリンク共有が可能になりました。</p>
+<h2>🔧 リリース自動化</h2>
+<p><code>./scripts/release.sh</code> を実行すると、appcast.xml だけでなく <code>docs/index.html</code> と <code>docs/whats-new/&lt;version&gt;.html</code> も自動再生成され、同じコミットにステージされるようになりました。 今後すべてのベータ版で Pages とアプリ内アップデート通知が <strong>同時に最新化</strong> されます。</p>
+<h2>🛠 内部改善</h2>
+<ul>
+<li><code>HoverPreviewController.dismissNow()</code> をタップ経路のフェイルセーフとして活用</li>
+<li><code>PreviousAppTracker.restoreFocus</code> が <code>app.isActive</code> で早期 return</li>
+<li><code>WheelCatcherNSView</code> に <code>cachedScrollView</code> を導入し、scroll wheel ハンドラの 1 イベントあたりのコストを大幅削減</li>
+<li>リリースノートビルダー <code>scripts/build-pages.py</code> (独自 markdown→HTML 変換器内蔵) を新規追加</li>
+</ul>
+<h2>🔧 既知の制約</h2>
+<ul>
+<li>C1 iCloud 同期は引き続き設計フェーズ完了状態 (UI 上は disabled)。実装は v0.9 で進めます。</li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.1-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.8.1-beta</a></p>
+        <a class="permalink" href="whats-new/0.8.1-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.8.0-beta</span>
+        
         <span class="date">2026-06-17</span>
       </summary>
       <div class="body">
