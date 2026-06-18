@@ -594,7 +594,9 @@ struct SettingsView: View {
     }
 
     private var aboutTab: some View {
-        VStack(spacing: 14) {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+        return VStack(spacing: 14) {
             Image(systemName: "doc.on.clipboard.fill")
                 .font(.system(size: 36))
                 .foregroundStyle(.tint)
@@ -602,6 +604,40 @@ struct SettingsView: View {
                 .font(.title.weight(.semibold))
             Text("オープンソースの macOS クリップボードマネージャ")
                 .foregroundStyle(.secondary)
+
+            // Version badge — クリックでバージョン文字列をコピー
+            Button {
+                let payload = "Pasty v\(short) (build \(build))"
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(payload, forType: .string)
+                PasteToast.shared.show(targetApp: nil, customMessage: "バージョン情報をコピーしました")
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tint)
+                    Text("v\(short) · build \(build)")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule().fill(Color.primary.opacity(0.07))
+                )
+                .overlay(
+                    Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+                )
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("クリックでバージョン文字列をコピー")
+            .padding(.top, 4)
+            .padding(.bottom, 6)
 
             HStack(spacing: 10) {
                 Button {
