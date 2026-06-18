@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty v0.8.2-beta — リリースノート</title>
-<meta name="description" content="Pasty v0.8.2-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<title>Pasty v0.8.3-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.8.3-beta のリリースノート — 新機能・改善・修正の詳細。" />
 <link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
 <style>
 :root {
@@ -124,40 +124,32 @@ body::before {
 <div class="wrap">
   <a class="back" href="../index.html">← Pasty トップへ</a>
   <article class="card">
-    <span class="eyebrow">v0.8.2-beta</span>
-    <h1>Pasty v0.8.2-beta</h1>
-    <div class="meta">2026-06-18 リリース</div>
-    <h1>Pasty v0.8.2-beta — トップページが、自分で最新を語るように。</h1>
-<p>「ヒーロー、ちゃんと更新されますように。」</p>
-<h2>🛠 ランディングページのヒーロー自動更新を修正</h2>
-<p>v0.8.1 まで <code>docs/index.html</code> のヒーロー部 — バージョンバッジ、説明文、DMG サイズ、フィーチャーチップ — が初期リリース当時の文言のまま固まっており、リリースしてもトップが更新されないという問題がありました。</p>
-<p>このリリースで <code>&lt;!-- HERO:BEGIN/END --&gt;</code> などのセンチネルを導入し、<code>scripts/build-pages.py</code> がリリース時に毎回ヒーローを最新版で差し替えるようにしました。</p>
-<h3>何が自動化されたか</h3>
+    <span class="eyebrow">v0.8.3-beta</span>
+    <h1>Pasty v0.8.3-beta</h1>
+    
+    <h1>Pasty v0.8.3-beta — バージョンが、ワンクリックで手元に。</h1>
+<p>「いま、どのビルドを使ってるんだっけ？」を、もう探さない。</p>
+<h2>🏷 設定 → Pasty について にバージョンバッジを追加</h2>
+<p>「Pastyについて」タブに、現在動いているビルドが一目でわかる <strong>バージョンバッジ</strong> を追加しました。</p>
+<p>説明文と各種ボタン (使い方を見る / ショートカット一覧 / アップデートを確認 / リリースノート) のあいだに、<code>v&lt;version&gt; · build &lt;build&gt;</code> という小さなピル状のバッジが表示されます。等幅フォントなので、数字がきれいに揃います。</p>
+<h3>ワンクリックでコピー</h3>
+<p>バッジをクリックすると、<code>Pasty v&lt;version&gt; (build &lt;build&gt;)</code> という文字列が自動でクリップボードにコピーされます。バグ報告のときに「環境を教えてください」と言われたら、設定を開いて 1 クリックするだけ。</p>
+<p>コピー後はおなじみのトーストが表示され、ちゃんとコピーできたことが確認できます。</p>
+<h3>デザイン</h3>
 <ul>
-<li><strong>ヒーローのバージョンチップ</strong> (初期固定 → 常に最新版)</li>
-<li><strong>マーケティングコピー</strong> (リリースノート md の冒頭タグラインを反映)</li>
-<li><strong>フィーチャーピル</strong> (リリースノートの <code>## </code> 見出しから 3〜4 個抽出)</li>
-<li><strong>DMG サイズ</strong> (<code>dist/Pasty-&lt;ver&gt;.dmg</code> の実ファイルサイズを <code>du -h</code> で取得)</li>
-<li><strong>ダウンロードカードのバージョン表記</strong></li>
-<li><strong>トップナビの "vX.Y" チップ</strong> (<code>#releases</code> セクションへリンク)</li>
-<li><strong>Raycast 推奨バージョン</strong></li>
+<li><code>checkmark.seal.fill</code> の認証バッジアイコン (青)</li>
+<li>等幅フォントで <code>v0.8.3-beta · build 30</code> を表示</li>
+<li>右端に <code>doc.on.doc</code> のコピーアイコンを薄く配置 — クリックできることがひと目で伝わります</li>
+<li>カプセル型のピル背景はライト/ダーク両モードに最適化</li>
 </ul>
-<h3>冪等性も確保</h3>
-<p><code>python3 scripts/build-pages.py</code> を 2 回続けて実行すると、2 回目は差分ゼロになります。リリース自動化のドライランや、CI 再実行時にも安全です。</p>
-<h3>歴史的セクションは自動でリブランド</h3>
-<p>初期リリースの「新機能」紹介として固定されていた深い "What's New" セクションは、機能ハイライト (「編集できる倉庫」) という通時的なセクションに自動で書き換わります。実装内容自体は引き続き紹介され、見た目だけが「過去のリリース推し」ではなくなります。</p>
-<h2>📦 アプリ本体は変更なし</h2>
-<p>このリリースは Pages 更新フロー専用の hotfix です。アプリの動作・UI・機能には変更がありません。すでに v0.8.1-beta を使っている方も、Sparkle 経由のアップデート通知は届きますが、必須ではありません。</p>
-<h2>🔧 内部改善</h2>
-<ul>
-<li><code>scripts/build-pages.py</code> に <code>extract_hero_summary</code> / <code>extract_hero_pills</code> / <code>detect_dmg_size_mb</code> / <code>refresh_hero</code> を追加</li>
-<li>初回実行時はヒーロー周辺の従来マークアップを seed regex で検出し、その場でセンチネルを自動挿入</li>
-<li>2 回目以降はセンチネル境界のみで差し替え (人手のレイアウト編集も保護)</li>
-</ul>
+<h2>🌐 ランディングページも自動更新</h2>
+<p><a href="https://ivygain.github.io/Pasty/" target="_blank" rel="noopener">ivygain.github.io/Pasty</a> のヒーローも v0.8.3-beta に自動反映されます。v0.8.2 で導入したヒーロー自動更新の仕組みがそのまま走るので、トップを見れば「最新が何か」が常にわかります。</p>
+<h2>📦 アプリ本体の他の変更</h2>
+<p>このリリースは「Pasty について」タブの UI 改善が中心です。クリップボード処理・キャプチャ・AI まわりの挙動には変更がありません。Sparkle 経由のアップデート通知は届きますが、現行 v0.8.2-beta から急いで更新する必要はありません。</p>
 <hr />
-<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.2-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.8.2-beta</a></p>
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.3-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.8.3-beta</a></p>
     <a class="dl"
-       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.2-beta"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.3-beta"
        target="_blank" rel="noopener">
       GitHub Releases で詳細を見る ↗
     </a>
