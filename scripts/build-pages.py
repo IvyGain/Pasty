@@ -37,6 +37,19 @@ INDEX_PATH = DOCS / "index.html"
 SENTINEL_BEGIN = "<!-- RELEASES:BEGIN -->"
 SENTINEL_END = "<!-- RELEASES:END -->"
 
+# Hero block sentinels — wrap the hero subtitle, eyebrow pill, and download CTA.
+HERO_BEGIN = "<!-- HERO:BEGIN -->"
+HERO_END = "<!-- HERO:END -->"
+# Nav chip sentinel — wraps the top-nav "v0.x.y" link
+HERO_NAV_BEGIN = "<!-- HERO_NAV:BEGIN -->"
+HERO_NAV_END = "<!-- HERO_NAV:END -->"
+# Download card sentinel — wraps the macOS app card version + dmg size
+DOWNLOAD_CARD_BEGIN = "<!-- DOWNLOAD_CARD:BEGIN -->"
+DOWNLOAD_CARD_END = "<!-- DOWNLOAD_CARD:END -->"
+# Raycast recommended-version sentinel — wraps "Pasty vX.Y.Z-beta+ 推奨"
+RAYCAST_REC_BEGIN = "<!-- RAYCAST_REC:BEGIN -->"
+RAYCAST_REC_END = "<!-- RAYCAST_REC:END -->"
+
 # Minimum version (inclusive) to display in the release-notes section.
 MIN_VERSION = (0, 6, 0)
 
@@ -608,6 +621,363 @@ def render_releases_section(entries: List[dict], latest_version: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Hero auto-update — keeps docs/index.html top-of-page content fresh.
+# ---------------------------------------------------------------------------
+
+# Emoji prefix matcher for stripping ## headings into clean pill labels.
+_EMOJI_PREFIX_RE = re.compile(
+    r"^[\U0001F300-\U0001FAFF☀-➿⬀-⯿〰〽㊗㊙️‍]+\s*"
+)
+
+# Headings we never want to surface as marketing pills (internal/known-issue noise).
+_PILL_EXCLUDE_KEYWORDS = (
+    "内部改善",
+    "既知の制約",
+    "既知の不具合",
+    "既知の問題",
+    "Known issues",
+)
+
+
+def extract_hero_summary(md: str, *, max_sentences: int = 2) -> str:
+    """Return the first 1-2 plain-text sentences after the H1 heading.
+
+    Strips markdown formatting (links, code, emphasis) and keeps it short
+    enough to fit the hero subtitle paragraph.
+    """
+    lines = md.replace("\r\n", "\n").split("\n")
+    body: List[str] = []
+    seen_h1 = False
+    for line in lines:
+        stripped = line.strip()
+        if not seen_h1:
+            if stripped.startswith("# "):
+                seen_h1 = True
+            continue
+        if not stripped:
+            if body:
+                # End of first paragraph block — but accept a tagline ("...") line
+                # plus the next paragraph if we only have one short line so far.
+                joined = " ".join(body).strip()
+                if len(joined) > 24:
+                    break
+                continue
+        if stripped.startswith("#"):
+            if body:
+                break
+            continue
+        body.append(stripped)
+    text = " ".join(body).strip()
+    # Strip markdown emphasis/links/code.
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    # Split into sentences (Japanese 。 + Western .)
+    sentences = re.split(r"(?<=[。.!?！？])\s*", text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    return "".join(sentences[:max_sentences]).strip()
+
+
+def extract_hero_pills(md: str, *, max_pills: int = 4) -> List[str]:
+    """Return the first N ## headings as plain-text pill labels (emoji stripped)."""
+    pills: List[str] = []
+    for line in md.replace("\r\n", "\n").split("\n"):
+        m = re.match(r"^##\s+(.*\S)\s*$", line)
+        if not m:
+            continue
+        label = m.group(1).strip()
+        label = _EMOJI_PREFIX_RE.sub("", label).strip()
+        # Many headings read "X を改善" / "X の刷新" — strip a trailing verb-y tail
+        # to keep the pill snappy. Heuristic: cut at the first 「を」/「の」 followed
+        # by 4+ chars; conservative — falls back to full label.
+        if len(label) > 14:
+            short = re.split(r"(?<=を)|(?<=の)", label, maxsplit=1)
+            if short and len(short[0]) <= 14:
+                label = short[0].rstrip("をの")
+        if any(kw in label for kw in _PILL_EXCLUDE_KEYWORDS):
+            continue
+        if label and label not in pills:
+            pills.append(label)
+        if len(pills) >= max_pills:
+            break
+    return pills
+
+
+def detect_dmg_size_mb(version: str) -> Optional[str]:
+    """Return human-readable dmg size like '5.6 MB' for the latest release.
+
+    Sources in priority order:
+      1. dist/Pasty-<version>.dmg (local build)
+      2. gh release view v<version> --json assets
+      Returns None if neither is available; caller picks a fallback.
+    """
+    dmg_path = ROOT / "dist" / f"Pasty-{version}.dmg"
+    if dmg_path.exists():
+        size_bytes = dmg_path.stat().st_size
+        return _human_size(size_bytes)
+    # gh fallback
+    try:
+        out = subprocess.check_output(
+            [
+                "gh",
+                "release",
+                "view",
+                f"v{version}",
+                "--json",
+                "assets",
+                "-q",
+                ".assets[] | select(.name | endswith(\".dmg\")) | .size",
+            ],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        line = out.strip().splitlines()[0] if out.strip() else ""
+        if line.isdigit():
+            return _human_size(int(line))
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    return None
+
+
+def _human_size(n: int) -> str:
+    mb = n / (1024 * 1024)
+    if mb < 10:
+        return f"{mb:.1f} MB"
+    return f"{round(mb)} MB"
+
+
+def build_hero_block(version: str, summary: str, pills: List[str], dmg_size: str) -> str:
+    """Render the hero block (eyebrow + headline + subtitle + CTAs) HTML."""
+    pill_segments = [f"v{version}"] + pills + ["MIT"]
+    eyebrow = " · ".join(html.escape(p) for p in pill_segments)
+    safe_summary = html.escape(summary)
+    safe_size = html.escape(dmg_size)
+    return (
+        f'    <div class="reveal">\n'
+        f'      <span class="eyebrow">{eyebrow}</span>\n'
+        f'      <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>\n'
+        f'      <p class="subtitle">\n'
+        f'        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。{safe_summary}\n'
+        f'      </p>\n'
+        f'      <div class="ctas">\n'
+        f'        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">\n'
+        f'          Pasty.dmg をダウンロード\n'
+        f'          <small>· {safe_size} · macOS 14 以降</small>\n'
+        f'        </a>\n'
+        f'        <a class="btn ghost" href="#download">\n'
+        f'          Raycast 拡張をインストール\n'
+        f'          <small>· ワンライナーで簡単セットアップ</small>\n'
+        f'        </a>\n'
+        f'      </div>\n'
+        f'\n'
+        f'      <div class="hero-icon" aria-hidden="true">\n'
+        f'        <img src="assets/icon-512.png" alt="Pasty のアプリアイコン" width="220" height="220" />\n'
+        f'      </div>\n'
+        f'    </div>'
+    )
+
+
+def build_hero_nav_block(version: str) -> str:
+    """Render the top-nav "v0.x.y" chip link pointing at the releases section."""
+    short = ".".join(version.lstrip("v").split("-")[0].split(".")[:2])
+    return f'      <li><a href="#releases">v{html.escape(short)}</a></li>'
+
+
+def build_download_card_block(version: str, dmg_size: str) -> str:
+    """Render the macOS download card version + dmg-size lines."""
+    return (
+        f'            <h3>macOS アプリ</h3>\n'
+        f'            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v{html.escape(version)}</div>\n'
+        f'          </div>\n'
+        f'        </div>\n'
+        f'        <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>\n'
+        f'        <div class="ctas">\n'
+        f'          <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">\n'
+        f'            Pasty.dmg をダウンロード\n'
+        f'            <small>· {html.escape(dmg_size)}</small>\n'
+        f'          </a>\n'
+        f'        </div>'
+    )
+
+
+def build_raycast_rec_block(version: str) -> str:
+    """Render the Raycast recommended-version badge line."""
+    return f'          <span>Pasty v{html.escape(version)}+ 推奨</span>'
+
+
+def _wrap_or_replace_block(
+    text: str,
+    begin: str,
+    end: str,
+    new_block: str,
+    *,
+    seed_pattern: str,
+    label: str,
+) -> tuple:
+    """Replace the content between sentinels with new_block.
+
+    If sentinels don't yet exist, auto-insert them by matching seed_pattern
+    (a regex that captures the existing block in the file). Returns
+    (new_text, changed).
+    """
+    if begin in text and end in text:
+        pattern = re.compile(
+            re.escape(begin) + r".*?" + re.escape(end),
+            re.DOTALL,
+        )
+        replacement = f"{begin}\n{new_block}\n{end}"
+        new_text, n = pattern.subn(replacement, text, count=1)
+        if n != 1:
+            sys.stderr.write(f"[build-pages] warn: failed to substitute {label} block\n")
+            return text, False
+        return new_text, new_text != text
+
+    # First-run path: locate seed pattern and wrap.
+    m = re.search(seed_pattern, text, re.DOTALL)
+    if not m:
+        sys.stderr.write(
+            f"[build-pages] error: {label}: sentinels missing and seed pattern not matched\n"
+        )
+        return text, False
+    seed = m.group(0)
+    wrapped = f"{begin}\n{new_block}\n{end}"
+    new_text = text.replace(seed, wrapped, 1)
+    return new_text, True
+
+
+_DEMO_CARD_VERSION_RE = re.compile(r"v0\.5\.0-beta(?= 出荷)")
+_DEMO_CARD_VERSION_RE_2 = re.compile(r"Pasty v0\.5\.0-beta — クリップ編集 & 動画プレビュー")
+_DEMO_CARD_VERSION_RE_3 = re.compile(r"今日 v0\.5\.0-beta 出荷")
+_LEGACY_EYEBROW_RE = re.compile(r"v0\.5\.0-beta — 最新リリース")
+
+
+def refresh_hero(version: str, summary: str, pills: List[str], dmg_size: str) -> bool:
+    """Refresh the hero block, nav chip, download card, and raycast badge in
+    docs/index.html. Idempotent: returns True on success, False on hard error.
+    """
+    if not INDEX_PATH.exists():
+        sys.stderr.write(f"[build-pages] error: {INDEX_PATH} not found\n")
+        return False
+    text = INDEX_PATH.read_text(encoding="utf-8")
+    original = text
+
+    hero_block = build_hero_block(version, summary, pills, dmg_size)
+    nav_block = build_hero_nav_block(version)
+    download_block = build_download_card_block(version, dmg_size)
+    raycast_block = build_raycast_rec_block(version)
+
+    # ---- Demo-card literal refresh (decorative cards inside marketing copy) ----
+    # These show example clip content with the current shipping version.
+    text = _DEMO_CARD_VERSION_RE_3.sub(f"今日 v{version} 出荷", text)
+    text = _DEMO_CARD_VERSION_RE_2.sub(
+        f"Pasty v{version} — クリップ編集 & 動画プレビュー", text
+    )
+    # JS-side demo arrays (line ~2168, 2171)
+    text = re.sub(
+        r"'Pasty v0\.5\.0-beta — 出荷'",
+        f"'Pasty v{version} — 出荷'",
+        text,
+    )
+    text = re.sub(
+        r'\{"version":"0\.5\.0-beta","license":"MIT"\}',
+        f'{{"version":"{version}","license":"MIT"}}',
+        text,
+    )
+
+    # ---- Legacy v0.5.0 "What's New" section -> generic feature showcase ----
+    # The section's content (clip editing, URL auto-detect, video preview, Stack)
+    # describes current product features and is still accurate; we just strip
+    # the now-stale "v0.5.0-beta" version prefix so the section reads as a
+    # timeless feature highlight rather than a release-specific callout.
+    text = re.sub(
+        r"<!-- WHAT'S NEW v0\.5\.0-beta =+\s*-->",
+        "<!-- FEATURE HIGHLIGHTS — clip editing & previews ============================================ -->",
+        text,
+    )
+    text = re.sub(
+        r'<section id="whatsnew-v50">',
+        '<section id="feature-highlights">',
+        text,
+    )
+    text = re.sub(
+        r'<span class="eyebrow">v0\.5\.0-beta — [^<]+</span>',
+        '<span class="eyebrow">機能ハイライト</span>',
+        text,
+    )
+    text = re.sub(
+        r'<h2 class="section-title">v0\.5\.0-beta の新機能 — ',
+        '<h2 class="section-title">編集できる倉庫 — ',
+        text,
+    )
+    text = re.sub(
+        r"v0\.5\.0-beta は「倉庫の中で完結する」ためのアップデートです。",
+        "Pasty は「倉庫の中で完結する」ことを大事にしています。",
+        text,
+    )
+    # Nav anchor — repoint legacy #whatsnew-v50 to the renamed section.
+    text = re.sub(
+        r'<li><a href="#whatsnew-v50">v0\.5\.0 の新機能</a></li>',
+        '<li><a href="#feature-highlights">機能ハイライト</a></li>',
+        text,
+    )
+
+    # Seed patterns: match the v0.5.0-baked-in markup as a one-time anchor.
+    # On subsequent runs the sentinels exist and seed patterns are unused.
+    HERO_SEED = (
+        r'    <div class="reveal">\s*\n'
+        r'      <span class="eyebrow">v[^<]+</span>\s*\n'
+        r'      <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>\s*\n'
+        r'      <p class="subtitle">.*?</p>\s*\n'
+        r'      <div class="ctas">.*?</div>\s*\n'
+        r'\s*\n'
+        r'      <div class="hero-icon"[^>]*>\s*\n'
+        r'        <img src="assets/icon-512\.png"[^/]*/>\s*\n'
+        r'      </div>\s*\n'
+        r'    </div>'
+    )
+    NAV_SEED = r'      <li><a href="#whatsnew-v\d+">v\d+\.\d+(?:\.\d+)?</a></li>'
+    DOWNLOAD_SEED = (
+        r'            <h3>macOS アプリ</h3>\s*\n'
+        r'            <div style="color:var\(--text-dim\);font-size:13px;font-family:var\(--mono\)">v[^<]+</div>\s*\n'
+        r'          </div>\s*\n'
+        r'        </div>\s*\n'
+        r'        <p class="lede">dmg をダウンロード。.*?</p>\s*\n'
+        r'        <div class="ctas">\s*\n'
+        r'          <a class="btn primary" href="https://github\.com/IvyGain/Pasty/releases/latest/download/Pasty\.dmg">\s*\n'
+        r'            Pasty\.dmg をダウンロード\s*\n'
+        r'            <small>· [^<]+</small>\s*\n'
+        r'          </a>\s*\n'
+        r'        </div>'
+    )
+    RAYCAST_SEED = r'          <span>Pasty v[^<]+\+ 推奨</span>'
+
+    text, _ = _wrap_or_replace_block(
+        text, HERO_BEGIN, HERO_END, hero_block,
+        seed_pattern=HERO_SEED, label="HERO",
+    )
+    text, _ = _wrap_or_replace_block(
+        text, HERO_NAV_BEGIN, HERO_NAV_END, nav_block,
+        seed_pattern=NAV_SEED, label="HERO_NAV",
+    )
+    text, _ = _wrap_or_replace_block(
+        text, DOWNLOAD_CARD_BEGIN, DOWNLOAD_CARD_END, download_block,
+        seed_pattern=DOWNLOAD_SEED, label="DOWNLOAD_CARD",
+    )
+    text, _ = _wrap_or_replace_block(
+        text, RAYCAST_REC_BEGIN, RAYCAST_REC_END, raycast_block,
+        seed_pattern=RAYCAST_SEED, label="RAYCAST_REC",
+    )
+
+    if text == original:
+        sys.stderr.write("[build-pages] hero already up-to-date (no changes)\n")
+        return True
+    INDEX_PATH.write_text(text, encoding="utf-8")
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline.
 # ---------------------------------------------------------------------------
 
@@ -752,6 +1122,36 @@ def main() -> int:
     if not inject_index(section_html):
         return 1
     print(f"[build-pages] injected release section into {INDEX_PATH}")
+
+    # Refresh the top-of-page hero block with content sourced from the latest md.
+    latest_md = read_markdown(latest) or ""
+    summary = extract_hero_summary(latest_md) if latest_md else ""
+    pills = extract_hero_pills(latest_md) if latest_md else []
+    if not summary:
+        summary = f"v{latest} の最新アップデートはリリースノートをご覧ください。"
+    if not pills:
+        pills = ["クリップ編集", "URL 自動認識", "動画プレビュー", "Stack"]
+    dmg_size = detect_dmg_size_mb(latest) or "5 MB"
+    if not refresh_hero(latest, summary, pills, dmg_size):
+        return 1
+    print(f"[build-pages] refreshed hero block in {INDEX_PATH} (v{latest}, {dmg_size}, pills={pills})")
+
+    # Sanity check: per the v0.8.2-beta hotfix spec, the page must contain
+    # zero stale v0.5.0 references. (Authors of future release notes should
+    # avoid the literal "v0.5.0" string in their markdown if it would land
+    # here only as historical color — refer to "初期リリース" instead.)
+    final = INDEX_PATH.read_text(encoding="utf-8")
+    stale = final.count("v0.5.0")
+    if stale and not latest.startswith("0.5.0"):
+        # Show the offending lines for fast diagnosis.
+        for i, line in enumerate(final.splitlines(), start=1):
+            if "v0.5.0" in line:
+                sys.stderr.write(f"  {i}: {line.strip()[:160]}\n")
+        sys.stderr.write(
+            f"[build-pages] error: {stale} stale 'v0.5.0' reference(s) remain in {INDEX_PATH}\n"
+        )
+        return 1
+    print(f"[build-pages] hero freshness OK (no stale v0.5.0 references)")
     return 0
 
 
