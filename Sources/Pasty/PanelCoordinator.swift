@@ -211,6 +211,21 @@ final class PanelCoordinator: ObservableObject {
                 if let screen = NSScreen.cursorScreen() {
                     panel.position(onScreen: screen)
                 }
+                // SwiftUI の `body` 初期評価を起動時に償却する。オフスクリーンへ
+                // 一瞬出して layoutSubtreeIfNeeded を回し、すぐ orderOut する。
+                // これで ⇧⌘V を最初に押した瞬間の引っかかりが消える。
+                let savedFrame = panel.frame
+                panel.setFrame(NSRect(x: -10000, y: -10000, width: 1, height: 1), display: false)
+                panel.alphaValue = 0
+                panel.orderFrontRegardless()
+                if let hosting = panel.contentViewController as? NSHostingController<StripView> {
+                    hosting.view.layoutSubtreeIfNeeded()
+                } else {
+                    panel.contentView?.layoutSubtreeIfNeeded()
+                }
+                panel.orderOut(nil)
+                panel.alphaValue = 1
+                panel.setFrame(savedFrame, display: false)
                 // orderOut のままにして実画面には出さない
             }
         }

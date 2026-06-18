@@ -25,6 +25,9 @@ final class NotchHoverController: NSObject {
     /// ホバー検出から show までの待ち時間。ノッチに「ふっと触れただけ」では
     /// 開かないギリギリの値に抑え、体感を「ほぼ即」に近づける。
     private var dwellDelay: TimeInterval = 0.08
+    /// `mouseExited` 後の閉じ判定を遅延させて、ホットゾーン直外を「ピクッ」と
+    /// 横切ったときに即座に cancelShow されないようにする。50ms の grace。
+    private var pendingCancellation: DispatchWorkItem?
 
     /// パネルが開いている間だけ動くマウス位置の見張り役。`NSPanel` の
     /// `mouseExited` は、プログラマティックに `NSHostingController` を
@@ -123,7 +126,7 @@ final class NotchHoverController: NSObject {
         let zone = notchHotZone(on: screen)
         let panel = TriggerPanel(zone: zone)
         panel.onHoverEnter = { [weak self] in self?.scheduleShow(on: screen) }
-        panel.onHoverExit  = { [weak self] in self?.cancelShow() }
+        panel.onHoverExit  = { [weak self] in self?.scheduleCancelShow() }
         return panel
     }
 
@@ -134,7 +137,7 @@ final class NotchHoverController: NSObject {
     private func notchHotZone(on screen: NSScreen) -> NSRect {
         let frame = screen.frame
         let inset = screen.safeAreaInsets.top
-        let height: CGFloat = max(inset > 0 ? min(inset, 14) : 4, 4)
+        let height: CGFloat = max(inset > 0 ? min(inset, 14) : 24, 24)
         let topY = frame.maxY - height
 
         if inset > 0 {
@@ -154,12 +157,26 @@ final class NotchHoverController: NSObject {
 
     private func scheduleShow(on screen: NSScreen) {
         guard SettingsStore.shared.notchHoverEnabled else { return }
+        // mouseExited 直後の grace 期間中に再 enter したケースを救う。
+        pendingCancellation?.cancel()
+        pendingCancellation = nil
         cancelShow()
         let work = DispatchWorkItem { [weak self] in
             self?.show(on: screen)
         }
         hoverWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + dwellDelay, execute: work)
+    }
+
+    /// mouseExited 時の cancelShow を 50ms 遅延させる。ホットゾーンの縁を
+    /// 「ピクッ」と横切っただけで開きかけのドロップダウンが消えないようにする。
+    private func scheduleCancelShow() {
+        pendingCancellation?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.cancelShow()
+        }
+        pendingCancellation = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
     }
 
     private func cancelShow() {
@@ -172,7 +189,22 @@ final class NotchHoverController: NSObject {
     func prewarm() {
         guard cachedPanel == nil else { return }
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        cachedPanel = buildPanel(on: screen)
+        let panel = buildPanel(on: screen)
+        // SwiftUI の `body` は最初に view が画面上に追加されるまで評価されない。
+        // 初回 hover で `orderFrontRegardless` した瞬間に走ると一拍引っかかるので、
+        // ここで一度オフスクリーンに表示 → layout → 退避 して `body` の初期評価を
+        // 起動時に償却しておく。
+        panel.setFrame(NSRect(x: -10000, y: -10000, width: 1, height: 1), display: false)
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        if let hosting = panel.contentViewController as? NSHostingController<StripView> {
+            hosting.view.layoutSubtreeIfNeeded()
+        } else {
+            panel.contentView?.layoutSubtreeIfNeeded()
+        }
+        panel.orderOut(nil)
+        panel.alphaValue = 1
+        cachedPanel = panel
     }
 
     private func buildPanel(on screen: NSScreen) -> NSPanel {

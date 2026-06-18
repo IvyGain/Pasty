@@ -41,16 +41,18 @@ struct PastyApp: App {
         _settings = StateObject(wrappedValue: .shared)
         _selection = StateObject(wrappedValue: selection)
 
-        // Defer hotkey & notch install until after the run loop is alive.
+        // v0.8.4-beta (M-4): 起動シーケンスを 2 段に分割。
+        // Stage 1 はホットキー/ノッチ/Strip prewarm/権限など UI クリティカル。
+        // Stage 2 は Sparkle / Onboarding / WhatsNew / Stack ピル / DB backfill
+        // など最初のフレームに不要なものを 0.5s 遅延で。
         let installable = coordinator
         let store2 = store
+
+        // Stage 1 — 即時 (UI クリティカル)
         DispatchQueue.main.async {
             installable.installHotkeys()
             installable.installNotchHover()
             installable.prewarmStrip()
-            // Sparkle: SPUStandardUpdaterController(startingUpdater: true) を呼んだ時点で
-            // 自動チェッカーが起動するので、shared にアクセスするだけで初期化される。
-            _ = SparkleUpdater.shared
             _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
 
             // Subscribe to settings notifications.
@@ -62,6 +64,13 @@ struct PastyApp: App {
                                                    object: nil, queue: .main) { _ in
                 openSettingsWindowRobustly()
             }
+        }
+
+        // Stage 2 — 0.5s 遅延 (非クリティカル / 起動後タスク)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [stack] in
+            // Sparkle: SPUStandardUpdaterController(startingUpdater: true) を呼んだ時点で
+            // 自動チェッカーが起動するので、shared にアクセスするだけで初期化される。
+            _ = SparkleUpdater.shared
 
             // 初回起動時のオンボーディング
             OnboardingPresenter.shared.presentIfNeeded {
@@ -76,8 +85,11 @@ struct PastyApp: App {
 
             // フローティング Stack ピル（Stack に積まれている時だけ表示）
             if SettingsStore.shared.stackPillEnabled {
-                StackPillController.shared.install(stack: stack, coordinator: coordinator)
+                StackPillController.shared.install(stack: stack, coordinator: installable)
             }
+
+            // 起動後にバックグラウンドで entity_uuid backfill を進める (M-2)
+            Task { await store2.backfillEntityUUIDsIfNeeded() }
         }
     }
 

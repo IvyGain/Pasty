@@ -43,7 +43,12 @@ final class SelectionModel: ObservableObject {
     /// 単純クリック — 既に選択がある場合だけトグル、それ以外は何もしない（即貼付は呼び出し側）。
     func tap(at index: Int, in items: [ClipItem]) -> TapResult {
         guard items.indices.contains(index) else { return .noop }
-        cursorIndex = index
+        // v0.8.4: cursorIndex 移動はユーザー操作なので、隣接カードの
+        // scale/offset を控えめに補間したい。StripCard 側の .animation を外した
+        // ぶんを、ここで一瞬だけかけ直す。
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = index
+        }
         let id = items[index].id ?? -1
 
         if multiMode {
@@ -62,7 +67,9 @@ final class SelectionModel: ObservableObject {
         guard items.indices.contains(index) else { return }
         let id = items[index].id ?? -1
         multiMode = true
-        cursorIndex = index
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = index
+        }
         anchorIndex = index
         toggle(id: id)
     }
@@ -72,7 +79,9 @@ final class SelectionModel: ObservableObject {
         guard items.indices.contains(index) else { return }
         multiMode = true
         let from = anchorIndex ?? cursorIndex
-        cursorIndex = index
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = index
+        }
         selectRange(from: from, to: index, in: items, additive: true)
     }
 
@@ -88,7 +97,10 @@ final class SelectionModel: ObservableObject {
     /// ↑/↓ — カーソルを動かすだけ（選択は変えない）。
     func moveCursor(by delta: Int, in items: [ClipItem]) {
         guard !items.isEmpty else { return }
-        cursorIndex = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        let next = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = next
+        }
     }
 
     /// ⇧+↑/↓ — カーソルを動かしつつアンカーから現在地までの範囲を選択。
@@ -96,7 +108,10 @@ final class SelectionModel: ObservableObject {
         guard !items.isEmpty else { return }
         if anchorIndex == nil { anchorIndex = cursorIndex }
         multiMode = true
-        cursorIndex = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        let next = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = next
+        }
         if let anchor = anchorIndex {
             selectRange(from: anchor, to: cursorIndex, in: items, additive: false)
         }
@@ -107,7 +122,10 @@ final class SelectionModel: ObservableObject {
         multiMode = true
         orderedSelectedIDs = items.compactMap { $0.id }
         anchorIndex = 0
-        cursorIndex = max(0, items.count - 1)
+        let last = max(0, items.count - 1)
+        withAnimation(.easeOut(duration: 0.12)) {
+            self.cursorIndex = last
+        }
     }
 
     /// 選択中のアイテムを **選択した順序** で取り出す (結合貼付・順次貼付で使用)。

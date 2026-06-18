@@ -146,18 +146,60 @@ final class ClipStore: ObservableObject {
             }
         }
 
-        migrator.registerMigration("v5.entity_uuid_backfill") { db in
+        // v0.8.4-beta (M-2): entity_uuid backfill は同期マイグレーションから外し、
+        // 起動後にバックグラウンドで分割実行する。大容量 clips テーブルでの
+        // 起動ストールを避けるため。フラグは UserDefaults で 1 回だけ完了判定する。
+
+        try migrator.migrate(dbWriter)
+    }
+
+    // MARK: - Deferred entity_uuid backfill (M-2)
+
+    /// 起動後にバックグラウンドで実行される。`entity_uuid` が NULL の行を
+    /// 500 件ずつ埋める。完了したら UserDefaults フラグで二度と走らせない。
+    /// insert() / update() は既に新規行に entity_uuid を刻んでいるので、
+    /// `WHERE entity_uuid IS NULL` ガードがある限り並行 INSERT と衝突しない。
+    func backfillEntityUUIDsIfNeeded() async {
+        let flagKey = "pasty.entityUuidBackfillCompleted"
+        if UserDefaults.standard.bool(forKey: flagKey) { return }
+
+        await Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            do {
+                while true {
+                    let affected = try await self.runBackfillBatch(limit: 500)
+                    if affected == 0 { break }
+                }
+                UserDefaults.standard.set(true, forKey: flagKey)
+            } catch {
+                // ログだけ残して伝播しない。次回起動でリトライされる。
+                NSLog("[ClipStore] entity_uuid backfill failed: \(error)")
+            }
+        }.value
+    }
+
+    /// 1 バッチ分の backfill を実行し、影響を受けた総行数を返す。
+    /// `clips` / `pinboards` / `pinboard_items` 各テーブルで `entity_uuid IS NULL`
+    /// の行を最大 `limit` 件ずつ UUID で埋める。
+    private func runBackfillBatch(limit: Int) async throws -> Int {
+        try await dbWriter.write { db in
+            var totalAffected = 0
             for table in ["clips", "pinboards", "pinboard_items"] {
                 // SQLite の randomblob を使った in-place UUID 生成。
+                // WHERE 句で IS NULL / '' ガードを掛けるので並行 INSERT と衝突しない。
                 try db.execute(sql: """
                     UPDATE \(table)
                     SET entity_uuid = lower(hex(randomblob(16)))
-                    WHERE entity_uuid IS NULL OR entity_uuid = ''
+                    WHERE rowid IN (
+                        SELECT rowid FROM \(table)
+                        WHERE entity_uuid IS NULL OR entity_uuid = ''
+                        LIMIT \(limit)
+                    )
                     """)
+                totalAffected += db.changesCount
             }
+            return totalAffected
         }
-
-        try migrator.migrate(dbWriter)
     }
 
     /// 現在の端末を識別する UUID。Keychain に置きたいが、phase 1 では

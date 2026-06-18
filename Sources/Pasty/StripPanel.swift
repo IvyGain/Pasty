@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 /// Pasty のメインモーダル — 下から立ち上がるカルーセル/グリッド。
@@ -74,6 +75,10 @@ struct StripView: View {
     @State private var showingNewSnippet: Bool = false
     @State private var newSnippetText: String = ""
     @State private var editingClip: ClipItem?
+    // v0.8.4: 単一の onTapGesture でダブルクリックを手動検出するためのタイムスタンプ。
+    // simultaneousGesture(count:2)+count:1 ペアは AppKit のクリック発火順とずれが
+    // 出ることがあり、貼付がスキップされる挙動を生むので置き換えた。
+    @State private var lastTapAt: Double = 0
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -314,18 +319,19 @@ struct StripView: View {
                         )
                         .id(idx)
                         // ダブルクリック = 貼付 / シングルクリック = 選択。
-                        // v0.8.1: 2 つの onTapGesture を並べると SwiftUI が
-                        // ~250ms 待って double-tap を見送ってからシングルを発火
-                        // させるため、クリックがもっさり感じる。simultaneousGesture
-                        // を 2 つ重ねれば single-tap は即時、double は first-tap も
-                        // 含めて発火する (handleTap は cursorIndex を動かすだけで
-                        // 後続の paste に対して無害)。
-                        .simultaneousGesture(
-                            TapGesture(count: 2).onEnded { handleDoubleTap(at: idx) }
-                        )
-                        .simultaneousGesture(
-                            TapGesture(count: 1).onEnded { handleTap(at: idx, modifiers: CurrentInput.modifierFlags) }
-                        )
+                        // v0.8.4: simultaneousGesture(count:2)+count:1 をやめて単一
+                        // onTapGesture + 手動ダブルクリック検出に統一。SwiftUI が
+                        // first-tap のあと paste を握りつぶす事故を避けるための変更。
+                        .onTapGesture(count: 1) {
+                            let now = CACurrentMediaTime()
+                            let delta = now - lastTapAt
+                            lastTapAt = now
+                            if delta < NSEvent.doubleClickInterval {
+                                handleDoubleTap(at: idx)
+                            } else {
+                                handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
+                            }
+                        }
                         .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                         .contextMenu {
                             if canEdit(clip) {
@@ -429,16 +435,18 @@ struct StripView: View {
                         ForEach(Array(items.enumerated()), id: \.element.id) { idx, clip in
                             explorerRow(clip: clip, index: idx)
                                 .id(idx)
-                                // v0.8.1: see carousel comment — simultaneousGesture
-                                // で single-tap の 250ms 待ちを潰す。
-                                .simultaneousGesture(
-                                    TapGesture(count: 2).onEnded { handleDoubleTap(at: idx) }
-                                )
-                                .simultaneousGesture(
-                                    TapGesture(count: 1).onEnded {
+                                // v0.8.4: see carousel comment — 単一 onTapGesture +
+                                // 手動ダブルクリック検出に統一。
+                                .onTapGesture(count: 1) {
+                                    let now = CACurrentMediaTime()
+                                    let delta = now - lastTapAt
+                                    lastTapAt = now
+                                    if delta < NSEvent.doubleClickInterval {
+                                        handleDoubleTap(at: idx)
+                                    } else {
                                         handleTap(at: idx, modifiers: CurrentInput.modifierFlags)
                                     }
-                                )
+                                }
                                 .draggableClip(clip, additionalSelected: selection.isSelected(clip.id ?? -1) ? selection.selectedItems(from: items).filter { $0.id != clip.id } : [])
                                 .contextMenu {
                                     if canEdit(clip) {
@@ -820,11 +828,17 @@ struct StripView: View {
         // v0.8.1: 貼付直前に hover プレビューを完全に消す。
         HoverPreviewController.shared.dismissNow()
         guard items.indices.contains(index) else { return }
+        // v0.8.4: cursorIndex を即時更新して、選択状態を視覚的にコミットしてから
+        // 1 フレーム遅らせて dismiss → paste を撃つ。これで「クリックしたのに
+        // 一発目が反映されない」現象 (最初のクリックで cursor が動いた後、
+        // SwiftUI のフレーム差で paste 経路が握りつぶされる) を防ぐ。
+        selection.cursorIndex = index
         let clip = items[index]
-        // dismiss → paste の順。PasteAutomator 側で 60ms 待ってからクリックを
-        // 撃つので、パネルが完全に消えるまでの猶予がある。
-        onDismiss()
-        PasteAutomator.shared.paste(clip)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 16_666_667)  // ~1 frame at 60Hz
+            onDismiss()
+            PasteAutomator.shared.paste(clip)
+        }
     }
 
     private func onReturn(plain: Bool) {
@@ -1138,8 +1152,11 @@ private struct StripCard: View {
         // Linear 風スプリング微小モーション
         .scaleEffect(isCursor ? 1.025 : 1.0)
         .offset(y: isCursor ? -2 : 0)
-        // v0.8.1: クリックの体感レスポンスを上げるため response を 0.28 → 0.18 に短縮
-        .animation(.spring(response: 0.18, dampingFraction: 0.85), value: isCursor)
+        // v0.8.4: .animation(value: isCursor) はクリック直後に値が変わると
+        // スプリングが裏で走り続け、続けて起きる onTap → paste の最初の数フレームを
+        // 食って "クリックしても貼られない" を体感させる原因。アニメは
+        // SelectionModel 側 (cursorIndex 更新ポイント) で withAnimation を使い
+        // 必要な瞬間だけかけるように変更したので、ここからは外す。
         // 約 600ms ホバー → 全文プレビュー pill。クリックには干渉しないよう
         // ディレイを長めに、また pill 自体はマウスイベントを取らない。
         .onHover { hovering in
