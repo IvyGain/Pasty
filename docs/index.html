@@ -1005,10 +1005,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.8.3-beta · 設定 → Pasty について にバージョンバッジを追加 · ランディングページも自動更新 · アプリ本体の他の変更 · MIT</span>
+      <span class="eyebrow">v0.8.4-beta · ノッチ表示遅延を根治 · クリック反応遅延を根治 · 起動が速く · 体感、1〜2 倍速い · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「いま、どのビルドを使ってるんだっけ？」を、もう探さない。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。ノッチに触れた瞬間、すっとパネルが降りてくる。カードをクリックした瞬間、ぱっとハイライトが出て、貼り付けが終わる。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1618,7 +1618,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.8.3-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.8.4-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1667,7 +1667,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.8.3-beta+ 推奨</span>
+          <span>Pasty v0.8.4-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -1924,10 +1924,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.8.3-beta</div>
+        <div class="ver">v0.8.4-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.8.3-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.8.4-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -1940,9 +1940,44 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.8.3-beta</span>
+        <span class="v">v0.8.4-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty v0.8.4-beta — 速さが、戻ってきた。</h1>
+<p>ノッチに触れた瞬間、すっとパネルが降りてくる。 カードをクリックした瞬間、ぱっとハイライトが出て、貼り付けが終わる。 v0.7 系の「気持ちよさ」を取り戻すために、Pasty の体感に効く 7 箇所を一気に直しました。</p>
+<h2>⚡️ ノッチ表示遅延を根治</h2>
+<p>起動直後にノッチへマウスを乗せても、パネルがすぐ降りてくるようになりました。原因は 4 つあり、全部直してあります。</p>
+<ul>
+<li><strong>SwiftUI body の初回評価を prewarm で先払い</strong> (M-3): 起動時に NotchHover と Strip パネルをいったん画面外で <code>layoutSubtreeIfNeeded</code> まで走らせ、初回 hover のときに body 評価が走らないようにしました。</li>
+<li><strong>起動シーケンスを 2 段に分割</strong> (M-4): hotkey 登録・notch hover・prewarm・Accessibility 許可だけを即時に走らせ、Sparkle / Onboarding / What's New / StackPill / マイグレーションのバックフィルは 0.5 秒後にずらしました。cold-start のメインスレッドが空くので、prewarm が他のタスクに邪魔されません。</li>
+<li><strong>hot zone を 24px に拡大 + 50ms grace 期間</strong> (M-7): ノッチなしの Mac だと判定領域が 4px しかなく、マウスがちょっと外れると <code>mouseExited</code> で即キャンセルされていた問題を修正。24px に拡大し、加えて mouseExited 後 50ms は cancelShow を遅延させるようにしました。マウスがちらりと離れて即戻る程度ではキャンセルされません。</li>
+<li><strong><code>entity_uuid</code> バックフィルを lazy 化</strong> (M-2): v0.8.0 で追加した全行 UPDATE のマイグレーションが cold-start のクリティカルパスに乗っていたのを、起動完了後に 500 行ずつバッチで走るバックグラウンド処理に分離。<code>WHERE entity_uuid IS NULL</code> ガードで新規 insert との衝突も防止しています。10k 行履歴で 500ms+ 短縮します。</li>
+</ul>
+<h2>⚡️ クリック反応遅延を根治</h2>
+<p>Strip カードをクリックしてから「光って消えて貼り付く」までの体感が、v0.7 級に戻りました。</p>
+<ul>
+<li><strong><code>simultaneousGesture</code> を撤去して手動 double-click 検知に置換</strong> (M-1): v0.8.1 で「snappy」と謳って入れた <code>simultaneousGesture(TapGesture(count:2)) + count:1</code> の二段重ねが、実は SwiftUI 内部の double-tap 排他制御で <strong>count=1 の発火を ~250ms 遅延</strong> させていました。今は <code>.onTapGesture(count: 1)</code> 一本に戻し、<code>CACurrentMediaTime()</code> の差分で <code>NSEvent.doubleClickInterval</code> を見て手動でダブルクリックを判定します。mouseUp 直後に即発火します。</li>
+<li><strong><code>.animation(value: isCursor)</code> 削除 + <code>withAnimation</code> 化</strong> (M-5): カーソル移動時に StripCard の <code>.animation(.spring, value: isCursor)</code> が、ForEach 配下の 20 枚すべてで spring + scale + offset + shadow を同時に再合成していたのを撤廃。代わりに <code>SelectionModel</code> 側で <code>withAnimation(.easeOut(duration: 0.12))</code> で囲み、差分のあった 2 枚 (抜けたカード + 選ばれたカード) だけが animate するようにしました。</li>
+<li><strong>1 フレームのハイライト視覚フィードバック</strong> (M-10): クリックから貼り付けまでが速すぎて「光らずに消える」現象が起きていたので、<code>handleDoubleTap</code> で <code>cursorIndex</code> を立てた直後に <strong>16.67ms (1 frame at 60Hz)</strong> だけ待ってから dismiss + paste するようにしました。Web の <code>button:active</code> を 100ms 維持するのと同じ理屈で、「タップした」確証が視覚的に返ります。</li>
+</ul>
+<h2>🏎 起動が速く</h2>
+<p>M-4 (init 2 段化) と M-2 (backfill lazy 化) の合わせ技で、cold-start のメインスレッド占有時間が <strong>150〜500ms 短縮</strong> されました。</p>
+<h2>✨ 体感、1〜2 倍速い</h2>
+<p>7 箇所の修正が積み上がった結果、ノッチ表示は v0.7 級の体感即時、クリック反応は 100ms 以内のハイライト + 貼付に戻りました。何より、起動直後の最初の 1 操作が「あ、戻ってきた」と感じられるはずです。</p>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.4-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.8.4-beta</a></p>
+        <a class="permalink" href="whats-new/0.8.4-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.8.3-beta</span>
+        
+        <span class="date">2026-06-18</span>
       </summary>
       <div class="body">
 <h1>Pasty v0.8.3-beta — バージョンが、ワンクリックで手元に。</h1>
