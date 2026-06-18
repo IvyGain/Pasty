@@ -32,6 +32,19 @@ final class SettingsStore: ObservableObject {
     @Published var notchScrollWheelEnabled: Bool {
         didSet { defaults.set(notchScrollWheelEnabled, forKey: Keys.notchScrollWheelEnabled) }
     }
+    /// v0.8.5: ノッチホバー検出から表示開始までの dwell 時間 (ms)。
+    /// 0=即時 (デフォルト) / 50 / 100 / 200。0 にすると hover 検出と同タイミックで
+    /// `show()` が走り、知覚遅延が「実質ゼロ」になる。誤発火が気になる人だけ
+    /// 値を上げる前提。
+    @Published var notchDwellMs: Int {
+        didSet { defaults.set(notchDwellMs, forKey: Keys.notchDwellMs) }
+    }
+    /// v0.8.5: ノッチパネルが降りてくるときのアニメーション時間 (ms)。
+    /// 0=アニメ無し (瞬間表示) / 60 / 120。0 を選ぶと NSAnimationContext を
+    /// 経由せず `setFrame` 直叩きで一発配置する。
+    @Published var notchAnimMs: Int {
+        didSet { defaults.set(notchAnimMs, forKey: Keys.notchAnimMs) }
+    }
     @Published var stripPanelEnabled: Bool {
         didSet { defaults.set(stripPanelEnabled, forKey: Keys.stripPanelEnabled) }
     }
@@ -121,6 +134,8 @@ final class SettingsStore: ObservableObject {
         static let maxRetentionDays       = "pasty.maxRetentionDays"
         static let notchHoverEnabled      = "pasty.notchHoverEnabled"
         static let notchScrollWheelEnabled = "pasty.notchScrollWheelEnabled"
+        static let notchDwellMs           = "pasty.notchDwellMs"
+        static let notchAnimMs            = "pasty.notchAnimMs"
         static let stripPanelEnabled      = "pasty.stripPanelEnabled"
         static let autoPaste              = "pasty.autoPaste"
         static let locale                 = "pasty.locale"
@@ -150,6 +165,8 @@ final class SettingsStore: ObservableObject {
             Keys.maxRetentionDays: 30,
             Keys.notchHoverEnabled: true,
             Keys.notchScrollWheelEnabled: true,
+            Keys.notchDwellMs: 0,
+            Keys.notchAnimMs: 0,
             Keys.stripPanelEnabled: true,
             Keys.autoPaste: true,
             Keys.locale: "ja",
@@ -193,6 +210,8 @@ final class SettingsStore: ObservableObject {
         self.maxRetentionDays = defaults.integer(forKey: Keys.maxRetentionDays)
         self.notchHoverEnabled = defaults.bool(forKey: Keys.notchHoverEnabled)
         self.notchScrollWheelEnabled = defaults.bool(forKey: Keys.notchScrollWheelEnabled)
+        self.notchDwellMs = defaults.integer(forKey: Keys.notchDwellMs)
+        self.notchAnimMs = defaults.integer(forKey: Keys.notchAnimMs)
         self.stripPanelEnabled = defaults.bool(forKey: Keys.stripPanelEnabled)
         self.autoPaste = defaults.bool(forKey: Keys.autoPaste)
         self.locale = defaults.string(forKey: Keys.locale) ?? "ja"

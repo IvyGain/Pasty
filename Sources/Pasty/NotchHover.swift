@@ -22,9 +22,13 @@ final class NotchHoverController: NSObject {
     /// `orderFrontRegardless` + `setFrame` だけで瞬時に表示できる。
     private var cachedPanel: NSPanel?
     private var hoverWorkItem: DispatchWorkItem?
-    /// ホバー検出から show までの待ち時間。ノッチに「ふっと触れただけ」では
-    /// 開かないギリギリの値に抑え、体感を「ほぼ即」に近づける。
-    private var dwellDelay: TimeInterval = 0.08
+    /// v0.8.5 以降は `SettingsStore.notchDwellMs` (default 0) を毎回読みに行く
+    /// ので、ここではフォールバック専用。値 0 のとき `scheduleShow` は
+    /// `dispatchAsyncAfter` を経由せず同期的に `show()` を叩き、知覚遅延を
+    /// ゼロに近づける。
+    private var dwellDelay: TimeInterval {
+        TimeInterval(SettingsStore.shared.notchDwellMs) / 1000.0
+    }
     /// `mouseExited` 後の閉じ判定を遅延させて、ホットゾーン直外を「ピクッ」と
     /// 横切ったときに即座に cancelShow されないようにする。50ms の grace。
     private var pendingCancellation: DispatchWorkItem?
@@ -41,6 +45,10 @@ final class NotchHoverController: NSObject {
     /// ので、通常の KeyHandlingView では拾えない。
     private var keyEventMonitor: Any?
     private var localKeyEventMonitor: Any?
+    /// v0.8.5 N-5: モニタは prewarm 時に install して show 時には付け替え無し。
+    /// `currentActiveFrame` が nil の間 (= dropdownPanel == nil) はモニタが
+    /// 無効化と同等になる (closure 側で guard する)。
+    private var currentActiveZone: NSRect?
     private var pointerInsidePanel: Bool = false
     private var pendingClose: DispatchWorkItem?
     /// マウスがパネルの矩形に「最低 1 回入った」フラグ。入る前に範囲外と
@@ -161,11 +169,20 @@ final class NotchHoverController: NSObject {
         pendingCancellation?.cancel()
         pendingCancellation = nil
         cancelShow()
+        // v0.8.5 N-3: dwellMs == 0 のときは dispatchAsyncAfter を一切経由せず
+        // 同じ run-loop tick で show() を叩く。RunLoop 1 周分 (~1ms) と
+        // DispatchWorkItem 生成コストを丸ごと飛ばし「mouseEntered → 即表示」を
+        // 達成する。0 以外の時だけ従来通り asyncAfter で待つ。
+        let dwell = dwellDelay
+        if dwell <= 0 {
+            show(on: screen)
+            return
+        }
         let work = DispatchWorkItem { [weak self] in
             self?.show(on: screen)
         }
         hoverWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + dwellDelay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + dwell, execute: work)
     }
 
     /// mouseExited 時の cancelShow を 50ms 遅延させる。ホットゾーンの縁を
@@ -202,9 +219,16 @@ final class NotchHoverController: NSObject {
         } else {
             panel.contentView?.layoutSubtreeIfNeeded()
         }
+        // v0.8.5 N-4: panel.makeKey() のコストも起動時に償却する。
+        // .nonactivatingPanel なので、現在のアプリのフォーカスは奪わない。
+        // 直後に orderOut + alpha=1 戻しでユーザーには一切見えない。
+        panel.makeKey()
         panel.orderOut(nil)
         panel.alphaValue = 1
         cachedPanel = panel
+        // v0.8.5 N-5: マウス / キー モニタを起動時に install しておき、show()
+        // でのコールを消す。currentActiveZone == nil の間はガードで no-op。
+        installPersistentMonitors()
     }
 
     private func buildPanel(on screen: NSScreen) -> NSPanel {
@@ -248,15 +272,28 @@ final class NotchHoverController: NSObject {
         let panel: NSPanel
         if let cached = cachedPanel {
             panel = cached
-            panel.setFrame(collapsed, display: false)
         } else {
             panel = buildPanel(on: screen)
             cachedPanel = panel
         }
+        // v0.8.5 N-2: anim==0 のときは折り畳み frame を経由せず最終位置に
+        // 直接 setFrame する (1 描画で展開済みとして表示)。anim>0 の時だけ
+        // collapsed → expanded の補間を走らせる。
+        let animMs = SettingsStore.shared.notchAnimMs
+        if animMs <= 0 {
+            panel.setFrame(expanded, display: false)
+        } else {
+            panel.setFrame(collapsed, display: false)
+        }
 
+        // v0.8.5 N-6: orderFrontRegardless の直前にもう一度 layoutSubtreeIfNeeded を
+        // 回しておくことで、初回 real show 時の SwiftUI 再評価コストを潰す。
+        if let hosting = panel.contentViewController as? NSHostingController<StripView> {
+            hosting.view.layoutSubtreeIfNeeded()
+        }
         panel.orderFrontRegardless()
-        // .nonactivatingPanel なので、makeKey しても直前のフォーカスアプリは
-        // 入れ替わらない (ユーザー視点では元のアプリがアクティブのまま)。
+        // v0.8.5 N-4: makeKey() は prewarm() で既に 1 度払い済み。再度呼ぶのは
+        // canBecomeKey=true の panel に対してフォーカスを戻すだけなので極めて安価。
         panel.makeKey()
         // ドロップダウン中は trigger panel が statusBar レベルで
         // ヘッダー上の操作 (フォルダタブクリック等) を奪うので一旦退避させる。
@@ -264,28 +301,36 @@ final class NotchHoverController: NSObject {
         dropdownPanel = panel
         pointerEnteredOnce = false
 
-        NSAnimationContext.runAnimationGroup { ctx in
-            // 体感を「ほぼ即」に近づけるため、180ms → 120ms に短縮。
-            ctx.duration = 0.12
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(expanded, display: true)
+        if animMs > 0 {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = TimeInterval(animMs) / 1000.0
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(expanded, display: true)
+            }
         }
 
         // パネルが固定矩形になったあとの位置を「閉じる判定」の母集合にする。
         let activeFrame = expanded
-        installMouseMonitors(activeFrame: activeFrame)
+        activateMonitors(activeFrame: activeFrame)
     }
 
     func dismiss() {
         guard let panel = dropdownPanel else { return }
-        removeMouseMonitors()
+        deactivateMonitors()
+        let animMs = SettingsStore.shared.notchAnimMs
+        if animMs <= 0 {
+            // v0.8.5 N-2: 閉じる方向も即時化。setFrame を経由せず orderOut のみ。
+            panel.orderOut(nil)
+            self.dropdownPanel = nil
+            for tp in self.triggerPanels { tp.orderFrontRegardless() }
+            return
+        }
         let frame = panel.frame
         let collapsed = NSRect(x: frame.origin.x,
                                y: frame.origin.y + frame.size.height,
                                width: frame.size.width, height: 0)
         NSAnimationContext.runAnimationGroup({ ctx in
-            // 閉じるアニメも 120ms に短縮。
-            ctx.duration = 0.12
+            ctx.duration = TimeInterval(animMs) / 1000.0
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(collapsed, display: true)
         }, completionHandler: { [weak self] in
@@ -304,62 +349,68 @@ final class NotchHoverController: NSObject {
 
     // MARK: - Mouse monitoring
 
-    /// マウスが `activeFrame`（パネルが完全に降りた時の矩形）の外に出たら
-    /// 自動で閉じる。`mouseMoved` をグローバルに観測することで、別アプリ上
-    /// にカーソルがあっても判定が止まらない。
-    private func installMouseMonitors(activeFrame: NSRect) {
-        removeMouseMonitors()
-        let inflate: CGFloat = 12     // 1〜2 px の縁を超えただけで閉じないように
-        let zone = activeFrame.insetBy(dx: -inflate, dy: -inflate)
-
-        let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+    /// v0.8.5 N-5: マウス / キー モニタは **prewarm() の時点で 1 度だけ**
+    /// install しておき、show / dismiss では `currentActiveZone` の更新と
+    /// heartbeat の停止/再開だけを担当する。これで初回 show 時に発生していた
+    /// `addGlobalMonitorForEvents` ×3 のコスト (数 ms) が完全に消える。
+    /// closure 側は `dropdownPanel == nil` (= currentActiveZone == nil) の間は
+    /// 何もしないので、パネル非表示時に外で動いていることによる害は無い。
+    private func installPersistentMonitors() {
+        // 既に install 済みなら no-op (multi-screen 等で複数回呼ばれる保険)。
+        guard globalMouseMonitor == nil else { return }
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             guard let self else { return }
-            Task { @MainActor in self.evaluatePointer(against: zone) }
+            Task { @MainActor in
+                guard let zone = self.currentActiveZone else { return }
+                self.evaluatePointer(against: zone)
+            }
         }
-        let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
             guard let self else { return event }
-            Task { @MainActor in self.evaluatePointer(against: zone) }
+            Task { @MainActor in
+                guard let zone = self.currentActiveZone else { return }
+                self.evaluatePointer(against: zone)
+            }
             return event
         }
-        globalMouseMonitor = global
-        localMouseMonitor = local
-
-        // モニタは move があった時しか発火しないので、マウスがそもそも
-        // 動かない場合の保険として 0.18 s 毎にも判定を回す。
-        scheduleHeartbeat(against: zone)
-
-        // Tab/Shift+Tab を NSPanel が key になれないまま捕捉するための
-        // グローバル keyDown モニタ。マウスがパネル上にある時だけ反応。
-        installKeyMonitor()
-    }
-
-    /// ノッチパネルは canBecomeKey = false なので、SwiftUI 内の
-    /// `KeyHandlingView` でも keyDown は届かない。グローバル keyDown を
-    /// 監視して、マウスがパネル内にある時の Tab / Shift+Tab だけを横取りし、
-    /// 通知センター経由で StripView のフォルダ循環を発火する。
-    private func installKeyMonitor() {
-        // グローバル (= 他アプリがフォーカス時) と local (= Pasty 自身がフォーカス時)
-        // の両方を仕込んでおく。グローバルは Accessibility 権限がいるので、
-        // 権限が無くても local だけは動く保険にもなる。
-        keyEventMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.keyDown]
-        ) { [weak self] event in
+        keyEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self else { return }
-            Task { @MainActor in self.handleNotchKey(event) }
+            Task { @MainActor in
+                guard self.dropdownPanel != nil else { return }
+                self.handleNotchKey(event)
+            }
         }
-        localKeyEventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.keyDown]
-        ) { [weak self] event in
+        localKeyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self else { return event }
-            // Tab だけは Pasty 内でも横取りしてノッチ循環として消費する
-            if event.keyCode == 48 {
+            // Tab だけは Pasty 内でも横取りしてノッチ循環として消費する。
+            // ただしパネルが表示されていないときは何もしない。
+            if event.keyCode == 48, self.dropdownPanel != nil {
                 Task { @MainActor in self.handleNotchKey(event) }
-                if self.pointerInsidePanel && self.dropdownPanel != nil {
+                if self.pointerInsidePanel {
                     return nil
                 }
             }
             return event
         }
+    }
+
+    /// show() から呼ばれて、現在のパネル位置を判定母集合として登録する。
+    /// モニタ本体は既に install 済み。
+    private func activateMonitors(activeFrame: NSRect) {
+        let inflate: CGFloat = 12     // 1〜2 px の縁を超えただけで閉じないように
+        currentActiveZone = activeFrame.insetBy(dx: -inflate, dy: -inflate)
+        // マウスが動かない場合の保険として 0.18 s 毎に判定を回す。
+        if let zone = currentActiveZone {
+            scheduleHeartbeat(against: zone)
+        }
+    }
+
+    /// dismiss() から呼ばれて、判定母集合をクリアする。モニタは生かしたまま。
+    private func deactivateMonitors() {
+        currentActiveZone = nil
+        pointerInsidePanel = false
+        pendingClose?.cancel()
+        pendingClose = nil
     }
 
     private func handleNotchKey(_ event: NSEvent) {

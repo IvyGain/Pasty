@@ -335,7 +335,20 @@ struct SettingsView: View {
                 Toggle("下部ストリップ (⌥⇧V)", isOn: $settings.stripPanelEnabled)
                 Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
                 Toggle("ホイールで横スクロール", isOn: $settings.notchScrollWheelEnabled)
-                Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。カードを下方向にドラッグするとマウスでペーストできます。マウスホイールを縦に回すと、カルーセルが横方向にスクロールします。")
+                Picker("ノッチ起動遅延", selection: $settings.notchDwellMs) {
+                    Text("0ms (即時)").tag(0)
+                    Text("50ms").tag(50)
+                    Text("100ms").tag(100)
+                    Text("200ms").tag(200)
+                }
+                .pickerStyle(.segmented)
+                Picker("ノッチアニメ", selection: $settings.notchAnimMs) {
+                    Text("0ms (瞬間表示)").tag(0)
+                    Text("60ms").tag(60)
+                    Text("120ms").tag(120)
+                }
+                .pickerStyle(.segmented)
+                Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。「起動遅延 0ms + アニメ 0ms」で瞬間表示になります。誤発火が気になる場合は 50ms / 100ms に上げてください。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
