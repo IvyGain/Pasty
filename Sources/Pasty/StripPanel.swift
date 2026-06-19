@@ -83,6 +83,10 @@ struct StripView: View {
     // 保持してビジュアルフィードバック (opacity 0.5) に流用。履歴タブ / + ボタンは
     // 対象外。`nil` のときは通常表示。
     @State private var draggedBoardId: Int64? = nil
+    // v0.8.7: Pinboard タブのドラッグ並び替え中に「ドロップしたらここに入る」
+    // という挿入位置 (0..pinboards.boards.count) を保持。タブ間のギャップに
+    // 縦線インジケータを表示するためだけに使う。`nil` は表示なし。
+    @State private var folderDropTargetIndex: Int? = nil
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -228,9 +232,15 @@ struct StripView: View {
     }
 
     // ヘッダー内の横スクロール式フォルダタブストリップ (履歴 + ピンボード + 新規)
+    //
+    // v0.8.7: Safari / Finder のタブと同じ「縦線ドロップインジケータ」方式に
+    // 刷新。ドラッグ中のタブは半透明にせず、代わりにギャップへ縦の青い
+    // capsule を出してリリース位置を示す。各ギャップに 8pt 幅の透明な
+    // dropDestination 領域を仕込んで、cursor がそこに入った瞬間に
+    // `folderDropTargetIndex` がそのギャップの index に切り替わる。
     private var inlineFolderStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .center, spacing: 5) {
+            HStack(alignment: .center, spacing: 0) {
                 ModernFolderTab(
                     name: "履歴",
                     colorHex: nil,
@@ -239,6 +249,7 @@ struct StripView: View {
                     isSelected: folderID == nil,
                     action: { folderID = nil }
                 )
+                .padding(.trailing, 5)
                 .acceptClipReferenceDrop(pinboardId: nil,
                                          pinboards: pinboards, store: store)
 
@@ -250,38 +261,12 @@ struct StripView: View {
                 }
 
                 ForEach(Array(pinboards.boards.enumerated()), id: \.element.id) { idx, board in
-                    ModernFolderTab(
-                        name: board.name,
-                        colorHex: board.colorHex,
-                        systemImage: nil,
-                        count: nil,
-                        isSelected: folderID == board.id,
-                        action: { folderID = board.id }
-                    )
-                    // v0.8.6: ドラッグ中の board は半透明にして掴んでいる感を演出。
-                    .opacity(draggedBoardId == board.id ? 0.5 : 1.0)
-                    .contextMenu {
-                        Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
-                        Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
-                        Divider()
-                        Button("フォルダ名を変更…") { promptRename(board) }
-                        Button("削除", role: .destructive) { promptDelete(board) }
-                    }
-                    .acceptClipReferenceDrop(pinboardId: board.id,
-                                             pinboards: pinboards, store: store)
-                    // v0.8.6: フォルダタブのドラッグ並び替え。文字列ペイロードに
-                    // board.id を埋め、ドロップ先のタブで target index を計算して
-                    // PinboardStore.reorder を呼ぶ。履歴タブ / + ボタンには付けない。
-                    .onDrag {
-                        draggedBoardId = board.id
-                        let payload = board.id.map { "pasty.pinboard:\($0)" } ?? "pasty.pinboard:0"
-                        return NSItemProvider(object: payload as NSString)
-                    }
-                    .onDrop(of: [.plainText],
-                            delegate: PinboardReorderDropDelegate(
-                                targetIndex: idx,
-                                pinboards: pinboards,
-                                draggedBoardId: $draggedBoardId))
+                    folderDropGap(at: idx)
+                    folderTab(board: board, idx: idx)
+                }
+                // 末尾 (最後のタブの右側) にも gap を置く: 一番うしろへ並べ替え可。
+                if !pinboards.boards.isEmpty {
+                    folderDropGap(at: pinboards.boards.count)
                 }
 
                 Button {
@@ -302,6 +287,7 @@ struct StripView: View {
                                               style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         )
                 }
+                .padding(.leading, 5)
                 .buttonStyle(.plain)
                 .help("新しいフォルダ")
             }
@@ -309,6 +295,63 @@ struct StripView: View {
         }
         // scrollClipDisabled() / maxWidth は撤去。ScrollView の clip 内に
         // 全タブが収まり、HStack の親フレーム内でヒットテストされる。
+    }
+
+    /// v0.8.7: 並び替え対象のフォルダタブ。ドラッグ中も opacity は落とさず
+    /// (位置インジケータが視覚キューを担うため)、コンテキストメニューや
+    /// クリップ参照ドロップ受け入れは従来どおり。
+    @ViewBuilder
+    private func folderTab(board: Pinboard, idx: Int) -> some View {
+        ModernFolderTab(
+            name: board.name,
+            colorHex: board.colorHex,
+            systemImage: nil,
+            count: nil,
+            isSelected: folderID == board.id,
+            action: { folderID = board.id }
+        )
+        .contextMenu {
+            Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
+            Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
+            Divider()
+            Button("フォルダ名を変更…") { promptRename(board) }
+            Button("削除", role: .destructive) { promptDelete(board) }
+        }
+        .acceptClipReferenceDrop(pinboardId: board.id,
+                                 pinboards: pinboards, store: store)
+        // v0.8.7: ドラッグ中タブを半透明にする処理は廃止。位置キューは縦線
+        // インジケータが担う。ペイロードは v0.8.6 と互換 ("pasty.pinboard:<id>")。
+        .onDrag {
+            draggedBoardId = board.id
+            let payload = board.id.map { "pasty.pinboard:\($0)" } ?? "pasty.pinboard:0"
+            return NSItemProvider(object: payload as NSString)
+        }
+    }
+
+    /// v0.8.7: フォルダタブ間に挟まる "ギャップ"。8pt 幅の不可視ドロップ領域 +
+    /// 中央に縦線の Drop インジケータ (折り畳まれているとゼロ幅で見えない)。
+    /// `index` はリリース時に `pinboards.reorder(boardId:to:)` に渡す挿入位置。
+    @ViewBuilder
+    private func folderDropGap(at index: Int) -> some View {
+        let isActive = (folderDropTargetIndex == index)
+        ZStack {
+            // 縦線インジケータ (Safari / Finder のタブ方式)
+            Capsule()
+                .fill(Color.accentColor)
+                .frame(width: 3, height: 24)
+                .opacity(isActive ? 1 : 0)
+                .animation(.easeOut(duration: 0.10), value: isActive)
+        }
+        // 8pt 幅にして実際の hit エリアを確保。タブ間の見た目スペースは
+        // タブ側の padding と合算されて違和感のない 5〜8pt に収まる。
+        .frame(width: 8, height: 28)
+        .contentShape(Rectangle())
+        .onDrop(of: [.plainText],
+                delegate: PinboardReorderDropDelegate(
+                    targetIndex: index,
+                    pinboards: pinboards,
+                    draggedBoardId: $draggedBoardId,
+                    folderDropTargetIndex: $folderDropTargetIndex))
     }
 
     /// shadcn セグメント風の種類フィルタチップ。
@@ -875,8 +918,14 @@ struct StripView: View {
     }
 
     private func onEsc() {
-        if selection.hasSelection { selection.clearAll() }
-        else                       { onDismiss() }
+        // v0.8.7: Esc は常にパネル即時 dismiss。複数選択中のクリアと2段階
+        // 動作を切り離し、「Esc 1 回で消える」というユーザ期待に合わせる。
+        // 開いている sheet (editingClip / showingNewFolder / showingNewSnippet)
+        // がある場合は、そのまま onEsc を発火させても SwiftUI の .sheet が
+        // 先に keyDown を捌くので、パネルまでイベントは届かない。
+        PerfLog.timing("strip.dismiss.byEsc") {
+            onDismiss()
+        }
     }
 
     private func pasteCurrent(plain: Bool) {
@@ -1567,21 +1616,39 @@ extension Notification.Name {
 //
 // v0.8.6: フォルダタブを横にドラッグして並び替えるための DropDelegate。
 // ペイロードは `pasty.pinboard:<id>` 形式の plainText。`targetIndex` はこの
-// タブの `pinboards.boards` 内インデックス。drop が成立したら sourceId と
-// targetIndex を `PinboardStore.reorder(boardId:to:)` に投げる。
+// ギャップの挿入位置。drop が成立したら sourceId と targetIndex を
+// `PinboardStore.reorder(boardId:to:)` に投げる。
+//
+// v0.8.7: タブ単位の DropDelegate から、タブ間ギャップ単位の DropDelegate に
+// 役割変更。`folderDropTargetIndex` Binding を介して縦線インジケータを
+// 出し入れする。`dropEntered` で active 化、`dropExited` で解除。
 @MainActor
 struct PinboardReorderDropDelegate: DropDelegate {
     let targetIndex: Int
     let pinboards: PinboardStore
     @Binding var draggedBoardId: Int64?
+    @Binding var folderDropTargetIndex: Int?
 
     func validateDrop(info: DropInfo) -> Bool {
         info.hasItemsConforming(to: [.plainText])
     }
 
+    func dropEntered(info: DropInfo) {
+        folderDropTargetIndex = targetIndex
+    }
+
+    func dropExited(info: DropInfo) {
+        // 別のギャップに渡る前にこちらが先に exit するので、自身が現在の
+        // ターゲットの場合だけクリアする (ちらつき防止)。
+        if folderDropTargetIndex == targetIndex {
+            folderDropTargetIndex = nil
+        }
+    }
+
     func performDrop(info: DropInfo) -> Bool {
         guard let provider = info.itemProviders(for: [.plainText]).first else {
             draggedBoardId = nil
+            folderDropTargetIndex = nil
             return false
         }
         let target = targetIndex
@@ -1594,15 +1661,10 @@ struct PinboardReorderDropDelegate: DropDelegate {
             Task { @MainActor in
                 try? await pinboards.reorder(boardId: sourceId, to: target)
                 draggedBoardId = nil
+                folderDropTargetIndex = nil
             }
         }
         return true
-    }
-
-    func dropExited(info: DropInfo) {
-        // dropExited は drop が成立しなくても呼ばれるので、ここでハンドルを
-        // クリアして「掴んだまま戻したときに半透明が残る」のを防ぐ。
-        // 実際の reorder 完了時のクリアは performDrop の Task 内で行う。
     }
 }
 

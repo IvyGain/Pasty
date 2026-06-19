@@ -11,6 +11,9 @@ final class PanelCoordinator: ObservableObject {
 
     // SpotlightPanel は Raycast 拡張に責務移譲済み。Pasty 本体には残らない。
     private var strip: StripPanel?
+    /// v0.8.7: Strip 表示中の Esc 安全網。SwiftUI 内の KeyHandlingView がフォーカス
+    /// を失っても確実にパネルを閉じる。`showStrip` で登録、`dismissStrip` で破棄。
+    private var stripEscMonitor: Any?
     let notch: NotchHoverController
 
     /// IDs returned by HotKeyManager so we can wipe + rebuild whenever
@@ -234,6 +237,11 @@ final class PanelCoordinator: ObservableObject {
     /// Esc 時の共通ハンドラ。Strip / Notch ドロップダウンを全部畳んで、
     /// フォーカスを直前アプリに返す。Spotlight は Raycast 拡張に移行済み。
     func dismissAll() {
+        // v0.8.7: Strip 経由の dismiss も Esc 安全網 monitor を確実に解除する。
+        if let m = stripEscMonitor {
+            NSEvent.removeMonitor(m)
+            stripEscMonitor = nil
+        }
         strip?.orderOut(nil)
         notch.dismiss()
     }
@@ -258,6 +266,25 @@ final class PanelCoordinator: ObservableObject {
             // makeKey はその後に呼んで KeyHandlingView が動作する状態にする。
             panel.orderFrontRegardless()
             panel.makeKey()
+            // v0.8.7: SwiftUI 内の KeyHandlingView が何らかの理由でフォーカスを
+            // 失っていても確実に Esc を捕まえる安全網。AIActionPanel と同じ
+            // パターン。多重登録しないように既存があれば一旦撤去。
+            if let m = stripEscMonitor {
+                NSEvent.removeMonitor(m)
+                stripEscMonitor = nil
+            }
+            stripEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self,
+                      let strip = self.strip,
+                      strip.isVisible,
+                      event.keyCode == 53 else { return event }
+                // v0.8.7: ClipEditSheet などの child window (sheet) が key のときは
+                // Esc を奪わない。sheet 側の .keyboardShortcut(.cancelAction) が
+                // 正常に発火するよう、イベントをそのまま返す。
+                if NSApp.keyWindow !== strip { return event }
+                Task { @MainActor in self.dismissStrip() }
+                return nil
+            }
         }
     }
 
@@ -270,6 +297,11 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func dismissStrip() {
+        // v0.8.7: Esc 安全網 monitor を解除。再度 showStrip したときに再登録する。
+        if let m = stripEscMonitor {
+            NSEvent.removeMonitor(m)
+            stripEscMonitor = nil
+        }
         strip?.orderOut(nil)
     }
 
