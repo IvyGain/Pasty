@@ -322,6 +322,8 @@ struct StripView: View {
             isSelected: folderID == board.id,
             action: { folderID = board.id }
         )
+        .opacity(draggedBoardId == board.id ? 0.2 : 1.0)
+        .animation(.easeOut(duration: 0.15), value: draggedBoardId)
         .contextMenu {
             Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
             Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
@@ -329,8 +331,8 @@ struct StripView: View {
             Button("フォルダ名を変更…") { promptRename(board) }
             Button("削除", role: .destructive) { promptDelete(board) }
         }
-        .opacity(draggedBoardId == board.id ? 0.2 : 1.0)
-        .animation(.easeOut(duration: 0.15), value: draggedBoardId)
+        .acceptClipReferenceDrop(pinboardId: board.id,
+                                 pinboards: pinboards, store: store)
         // v0.8.8: フォルダ並び替えのドラッグペイロードを `PinboardDragItem`
         // (独自 UTType `app.pasty.pinboard-tab`) に切替。これにより
         // 1) タブ本体の `dropDestination(for: String.self)` には流れ込まず、
@@ -340,40 +342,30 @@ struct StripView: View {
         // 3) クリップドラッグ (= `ClipDragItem`/String 系) はこの UTType に
         //    conform しないため、ギャップでインジケータが出ない。
         //
-        // v0.9.1: `.draggable` を `.acceptClipReferenceDrop` より先に適用。
+        // v0.9.1: `.draggable` を `.acceptClipReferenceDrop` より後に適用 (= 最外側)。
         // SwiftUI のヒットテストはタブ本体の clip drop destination を優先して
         // しまい、ギャップ側 `PinboardDragItem` の dropDestination が反応せず
-        // 青い縦線インジケータが消える回帰があった。順序を入れ替えることで
-        // タブ自体のドラッグ開始が手前に来て、ギャップが正しく受信する。
-        // v0.9.2: ドラッグ中はタブ本体を opacity 0.2 にフェード。`draggedBoardId` を
-        // 既存の onAppear で立て、reorder 確定 or キャンセル時にクリアする既存ロジックを再利用。
+        // 青い縦線インジケータが消える回帰があった。`.draggable` を最外側に
+        // 置くことでタブ自体のドラッグ開始が手前に来て、ギャップが正しく受信する。
+        //
+        // v0.9.2 回帰: モディファイア順を入れ替え `.acceptClipReferenceDrop` が
+        // 最外側になっていたため、`dropDestination(for: String.self)` が
+        // `PinboardDragItem` の経路を遮り、ギャップでの縦線インジケータと並び替えが
+        // 動作しなくなった。v0.9.3 で v0.9.1 のチェーン (draggable 最外側) に戻す。
+        //
+        // v0.9.3: ドラッグ中はタブ本体を opacity 0.2 にフェード。`draggedBoardId` は
+        // プレビュー内部の onAppear で立て、reorder 確定 or キャンセル時には
+        // folderDropGap 側 / 後段の onDrop ハンドラ側で nil 化される。
+        // `.onDisappear { draggedBoardId = nil }` は早期発火でフリッカを引き起こすため削除。
         .draggable(PinboardDragItem(boardID: board.id ?? -1)) {
-            // ドラッグプレビュー: タブの簡易レプリカ。色付きドット + 名前。
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color(hex: board.colorHex))
-                    .frame(width: 8, height: 8)
-                Text(board.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(Color(nsColor: .windowBackgroundColor))
-            )
-            .overlay(
-                Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
-            )
-            .onAppear { draggedBoardId = board.id }
-            // v0.9.2: ドラッグキャンセル (esc / ウィンドウ外でリリース) でも
-            // フェードを 1.0 に戻すため、プレビュー View 消滅時に状態をクリア。
-            // 成功 drop パスは folderDropGap 側で既に nil 化しているので二重代入
-            // になるが、SwiftUI の二重代入は安全。
-            .onDisappear { draggedBoardId = nil }
+            // v0.9.3: ドラッグプレビューを実質非表示 (1pt 透明矩形) にしてシステムの
+            // 既定スナップショットに任せる。`onAppear` のみで draggedBoardId を立てる。
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: 1, height: 1)
+                .opacity(0)
+                .onAppear { draggedBoardId = board.id }
         }
-        .acceptClipReferenceDrop(pinboardId: board.id,
-                                 pinboards: pinboards, store: store)
     }
 
     /// v0.8.7: フォルダタブ間に挟まる "ギャップ"。8pt 幅の不可視ドロップ領域 +
