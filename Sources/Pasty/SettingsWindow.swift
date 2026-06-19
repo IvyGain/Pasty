@@ -335,6 +335,7 @@ struct SettingsView: View {
                 Toggle("下部ストリップ (⌥⇧V)", isOn: $settings.stripPanelEnabled)
                 Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
                 Toggle("ホイールで横スクロール", isOn: $settings.notchScrollWheelEnabled)
+                Toggle("URL プレビュー (軽量フェッチ)", isOn: $settings.urlPreviewEnabled)
                 Picker("ノッチ起動遅延", selection: $settings.notchDwellMs) {
                     Text("0ms (即時)").tag(0)
                     Text("50ms").tag(50)
@@ -349,6 +350,9 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 Text("ヒント: ノッチ（またはノッチなし Mac では画面上端中央）にカーソルを当てるとパネルが降りてきます。「起動遅延 0ms + アニメ 0ms」で瞬間表示になります。誤発火が気になる場合は 50ms / 100ms に上げてください。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("URL プレビューを ON にすると、リンククリップのカードに LinkPresentation 経由でタイトル + ファビコンを表示します (キャッシュあり)。ネットワーク発火を避けたい場合は OFF。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

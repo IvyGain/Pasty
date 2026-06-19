@@ -75,6 +75,28 @@ final class WhatsNewPresenter {
         }
         return text
     }
+
+    /// 指定バージョンの `<version>.md` から `##` 見出し（level-2）を抜き出して返す。
+    /// 文頭の `## ` プレフィックスは取り除き、空文字は除外する。
+    /// ファイルが無い／見出しが 1 つも無い場合は空配列を返す。
+    func extractFeatureHeadings(forVersion version: String) -> [String] {
+        guard let body = loadMarkdown(for: version) else { return [] }
+        var out: [String] = []
+        for rawLine in body.components(separatedBy: "\n") {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            // 厳密に `## ` を取る (`###` は除外)
+            if line.hasPrefix("## "), !line.hasPrefix("### ") {
+                let stripped = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                if !stripped.isEmpty {
+                    out.append(stripped)
+                }
+            }
+        }
+        return out
+    }
+
+    /// 公開ユーティリティ: 現在表示中バージョンの見出し一覧 (OnboardingPresenter から使う)
+    var currentVersionString: String { currentVersion }
 }
 
 @MainActor

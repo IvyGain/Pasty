@@ -282,7 +282,7 @@ final class PanelCoordinator: ObservableObject {
                 NSEvent.removeMonitor(m)
                 stripEscMonitor = nil
             }
-            stripEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            stripEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak selection] event in
                 guard let self,
                       let strip = self.strip,
                       strip.isVisible,
@@ -291,6 +291,15 @@ final class PanelCoordinator: ObservableObject {
                 // Esc を奪わない。sheet 側の .keyboardShortcut(.cancelAction) が
                 // 正常に発火するよう、イベントをそのまま返す。
                 if NSApp.keyWindow !== strip { return event }
+                // v0.9.0 A-2: multiMode 中の Esc は「選択クリアのみ」(1 段階目)。
+                // KeyHandlingView 側の onEsc と同じ branch を安全網にも揃える。
+                // 安全網は SwiftUI のフォーカスを失った状態でも Esc を捕まえるための
+                // monitor なので、ここでも multiMode を尊重しないと「選択中に Esc 1 回で
+                // 消える」状態が再発する。
+                if let sel = selection, sel.multiMode {
+                    Task { @MainActor in sel.clearAll() }
+                    return nil
+                }
                 Task { @MainActor in self.dismissStrip() }
                 return nil
             }

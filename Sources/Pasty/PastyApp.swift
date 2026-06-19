@@ -80,7 +80,15 @@ struct PastyApp: App {
             }
             // オンボーディングを既に終えているユーザー向け: 起動直後に評価
             if SettingsStore.shared.hasCompletedOnboarding {
+                let prevSeen = UserDefaults.standard.string(forKey: "pasty.whatsNewLastShownVersion")
+                let current = WhatsNewPresenter.shared.currentVersionString
                 WhatsNewPresenter.shared.presentIfNeeded()
+                // アップデート直後にだけ、`##` 見出しから組み立てたミニオンボーディングをキューイング
+                if prevSeen != current {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        OnboardingPresenter.shared.presentMiniWhatsNew(version: current)
+                    }
+                }
             }
 
             // フローティング Stack ピル（Stack に積まれている時だけ表示）

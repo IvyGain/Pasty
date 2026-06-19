@@ -998,22 +998,39 @@ struct StripView: View {
                 strategy: .sequence(delayBetween: 0.25)
             )
         }
+        // v0.9.0 A-1: 貼付直後に選択状態を明示的にクリアする。
+        // onAppear だけに依存すると、パネルを閉じている隙に再表示された場合に
+        // 古い選択が残る事故が起きるので、ここで即時クリアしておく。
+        // clearAll() は multiMode = false も再設定するので Esc 2 段階の前提も保たれる。
+        selection.clearAll()
     }
 
     private func onReturn(plain: Bool) {
-        // 動的 Enter: 選択が 2 件以上なら結合貼付 (改行で繋いで末尾改行)、
-        // 0 または 1 件なら通常の単体貼付。Raycast 拡張側と挙動を揃える。
-        if selection.count >= 2 { pasteSelected(join: true, plain: plain) }
-        else if selection.hasSelection { pasteSelected(join: false, plain: plain) }
-        else                       { pasteCurrent(plain: plain) }
+        // v0.9.0 A-3: 複数選択モード中の単発 Enter は「選んだ全件を順次貼付」に振る。
+        // 「結合貼付」は ⌥Return / ⌘Return に明示的に割り振り済みなので、Enter 単体は
+        // 選択した順に 1 件ずつ ⌘V を撃つ sequential strategy で送る。
+        // 非選択モードでは従来通り単体貼付 (pasteCurrent)。
+        if selection.multiMode && !selection.orderedSelectedIDs.isEmpty {
+            pasteSelected(join: false, plain: plain)
+        } else if selection.hasSelection {
+            pasteSelected(join: false, plain: plain)
+        } else {
+            pasteCurrent(plain: plain)
+        }
     }
 
     private func onEsc() {
-        // v0.8.7: Esc は常にパネル即時 dismiss。複数選択中のクリアと2段階
-        // 動作を切り離し、「Esc 1 回で消える」というユーザ期待に合わせる。
+        // v0.9.0 A-2: 複数選択モード中の Esc は「選択クリアのみ」(1 段階目)。
+        // clearAll() が multiMode = false を再設定するので、続けてもう一度 Esc を
+        // 押せば下の `else` ブランチに入ってパネルが dismiss される (2 段階目)。
+        // 非選択モードでは v0.8.7 同様、Esc 1 回で即時 dismiss。
         // 開いている sheet (editingClip / showingNewFolder / showingNewSnippet)
         // がある場合は、そのまま onEsc を発火させても SwiftUI の .sheet が
         // 先に keyDown を捌くので、パネルまでイベントは届かない。
+        if selection.multiMode {
+            selection.clearAll()
+            return
+        }
         PerfLog.timing("strip.dismiss.byEsc") {
             onDismiss()
         }
@@ -1060,6 +1077,11 @@ struct StripView: View {
                 strategy: .sequence(delayBetween: 0.25)
             )
         }
+        // v0.9.0 A-1: 貼付直後に選択状態を明示的にクリアする。
+        // onAppear だけに依存すると、パネルを閉じている隙に再表示された場合に
+        // 古い選択が残る事故が起きるので、ここで即時クリアしておく。
+        // clearAll() は multiMode = false も再設定するので Esc 2 段階の前提も保たれる。
+        selection.clearAll()
     }
 
     private func pasteAllInFolder(_ board: Pinboard, join: Bool) {
@@ -1511,6 +1533,16 @@ private struct StripCard: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(8)
+            } else if clip.kind == .link,
+                      SettingsStore.shared.urlPreviewEnabled,
+                      let raw = clip.content,
+                      let u = URL(string: raw),
+                      let scheme = u.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https" {
+                URLLinkPreview(url: u)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
             } else {
                 // テキスト系。コードならモノスペース、それ以外は標準。
                 // 改行を確実に視認できるように `\n` のままの content を Text へ
@@ -1536,6 +1568,7 @@ private struct StripCard: View {
             }
         }
         .frame(maxHeight: Self.cardSize.height - Self.bannerHeight - Self.footerHeight)
+        .clipped()
     }
 
     // MARK: - Footer

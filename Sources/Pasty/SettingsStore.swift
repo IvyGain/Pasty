@@ -126,6 +126,15 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(cloudSyncEnabled, forKey: Keys.cloudSyncEnabled) }
     }
 
+    /// v0.9.0 (塊 Z / D): LINK kind のクリップカードで、URL のタイトル + ファビコン
+    /// を `LinkPresentation` 経由で取得して表示する。デフォルト ON。
+    /// OFF にすると従来の URL 文字列だけの fallback 表示に戻る。
+    /// fetch は `URLLinkPreviewCache` (メモリ + プロセス caches/ 内のディスクキャッシュ)
+    /// 経由でデバウンスされるので、同じ URL が連続してネットワークを叩くことはない。
+    @Published var urlPreviewEnabled: Bool {
+        didSet { defaults.set(urlPreviewEnabled, forKey: Keys.urlPreviewEnabled) }
+    }
+
     /// v0.8.6: ホットパスのレイテンシ計測ログ。ON にすると `PerfLog.timing`
     /// 経由で `[perf] label=Nms` 形式のログが NSLog / unified log (subsystem:
     /// `io.pasty.perf`, category: `hot-path`) に出る。普段は OFF で計測コスト
@@ -168,6 +177,7 @@ final class SettingsStore: ObservableObject {
         static let lastStripFilterKindRaw = "pasty.lastStripFilterKindRaw"
         static let aiMacros               = "pasty.aiMacros.v1"
         static let cloudSyncEnabled       = "pasty.cloudSyncEnabled"
+        static let urlPreviewEnabled      = "pasty.urlPreviewEnabled"
         static let perfLogEnabled         = "pasty.perfLogEnabled"
     }
 
@@ -205,6 +215,7 @@ final class SettingsStore: ObservableObject {
             Keys.lastStripQuery: "",
             Keys.lastStripFilterKindRaw: "",
             Keys.cloudSyncEnabled: false,
+            Keys.urlPreviewEnabled: true,
             Keys.perfLogEnabled: false,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
@@ -247,6 +258,7 @@ final class SettingsStore: ObservableObject {
         self.lastStripQuery = defaults.string(forKey: Keys.lastStripQuery) ?? ""
         self.lastStripFilterKindRaw = defaults.string(forKey: Keys.lastStripFilterKindRaw) ?? ""
         self.cloudSyncEnabled = defaults.bool(forKey: Keys.cloudSyncEnabled)
+        self.urlPreviewEnabled = defaults.bool(forKey: Keys.urlPreviewEnabled)
         let perfLog = defaults.bool(forKey: Keys.perfLogEnabled)
         self.perfLogEnabled = perfLog
         // PerfLog はグローバル enum 上のフラグなので、init 時にも反映しておく。

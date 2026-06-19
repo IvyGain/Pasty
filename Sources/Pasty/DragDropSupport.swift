@@ -32,12 +32,21 @@ struct PinboardDragItem: Codable, Transferable {
 
 /// クリップ参照を文字列でエンコードして D&D の payload として運ぶ。
 /// 形式: `PASTY|<id>|<preview>`。
+/// v0.9.0: 複数選択ドラッグ用に `PASTY-MULTI|<id1>|<id2>|...` 形式も追加。
+/// preview は格納しない (受信側は ID から store で再解決する)。
 enum ClipDnDPayload {
     static let marker = "PASTY|"
+    static let multiMarker = "PASTY-MULTI|"
 
     static func encode(_ clip: ClipItem) -> String {
         let id = clip.id ?? -1
         return marker + "\(id)|" + clip.preview
+    }
+
+    /// 複数クリップを 1 つの payload にまとめる。受信側で `decodeMulti` を使う。
+    static func encodeMulti(_ clips: [ClipItem]) -> String {
+        let ids = clips.compactMap { $0.id }.map(String.init)
+        return multiMarker + ids.joined(separator: "|")
     }
 
     static func decode(_ s: String) -> (id: Int64, preview: String)? {
@@ -48,6 +57,14 @@ enum ClipDnDPayload {
         let preview = String(rest[rest.index(after: pipeIdx)...])
         guard let id = Int64(idStr), id > 0 else { return nil }
         return (id, preview)
+    }
+
+    /// 複数 payload 用デコーダ。`PASTY-MULTI|id1|id2|...` を `[Int64]` に展開。
+    static func decodeMulti(_ s: String) -> [Int64]? {
+        guard s.hasPrefix(multiMarker) else { return nil }
+        let rest = s.dropFirst(multiMarker.count)
+        let ids = rest.split(separator: "|").compactMap { Int64($0) }.filter { $0 > 0 }
+        return ids.isEmpty ? nil : ids
     }
 }
 
@@ -95,6 +112,32 @@ struct ClipDragItem: Transferable {
     }
 }
 
+// MARK: - Multi-clip drag wrapper (v0.9.0)
+
+/// 複数選択中にドラッグした時の Transferable。
+/// - 内部 D&D 用: `PASTY-MULTI|<id1>|<id2>|...` の 1 行 marker。
+///   `acceptClipReferenceDrop` の `dropDestination(for: String.self)` 経路で
+///   `ClipDnDPayload.decodeMulti` により ID 配列に展開される。
+/// - 外部 D&D 用: 各クリップの plain text を改行で繋いだ 1 個の文字列。
+///   Notion / Slack / メモなど他アプリには「全件分」がまとめて貼られる。
+struct MultiClipDragItem: Transferable {
+    let clips: [ClipItem]
+
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation(exporting: \MultiClipDragItem.markerString)
+        ProxyRepresentation(exporting: \MultiClipDragItem.plainText)
+    }
+
+    var markerString: String {
+        ClipDnDPayload.encodeMulti(clips)
+    }
+
+    /// 外部アプリ向けに「選んだ順」で全件のテキストを改行連結。
+    var plainText: String {
+        clips.map { $0.content ?? $0.preview }.joined(separator: "\n")
+    }
+}
+
 // MARK: - Draggable extension
 
 @MainActor
@@ -103,12 +146,24 @@ extension View {
     /// `additionalSelected` に「同時にドラッグする他のクリップ」を渡すと、
     /// 奥に重なる層として表示される（複数選択ドラッグ用）。
     ///
-    /// Transferable は `ClipDragItem` を提供し、内部 D&D には marker 付き文字列、
-    /// 外部 D&D には素のテキスト / URL を露出する。
+    /// v0.9.0 A-4: `additionalSelected` が非空の時は `MultiClipDragItem` を露出し、
+    /// 内部 D&D 経路 (`acceptClipReferenceDrop`) には全件分の ID をまとめた
+    /// `PASTY-MULTI|...` 1 行 payload を、外部アプリには改行連結したテキストを渡す。
+    /// 空の時は従来の 1 件 `ClipDragItem` のまま (回帰なし)。
+    @ViewBuilder
     func draggableClip(_ clip: ClipItem,
                        additionalSelected: [ClipItem] = []) -> some View {
-        self.draggable(ClipDragItem(clip: clip)) {
-            ClipDragCard(primary: clip, others: additionalSelected)
+        if additionalSelected.isEmpty {
+            self.draggable(ClipDragItem(clip: clip)) {
+                ClipDragCard(primary: clip, others: additionalSelected)
+            }
+        } else {
+            // 「掴んだクリップを先頭」にして選択順を維持。重複排除のため
+            // additionalSelected から primary を除外して連結する。
+            let ordered = [clip] + additionalSelected.filter { $0.id != clip.id }
+            self.draggable(MultiClipDragItem(clips: ordered)) {
+                ClipDragCard(primary: clip, others: additionalSelected)
+            }
         }
     }
 }
@@ -312,7 +367,18 @@ struct ClipReceiveDropTarget: ViewModifier {
             var pinned = 0
             var added = 0
             for s in strings {
-                if let payload = ClipDnDPayload.decode(s) {
+                // v0.9.0 A-4: 複数選択ドラッグから来た PASTY-MULTI marker は
+                // 1 つの文字列に複数 ID を詰め込んでいるので、ループで個別に pin。
+                if let ids = ClipDnDPayload.decodeMulti(s) {
+                    for cid in ids {
+                        do {
+                            try await pinboards.pin(clipId: cid, toBoard: pid)
+                            pinned += 1
+                        } catch {
+                            NSLog("D&D multi pin failed: \(error)")
+                        }
+                    }
+                } else if let payload = ClipDnDPayload.decode(s) {
                     do {
                         try await pinboards.pin(clipId: payload.id, toBoard: pid)
                         pinned += 1
