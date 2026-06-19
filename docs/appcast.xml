@@ -3,6 +3,15 @@
     <channel>
         <title>Pasty</title>
         <item>
+            <title>0.8.8-beta</title>
+            <pubDate>Fri, 19 Jun 2026 13:28:17 +0900</pubDate>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>0.8.8-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.8-beta/Pasty-0.8.8-beta.dmg" length="5910595" type="application/octet-stream" sparkle:edSignature="GaCfmyr3WUMixTIMQgeqVN2EfWsmSOI09Y+mjhKKjChpfhRl+pcj6s+luXVOEf4wrqcxtJTnn5wjCKXUVeAqCw=="/>
+        </item>
+        <item>
             <title>0.8.7-beta</title>
             <pubDate>Fri, 19 Jun 2026 13:12:31 +0900</pubDate>
             <sparkle:version>34</sparkle:version>
@@ -37,15 +46,6 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.4-beta/Pasty-0.8.4-beta.dmg" length="5867209" type="application/octet-stream" sparkle:edSignature="Wz6o4mrIgV6x1q0sTNxi4GUJM11S9t1Yg15YzYIt4vgeuF8a7IlREuOYOx/+Kuo8FfIMFrLC2Wq/Hrm45+YNBg=="/>
-        </item>
-        <item>
-            <title>0.8.3-beta</title>
-            <pubDate>Thu, 18 Jun 2026 11:49:46 +0900</pubDate>
-            <sparkle:version>30</sparkle:version>
-            <sparkle:shortVersionString>0.8.3-beta</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.3-beta/Pasty-0.8.3-beta.dmg" length="5871100" type="application/octet-stream" sparkle:edSignature="GPHzXLHdyRddNIESf1t7gq9lUheXrc1oM7APB6Ya3xDiPpPRL2kpgPgwfLHFQPzpzkOuVGKtIooOOrMKF0q7CQ=="/>
         </item>
     </channel>
 </rss>
