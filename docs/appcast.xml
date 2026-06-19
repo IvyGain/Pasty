@@ -3,6 +3,15 @@
     <channel>
         <title>Pasty</title>
         <item>
+            <title>0.9.3-beta</title>
+            <pubDate>Fri, 19 Jun 2026 17:51:15 +0900</pubDate>
+            <sparkle:version>40</sparkle:version>
+            <sparkle:shortVersionString>0.9.3-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.9.3-beta/Pasty-0.9.3-beta.dmg" length="6035455" type="application/octet-stream" sparkle:edSignature="HX1BJNxPnTuTpz3n5kUyGqdc0GA8x6Qct5RAfsaJV8E78pIvwlLjuLRbYw6XG8dFVOuj5CT86+cjOgum5+fKAA=="/>
+        </item>
+        <item>
             <title>0.9.2-beta</title>
             <pubDate>Fri, 19 Jun 2026 17:30:47 +0900</pubDate>
             <sparkle:version>39</sparkle:version>
@@ -37,15 +46,6 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.9-beta/Pasty-0.8.9-beta.dmg" length="5921408" type="application/octet-stream" sparkle:edSignature="VIn3D4jbrNoLRWiZgbOz6X3sQT0f7iixZPU4j7vRwkzmgoZJyp0UynaG25PE9R2ByK1FLD3KGg5BculROPBmBQ=="/>
-        </item>
-        <item>
-            <title>0.8.8-beta</title>
-            <pubDate>Fri, 19 Jun 2026 13:28:17 +0900</pubDate>
-            <sparkle:version>35</sparkle:version>
-            <sparkle:shortVersionString>0.8.8-beta</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.8.8-beta/Pasty-0.8.8-beta.dmg" length="5910595" type="application/octet-stream" sparkle:edSignature="GaCfmyr3WUMixTIMQgeqVN2EfWsmSOI09Y+mjhKKjChpfhRl+pcj6s+luXVOEf4wrqcxtJTnn5wjCKXUVeAqCw=="/>
         </item>
     </channel>
 </rss>

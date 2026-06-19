@@ -1005,10 +1005,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.2-beta · フォルダドラッグ中 · 影響範囲 · MIT</span>
+      <span class="eyebrow">v0.9.3-beta · フォルダ並べ替え · ドラッグプレビュー · 半透明フェードは引き続き有効 · 影響範囲 · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.2-beta の最新アップデートはリリースノートをご覧ください。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.3-beta の最新アップデートはリリースノートをご覧ください。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1618,7 +1618,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.2-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.3-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1667,7 +1667,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.2-beta+ 推奨</span>
+          <span>Pasty v0.9.3-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -1924,10 +1924,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.2-beta</div>
+        <div class="ver">v0.9.3-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.2-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.3-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -1940,9 +1940,46 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.2-beta</span>
+        <span class="v">v0.9.3-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty 0.9.3-beta — フォルダ並べ替え回帰ホットフィックス</h1>
+<h2>🛠 フォルダ並べ替えの青い縦線を完全復活</h2>
+<ul>
+<li>v0.9.2 で再発していた「フォルダタブをドラッグしても青い縦線インジケータが出ず、並べ替えが効かない」回帰を修正</li>
+<li>原因は <code>folderTab</code> の SwiftUI モディファイア順回帰: <code>.acceptClipReferenceDrop</code> が <code>.draggable</code> の外側に積まれてしまい、ギャップ側 <code>PinboardDragItem</code> の <code>dropDestination</code> が反応しなくなっていた</li>
+<li>v0.9.1 のチェーン (<code>.draggable(PinboardDragItem)</code> を最外側) に戻し、タブ間ギャップでのホバー検知と <code>PinboardStore.reorder</code> 発火を v0.8.7 / v0.8.8 / v0.9.1 と同じ感触で復活</li>
+</ul>
+<h2>🛠 ドラッグプレビューを再び不可視化</h2>
+<ul>
+<li>ドラッグ開始時にカーソルへ追従するシステム由来のタブスナップショットを廃止</li>
+<li>プレビューを 1×1 の完全透明な <code>Rectangle</code> に置き換え、macOS ネイティブのドラッグカーソルだけが表示されるように</li>
+<li>ドロップ先のフォルダタブが常に視認でき、青い縦線インジケータとの干渉もなくなりました</li>
+</ul>
+<h2>✅ 半透明フェードは引き続き有効</h2>
+<ul>
+<li>v0.9.2 で導入した「ドラッグ中の元タブを opacity 0.2 にフェード」は維持</li>
+<li>ドロップ完了時もキャンセル時 (Esc / ウィンドウ外でリリース) も、opacity は 1.0 に復帰します</li>
+<li>フェードのトリガとなる <code>draggedBoardId</code> はプレビュー内部の <code>onAppear</code> で立て、reorder 確定 or キャンセル時には folderDropGap / 後段の onDrop ハンドラ側で nil 化されます</li>
+</ul>
+<h2>影響範囲</h2>
+<ul>
+<li><code>folderTab</code> の SwiftUI モディファイアチェーンのみ変更 (順序の入れ替え + ドラッグプレビュー差し替え)</li>
+<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップ・<code>Transferable</code> ペイロード経路は一切変更なし</li>
+<li><code>folderDropGap.dropDestination</code> / <code>PinboardStore.reorder</code> のロジックには変更なし</li>
+</ul>
+        <a class="permalink" href="whats-new/0.9.3-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.2-beta</span>
+        
+        <span class="date">2026-06-19</span>
       </summary>
       <div class="body">
 <h1>Pasty 0.9.2-beta — フォルダドラッグの視認性ホットフィックス</h1>

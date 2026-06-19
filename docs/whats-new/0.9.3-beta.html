@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty v0.9.2-beta — リリースノート</title>
-<meta name="description" content="Pasty v0.9.2-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<title>Pasty v0.9.3-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.9.3-beta のリリースノート — 新機能・改善・修正の詳細。" />
 <link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
 <style>
 :root {
@@ -124,24 +124,36 @@ body::before {
 <div class="wrap">
   <a class="back" href="../index.html">← Pasty トップへ</a>
   <article class="card">
-    <span class="eyebrow">v0.9.2-beta</span>
-    <h1>Pasty v0.9.2-beta</h1>
-    <div class="meta">2026-06-19 リリース</div>
-    <h1>Pasty 0.9.2-beta — フォルダドラッグの視認性ホットフィックス</h1>
-<h2>🎯 フォルダドラッグ中のタブを半透明に</h2>
+    <span class="eyebrow">v0.9.3-beta</span>
+    <h1>Pasty v0.9.3-beta</h1>
+    
+    <h1>Pasty 0.9.3-beta — フォルダ並べ替え回帰ホットフィックス</h1>
+<h2>🛠 フォルダ並べ替えの青い縦線を完全復活</h2>
 <ul>
-<li>フォルダタブを掴んで並べ替えるとき、掴んでいるタブが opacity 0.2 まで薄くフェードするようになりました</li>
-<li>これによりドロップ先 (タブ間の青い縦線インジケータ) が見やすくなり、目的のスロットを正確に狙えるように</li>
-<li>ドロップ完了時もキャンセル時 (Esc / ウィンドウ外でリリース) も、opacity は確実に 1.0 に復帰します</li>
+<li>v0.9.2 で再発していた「フォルダタブをドラッグしても青い縦線インジケータが出ず、並べ替えが効かない」回帰を修正</li>
+<li>原因は <code>folderTab</code> の SwiftUI モディファイア順回帰: <code>.acceptClipReferenceDrop</code> が <code>.draggable</code> の外側に積まれてしまい、ギャップ側 <code>PinboardDragItem</code> の <code>dropDestination</code> が反応しなくなっていた</li>
+<li>v0.9.1 のチェーン (<code>.draggable(PinboardDragItem)</code> を最外側) に戻し、タブ間ギャップでのホバー検知と <code>PinboardStore.reorder</code> 発火を v0.8.7 / v0.8.8 / v0.9.1 と同じ感触で復活</li>
+</ul>
+<h2>🛠 ドラッグプレビューを再び不可視化</h2>
+<ul>
+<li>ドラッグ開始時にカーソルへ追従するシステム由来のタブスナップショットを廃止</li>
+<li>プレビューを 1×1 の完全透明な <code>Rectangle</code> に置き換え、macOS ネイティブのドラッグカーソルだけが表示されるように</li>
+<li>ドロップ先のフォルダタブが常に視認でき、青い縦線インジケータとの干渉もなくなりました</li>
+</ul>
+<h2>✅ 半透明フェードは引き続き有効</h2>
+<ul>
+<li>v0.9.2 で導入した「ドラッグ中の元タブを opacity 0.2 にフェード」は維持</li>
+<li>ドロップ完了時もキャンセル時 (Esc / ウィンドウ外でリリース) も、opacity は 1.0 に復帰します</li>
+<li>フェードのトリガとなる <code>draggedBoardId</code> はプレビュー内部の <code>onAppear</code> で立て、reorder 確定 or キャンセル時には folderDropGap / 後段の onDrop ハンドラ側で nil 化されます</li>
 </ul>
 <h2>影響範囲</h2>
 <ul>
-<li>フォルダタブ並べ替え (<code>PinboardDragItem</code>) のドラッグ表示のみ変更</li>
-<li>クリップドラッグ (<code>ClipDragItem</code> / <code>MultiClipDragItem</code>) はフォルダタブをフェードさせません — v0.9.1 と同じ挙動</li>
-<li>v0.8.7 以降の青い縦線インジケータ / <code>folderDropGap.dropDestination</code> ロジックには変更なし</li>
+<li><code>folderTab</code> の SwiftUI モディファイアチェーンのみ変更 (順序の入れ替え + ドラッグプレビュー差し替え)</li>
+<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップ・<code>Transferable</code> ペイロード経路は一切変更なし</li>
+<li><code>folderDropGap.dropDestination</code> / <code>PinboardStore.reorder</code> のロジックには変更なし</li>
 </ul>
     <a class="dl"
-       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.2-beta"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.3-beta"
        target="_blank" rel="noopener">
       GitHub Releases で詳細を見る ↗
     </a>
