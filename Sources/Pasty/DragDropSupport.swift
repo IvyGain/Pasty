@@ -2,6 +2,32 @@ import SwiftUI
 import UniformTypeIdentifiers
 import AppKit
 
+// MARK: - Custom UTTypes
+
+extension UTType {
+    /// v0.8.8: フォルダタブの並び替えドラッグ専用の独自 UTType。
+    /// `String` / `public.plain-text` には conform しないので、クリップ用の
+    /// `.dropDestination(for: String.self)` (= `acceptClipReferenceDrop`) には
+    /// 入らず、タブ間ギャップの `.dropDestination(for: PinboardDragItem.self)`
+    /// だけが受け取る。逆にクリップドラッグはこの UTType に conform しないので、
+    /// ギャップの縦線インジケータは反応しない。
+    static let pastyPinboardTab = UTType(exportedAs: "app.pasty.pinboard-tab",
+                                         conformingTo: .data)
+}
+
+// MARK: - PinboardDragItem
+
+/// v0.8.8: フォルダタブを掴んで並び替える時の Transferable。
+/// クリップドラッグの `String` 系 representation とは UTType レベルで分離されており、
+/// `.acceptClipReferenceDrop` (= `dropDestination(for: String.self)`) には流れ込まない。
+struct PinboardDragItem: Codable, Transferable {
+    let boardID: Int64
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .pastyPinboardTab)
+    }
+}
+
 // MARK: - Payload encoding
 
 /// クリップ参照を文字列でエンコードして D&D の payload として運ぶ。

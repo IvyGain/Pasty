@@ -21,9 +21,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.8.7-beta</string>
+    <string>0.8.8-beta</string>
     <key>CFBundleVersion</key>
-    <string>34</string>
+    <string>35</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>

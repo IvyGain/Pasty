@@ -319,18 +319,43 @@ struct StripView: View {
         }
         .acceptClipReferenceDrop(pinboardId: board.id,
                                  pinboards: pinboards, store: store)
-        // v0.8.7: ドラッグ中タブを半透明にする処理は廃止。位置キューは縦線
-        // インジケータが担う。ペイロードは v0.8.6 と互換 ("pasty.pinboard:<id>")。
-        .onDrag {
-            draggedBoardId = board.id
-            let payload = board.id.map { "pasty.pinboard:\($0)" } ?? "pasty.pinboard:0"
-            return NSItemProvider(object: payload as NSString)
+        // v0.8.8: フォルダ並び替えのドラッグペイロードを `PinboardDragItem`
+        // (独自 UTType `app.pasty.pinboard-tab`) に切替。これにより
+        // 1) タブ本体の `dropDestination(for: String.self)` には流れ込まず、
+        //    フォルダタブのボディに drop してもクリップとして取り込まれない。
+        // 2) タブ間ギャップの `dropDestination(for: PinboardDragItem.self)` だけが
+        //    受信し、縦線インジケータ + reorder が走る。
+        // 3) クリップドラッグ (= `ClipDragItem`/String 系) はこの UTType に
+        //    conform しないため、ギャップでインジケータが出ない。
+        .draggable(PinboardDragItem(boardID: board.id ?? -1)) {
+            // ドラッグプレビュー: タブの簡易レプリカ。色付きドット + 名前。
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: board.colorHex))
+                    .frame(width: 8, height: 8)
+                Text(board.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(Color(nsColor: .windowBackgroundColor))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+            )
+            .onAppear { draggedBoardId = board.id }
         }
     }
 
     /// v0.8.7: フォルダタブ間に挟まる "ギャップ"。8pt 幅の不可視ドロップ領域 +
     /// 中央に縦線の Drop インジケータ (折り畳まれているとゼロ幅で見えない)。
     /// `index` はリリース時に `pinboards.reorder(boardId:to:)` に渡す挿入位置。
+    ///
+    /// v0.8.8: 受信を `PinboardDragItem` (独自 UTType) 限定に切替。
+    /// クリップドラッグ (= `ClipDragItem`/String 系) は UTType レベルで合致せず、
+    /// 縦線インジケータも reorder も発火しない。
     @ViewBuilder
     private func folderDropGap(at index: Int) -> some View {
         let isActive = (folderDropTargetIndex == index)
@@ -346,12 +371,31 @@ struct StripView: View {
         // タブ側の padding と合算されて違和感のない 5〜8pt に収まる。
         .frame(width: 8, height: 28)
         .contentShape(Rectangle())
-        .onDrop(of: [.plainText],
-                delegate: PinboardReorderDropDelegate(
-                    targetIndex: index,
-                    pinboards: pinboards,
-                    draggedBoardId: $draggedBoardId,
-                    folderDropTargetIndex: $folderDropTargetIndex))
+        .dropDestination(for: PinboardDragItem.self) { items, _ in
+            // 並び替えは drop された時点で確定。`isTargeted` 解除よりも前に
+            // インデックスを掴むため、reorder を Task で発火する。
+            guard let item = items.first else {
+                folderDropTargetIndex = nil
+                draggedBoardId = nil
+                return false
+            }
+            let sourceId = item.boardID
+            let target = index
+            Task { @MainActor in
+                try? await pinboards.reorder(boardId: sourceId, to: target)
+                draggedBoardId = nil
+                folderDropTargetIndex = nil
+            }
+            return true
+        } isTargeted: { hovering in
+            if hovering {
+                folderDropTargetIndex = index
+            } else if folderDropTargetIndex == index {
+                // 別のギャップに渡る前にこちらが先に exit するので、自身が
+                // 現在のターゲットの場合だけクリアする (ちらつき防止)。
+                folderDropTargetIndex = nil
+            }
+        }
     }
 
     /// shadcn セグメント風の種類フィルタチップ。
@@ -1612,61 +1656,21 @@ extension Notification.Name {
     static let pastyClipEditClose = Notification.Name("pasty.clipEdit.close")
 }
 
-// MARK: - Pinboard reorder drop delegate
+// MARK: - Pinboard reorder drop delegate (removed in v0.8.8)
 //
-// v0.8.6: フォルダタブを横にドラッグして並び替えるための DropDelegate。
-// ペイロードは `pasty.pinboard:<id>` 形式の plainText。`targetIndex` はこの
-// ギャップの挿入位置。drop が成立したら sourceId と targetIndex を
-// `PinboardStore.reorder(boardId:to:)` に投げる。
+// v0.8.6 で `pasty.pinboard:<id>` という plainText ペイロード + 独自 DropDelegate で
+// フォルダタブを並び替えていたが、`.plainText` UTType がクリップドラッグの
+// `ClipDragItem.plainText` representation と衝突するため、フォルダタブ本体に
+// folder-drag を drop すると `acceptClipReferenceDrop`
+// (`dropDestination(for: String.self)`) に流れて偽クリップが作られる、
+// ギャップにクリップドラッグをかざすと縦線インジケータが点く、という二重バグが
+// 残っていた。
 //
-// v0.8.7: タブ単位の DropDelegate から、タブ間ギャップ単位の DropDelegate に
-// 役割変更。`folderDropTargetIndex` Binding を介して縦線インジケータを
-// 出し入れする。`dropEntered` で active 化、`dropExited` で解除。
-@MainActor
-struct PinboardReorderDropDelegate: DropDelegate {
-    let targetIndex: Int
-    let pinboards: PinboardStore
-    @Binding var draggedBoardId: Int64?
-    @Binding var folderDropTargetIndex: Int?
-
-    func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [.plainText])
-    }
-
-    func dropEntered(info: DropInfo) {
-        folderDropTargetIndex = targetIndex
-    }
-
-    func dropExited(info: DropInfo) {
-        // 別のギャップに渡る前にこちらが先に exit するので、自身が現在の
-        // ターゲットの場合だけクリアする (ちらつき防止)。
-        if folderDropTargetIndex == targetIndex {
-            folderDropTargetIndex = nil
-        }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        guard let provider = info.itemProviders(for: [.plainText]).first else {
-            draggedBoardId = nil
-            folderDropTargetIndex = nil
-            return false
-        }
-        let target = targetIndex
-        _ = provider.loadObject(ofClass: NSString.self) { obj, _ in
-            guard let raw = obj as? String else { return }
-            // 期待ペイロード: "pasty.pinboard:<int64>"
-            let prefix = "pasty.pinboard:"
-            guard raw.hasPrefix(prefix),
-                  let sourceId = Int64(raw.dropFirst(prefix.count)) else { return }
-            Task { @MainActor in
-                try? await pinboards.reorder(boardId: sourceId, to: target)
-                draggedBoardId = nil
-                folderDropTargetIndex = nil
-            }
-        }
-        return true
-    }
-}
+// v0.8.8 ではフォルダタブ専用の UTType `app.pasty.pinboard-tab` と
+// `PinboardDragItem` を導入し、folderTab 側で `.draggable(PinboardDragItem(...))`、
+// folderDropGap 側で `.dropDestination(for: PinboardDragItem.self)` に切り替えた。
+// String / plainText とは UTType レベルで分離されるので、本 DropDelegate は
+// 役目を終え、削除した。
 
 // MARK: - Wheel-to-horizontal scroll converter
 //
