@@ -255,63 +255,69 @@ final class NotchHoverController: NSObject {
     }
 
     func show(on screen: NSScreen) {
-        if dropdownPanel != nil { return }
-        // メニューバー直下に張り付ける。
-        let visible = screen.visibleFrame
-        let targetWidth: CGFloat = min(visible.width - 32, 1320)
-        let panelHeight: CGFloat = 280
-        let collapsed = NSRect(x: visible.midX - targetWidth / 2,
-                               y: visible.maxY,
-                               width: targetWidth, height: 0)
-        let expanded = NSRect(x: collapsed.origin.x,
-                              y: visible.maxY - panelHeight,
-                              width: targetWidth, height: panelHeight)
+        PerfLog.timing("notch.show.total") {
+            if dropdownPanel != nil { return }
+            // メニューバー直下に張り付ける。
+            let visible = screen.visibleFrame
+            let targetWidth: CGFloat = min(visible.width - 32, 1320)
+            let panelHeight: CGFloat = 280
+            let collapsed = NSRect(x: visible.midX - targetWidth / 2,
+                                   y: visible.maxY,
+                                   width: targetWidth, height: 0)
+            let expanded = NSRect(x: collapsed.origin.x,
+                                  y: visible.maxY - panelHeight,
+                                  width: targetWidth, height: panelHeight)
 
-        // キャッシュ済みパネルを優先的に再利用。初回 hover 時のみ
-        // ビルドコスト (~150ms) が発生する。
-        let panel: NSPanel
-        if let cached = cachedPanel {
-            panel = cached
-        } else {
-            panel = buildPanel(on: screen)
-            cachedPanel = panel
-        }
-        // v0.8.5 N-2: anim==0 のときは折り畳み frame を経由せず最終位置に
-        // 直接 setFrame する (1 描画で展開済みとして表示)。anim>0 の時だけ
-        // collapsed → expanded の補間を走らせる。
-        let animMs = SettingsStore.shared.notchAnimMs
-        if animMs <= 0 {
-            panel.setFrame(expanded, display: false)
-        } else {
-            panel.setFrame(collapsed, display: false)
-        }
-
-        // v0.8.5 N-6: orderFrontRegardless の直前にもう一度 layoutSubtreeIfNeeded を
-        // 回しておくことで、初回 real show 時の SwiftUI 再評価コストを潰す。
-        if let hosting = panel.contentViewController as? NSHostingController<StripView> {
-            hosting.view.layoutSubtreeIfNeeded()
-        }
-        panel.orderFrontRegardless()
-        // v0.8.5 N-4: makeKey() は prewarm() で既に 1 度払い済み。再度呼ぶのは
-        // canBecomeKey=true の panel に対してフォーカスを戻すだけなので極めて安価。
-        panel.makeKey()
-        // ドロップダウン中は trigger panel が statusBar レベルで
-        // ヘッダー上の操作 (フォルダタブクリック等) を奪うので一旦退避させる。
-        for tp in triggerPanels { tp.orderOut(nil) }
-        dropdownPanel = panel
-        pointerEnteredOnce = false
-
-        if animMs > 0 {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = TimeInterval(animMs) / 1000.0
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().setFrame(expanded, display: true)
+            // キャッシュ済みパネルを優先的に再利用。初回 hover 時のみ
+            // ビルドコスト (~150ms) が発生する。
+            let panel: NSPanel
+            if let cached = cachedPanel {
+                panel = cached
+            } else {
+                panel = buildPanel(on: screen)
+                cachedPanel = panel
             }
-        }
+            // v0.8.5 N-2: anim==0 のときは折り畳み frame を経由せず最終位置に
+            // 直接 setFrame する (1 描画で展開済みとして表示)。anim>0 の時だけ
+            // collapsed → expanded の補間を走らせる。
+            let animMs = SettingsStore.shared.notchAnimMs
+            PerfLog.timing("notch.show.setFrame") {
+                if animMs <= 0 {
+                    panel.setFrame(expanded, display: false)
+                } else {
+                    panel.setFrame(collapsed, display: false)
+                }
+            }
 
-        // パネルが固定矩形になったあとの位置を「閉じる判定」の母集合にする。
-        let activeFrame = expanded
-        activateMonitors(activeFrame: activeFrame)
+            // v0.8.6: prewarm() で 1 度 layoutSubtreeIfNeeded を回しているので、
+            // show() 側の二重実行は不要 (毎回 hover で数 ms の SwiftUI 再評価を払う
+            // のを止める)。N-6 で導入していた追加 layoutSubtreeIfNeeded はここで撤去。
+            PerfLog.timing("notch.show.orderFront") {
+                panel.orderFrontRegardless()
+            }
+            // v0.8.5 N-4: makeKey() は prewarm() で既に 1 度払い済み。再度呼ぶのは
+            // canBecomeKey=true の panel に対してフォーカスを戻すだけなので極めて安価。
+            PerfLog.timing("notch.show.makeKey") {
+                panel.makeKey()
+            }
+            // ドロップダウン中は trigger panel が statusBar レベルで
+            // ヘッダー上の操作 (フォルダタブクリック等) を奪うので一旦退避させる。
+            for tp in triggerPanels { tp.orderOut(nil) }
+            dropdownPanel = panel
+            pointerEnteredOnce = false
+
+            if animMs > 0 {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = TimeInterval(animMs) / 1000.0
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    panel.animator().setFrame(expanded, display: true)
+                }
+            }
+
+            // パネルが固定矩形になったあとの位置を「閉じる判定」の母集合にする。
+            let activeFrame = expanded
+            activateMonitors(activeFrame: activeFrame)
+        }
     }
 
     func dismiss() {

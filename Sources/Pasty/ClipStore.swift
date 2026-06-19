@@ -15,19 +15,21 @@ final class ClipStore: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     static func shared() throws -> ClipStore {
-        let appSupport = try FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("Pasty", isDirectory: true)
-        try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        try PerfLog.timing("clipStore.shared.total") {
+            let appSupport = try FileManager.default
+                .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Pasty", isDirectory: true)
+            try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
-        let dbURL = appSupport.appendingPathComponent("pasty.sqlite")
-        let dbQueue = try DatabaseQueue(path: dbURL.path)
+            let dbURL = appSupport.appendingPathComponent("pasty.sqlite")
+            let dbQueue = try DatabaseQueue(path: dbURL.path)
 
-        let blobs = appSupport.appendingPathComponent("blobs", isDirectory: true)
-        try FileManager.default.createDirectory(at: blobs, withIntermediateDirectories: true)
+            let blobs = appSupport.appendingPathComponent("blobs", isDirectory: true)
+            try FileManager.default.createDirectory(at: blobs, withIntermediateDirectories: true)
 
-        let store = try ClipStore(dbWriter: dbQueue, blobDirectory: blobs)
-        return store
+            let store = try ClipStore(dbWriter: dbQueue, blobDirectory: blobs)
+            return store
+        }
     }
 
     init(dbWriter: any DatabaseWriter, blobDirectory: URL) throws {

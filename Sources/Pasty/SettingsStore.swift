@@ -126,6 +126,18 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(cloudSyncEnabled, forKey: Keys.cloudSyncEnabled) }
     }
 
+    /// v0.8.6: ホットパスのレイテンシ計測ログ。ON にすると `PerfLog.timing`
+    /// 経由で `[perf] label=Nms` 形式のログが NSLog / unified log (subsystem:
+    /// `io.pasty.perf`, category: `hot-path`) に出る。普段は OFF で計測コスト
+    /// ゼロ。Console.app でフィルタすると ⇧⌘V / ノッチ展開 / クリップ取得の
+    /// 各所要時間が一気に俯瞰できる。
+    @Published var perfLogEnabled: Bool {
+        didSet {
+            defaults.set(perfLogEnabled, forKey: Keys.perfLogEnabled)
+            PerfLog.enabled = perfLogEnabled
+        }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -156,6 +168,7 @@ final class SettingsStore: ObservableObject {
         static let lastStripFilterKindRaw = "pasty.lastStripFilterKindRaw"
         static let aiMacros               = "pasty.aiMacros.v1"
         static let cloudSyncEnabled       = "pasty.cloudSyncEnabled"
+        static let perfLogEnabled         = "pasty.perfLogEnabled"
     }
 
     private init() {
@@ -192,6 +205,7 @@ final class SettingsStore: ObservableObject {
             Keys.lastStripQuery: "",
             Keys.lastStripFilterKindRaw: "",
             Keys.cloudSyncEnabled: false,
+            Keys.perfLogEnabled: false,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -233,6 +247,10 @@ final class SettingsStore: ObservableObject {
         self.lastStripQuery = defaults.string(forKey: Keys.lastStripQuery) ?? ""
         self.lastStripFilterKindRaw = defaults.string(forKey: Keys.lastStripFilterKindRaw) ?? ""
         self.cloudSyncEnabled = defaults.bool(forKey: Keys.cloudSyncEnabled)
+        let perfLog = defaults.bool(forKey: Keys.perfLogEnabled)
+        self.perfLogEnabled = perfLog
+        // PerfLog はグローバル enum 上のフラグなので、init 時にも反映しておく。
+        PerfLog.enabled = perfLog
         // B2: AI マクロの初期化。データが無ければデフォルトを seed する。
         if let data = defaults.data(forKey: Keys.aiMacros),
            let decoded = try? JSONDecoder().decode([AIMacro].self, from: data) {

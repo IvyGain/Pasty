@@ -247,16 +247,18 @@ final class PanelCoordinator: ObservableObject {
     }
 
     func showStrip() {
-        recordSummonPoint()
-        let panel = strip ?? makeStrip()
-        strip = panel
-        if let screen = NSScreen.cursorScreen() {
-            panel.position(onScreen: screen)
+        PerfLog.timing("panel.showStrip.total") {
+            recordSummonPoint()
+            let panel = strip ?? makeStrip()
+            strip = panel
+            if let screen = NSScreen.cursorScreen() {
+                panel.position(onScreen: screen)
+            }
+            // orderFrontRegardless で「キー取得 + 順序昇格」のコストを節約。
+            // makeKey はその後に呼んで KeyHandlingView が動作する状態にする。
+            panel.orderFrontRegardless()
+            panel.makeKey()
         }
-        // orderFrontRegardless で「キー取得 + 順序昇格」のコストを節約。
-        // makeKey はその後に呼んで KeyHandlingView が動作する状態にする。
-        panel.orderFrontRegardless()
-        panel.makeKey()
     }
 
     /// パネルを召喚した瞬間のマウス座標を記録。`PasteAutomator` が貼付
@@ -272,23 +274,25 @@ final class PanelCoordinator: ObservableObject {
     }
 
     private func makeStrip() -> StripPanel {
-        let panel = StripPanel()
-        let view = StripView(
-            store: store,
-            pinboards: pinboards,
-            stack: stack,
-            selection: selection,
-            onDismiss: { [weak self] in self?.dismissAll() },
-            onOpenSettings: { [weak self] in self?.openSettings() }
-        )
-        let hosting = NSHostingController(rootView: view)
-        // sizingOptions を [] にして「コンテンツの minSize が変わってもパネルが
-        // 動かない」挙動に。フォルダ切替や複数選択 bar 出現でパネルが上下に
-        // ジャンプする現象を防ぐ。
-        hosting.sizingOptions = []
-        hosting.view.translatesAutoresizingMaskIntoConstraints = false
-        panel.contentViewController = hosting
-        return panel
+        PerfLog.timing("panel.makeStrip.firstTime") {
+            let panel = StripPanel()
+            let view = StripView(
+                store: store,
+                pinboards: pinboards,
+                stack: stack,
+                selection: selection,
+                onDismiss: { [weak self] in self?.dismissAll() },
+                onOpenSettings: { [weak self] in self?.openSettings() }
+            )
+            let hosting = NSHostingController(rootView: view)
+            // sizingOptions を [] にして「コンテンツの minSize が変わってもパネルが
+            // 動かない」挙動に。フォルダ切替や複数選択 bar 出現でパネルが上下に
+            // ジャンプする現象を防ぐ。
+            hosting.sizingOptions = []
+            hosting.view.translatesAutoresizingMaskIntoConstraints = false
+            panel.contentViewController = hosting
+            return panel
+        }
     }
 
     /// 各サーフェスから設定画面を開くための共通ヘルパー。

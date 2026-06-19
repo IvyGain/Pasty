@@ -601,6 +601,17 @@ struct SettingsView: View {
                     NotificationCenter.default.post(name: .pastyWipeAll, object: nil)
                 }
             }
+
+            // v0.8.6: 開発者向けの perf 計測フラグ。Console.app で subsystem
+            // `io.pasty.perf` を絞ると ⇧⌘V / ノッチ展開 / ClipStore 初期化の
+            // 所要時間が flat な行で出てくる。デフォルト OFF (オーバーヘッド 0)。
+            Section("診断") {
+                Toggle("パフォーマンスログを記録 (Console.app で io.pasty.perf を確認)",
+                       isOn: $settings.perfLogEnabled)
+                Text("ホットパス (ノッチ展開・ストリップ表示・ClipStore 初期化) の所要時間を NSLog と unified log に記録します。問題報告のときだけ ON にしてください。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

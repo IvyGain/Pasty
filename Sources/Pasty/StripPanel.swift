@@ -79,6 +79,10 @@ struct StripView: View {
     // simultaneousGesture(count:2)+count:1 ペアは AppKit のクリック発火順とずれが
     // 出ることがあり、貼付がスキップされる挙動を生むので置き換えた。
     @State private var lastTapAt: Double = 0
+    // v0.8.6: Pinboard タブのドラッグリオーダー中に「いま掴んでいる board の id」を
+    // 保持してビジュアルフィードバック (opacity 0.5) に流用。履歴タブ / + ボタンは
+    // 対象外。`nil` のときは通常表示。
+    @State private var draggedBoardId: Int64? = nil
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -245,7 +249,7 @@ struct StripView: View {
                         .padding(.horizontal, 1)
                 }
 
-                ForEach(pinboards.boards) { board in
+                ForEach(Array(pinboards.boards.enumerated()), id: \.element.id) { idx, board in
                     ModernFolderTab(
                         name: board.name,
                         colorHex: board.colorHex,
@@ -254,6 +258,8 @@ struct StripView: View {
                         isSelected: folderID == board.id,
                         action: { folderID = board.id }
                     )
+                    // v0.8.6: ドラッグ中の board は半透明にして掴んでいる感を演出。
+                    .opacity(draggedBoardId == board.id ? 0.5 : 1.0)
                     .contextMenu {
                         Button("中身を順次貼付") { pasteAllInFolder(board, join: false) }
                         Button("中身を結合して貼付") { pasteAllInFolder(board, join: true) }
@@ -263,6 +269,19 @@ struct StripView: View {
                     }
                     .acceptClipReferenceDrop(pinboardId: board.id,
                                              pinboards: pinboards, store: store)
+                    // v0.8.6: フォルダタブのドラッグ並び替え。文字列ペイロードに
+                    // board.id を埋め、ドロップ先のタブで target index を計算して
+                    // PinboardStore.reorder を呼ぶ。履歴タブ / + ボタンには付けない。
+                    .onDrag {
+                        draggedBoardId = board.id
+                        let payload = board.id.map { "pasty.pinboard:\($0)" } ?? "pasty.pinboard:0"
+                        return NSItemProvider(object: payload as NSString)
+                    }
+                    .onDrop(of: [.plainText],
+                            delegate: PinboardReorderDropDelegate(
+                                targetIndex: idx,
+                                pinboards: pinboards,
+                                draggedBoardId: $draggedBoardId))
                 }
 
                 Button {
@@ -379,9 +398,15 @@ struct StripView: View {
             }
             // v0.8: ホイール (or トラックパッド縦) を横スクロールに変換。
             // 設定で OFF にすれば従来通り。
+            // v0.8.6: 設定 OFF のときは NSViewRepresentable 自体をぶら下げない
+            // ことで NSView 生成コストを完全に落とす (show-path 軽量化)。
             .background(
-                WheelToHorizontalCatcher(isEnabled: settings.notchScrollWheelEnabled)
-                    .allowsHitTesting(false)
+                Group {
+                    if settings.notchScrollWheelEnabled {
+                        WheelToHorizontalCatcher(isEnabled: true)
+                            .allowsHitTesting(false)
+                    }
+                }
             )
         }
     }
@@ -1536,6 +1561,49 @@ extension Notification.Name {
     /// 購読し、編集中は自動 dismissal を停止する。
     static let pastyClipEditOpen  = Notification.Name("pasty.clipEdit.open")
     static let pastyClipEditClose = Notification.Name("pasty.clipEdit.close")
+}
+
+// MARK: - Pinboard reorder drop delegate
+//
+// v0.8.6: フォルダタブを横にドラッグして並び替えるための DropDelegate。
+// ペイロードは `pasty.pinboard:<id>` 形式の plainText。`targetIndex` はこの
+// タブの `pinboards.boards` 内インデックス。drop が成立したら sourceId と
+// targetIndex を `PinboardStore.reorder(boardId:to:)` に投げる。
+@MainActor
+struct PinboardReorderDropDelegate: DropDelegate {
+    let targetIndex: Int
+    let pinboards: PinboardStore
+    @Binding var draggedBoardId: Int64?
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.plainText])
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: [.plainText]).first else {
+            draggedBoardId = nil
+            return false
+        }
+        let target = targetIndex
+        _ = provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let raw = obj as? String else { return }
+            // 期待ペイロード: "pasty.pinboard:<int64>"
+            let prefix = "pasty.pinboard:"
+            guard raw.hasPrefix(prefix),
+                  let sourceId = Int64(raw.dropFirst(prefix.count)) else { return }
+            Task { @MainActor in
+                try? await pinboards.reorder(boardId: sourceId, to: target)
+                draggedBoardId = nil
+            }
+        }
+        return true
+    }
+
+    func dropExited(info: DropInfo) {
+        // dropExited は drop が成立しなくても呼ばれるので、ここでハンドルを
+        // クリアして「掴んだまま戻したときに半透明が残る」のを防ぐ。
+        // 実際の reorder 完了時のクリアは performDrop の Task 内で行う。
+    }
 }
 
 // MARK: - Wheel-to-horizontal scroll converter

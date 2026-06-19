@@ -132,6 +132,25 @@ final class PinboardStore: ObservableObject {
         }
     }
 
+    /// v0.8.6: フォルダタブのドラッグ並び替え。`boardId` を `newIndex` の位置に
+    /// 移動し、`sortOrder` を 0..n-1 で振り直す。`reload()` 同期版を呼んで
+    /// 並びを SwiftUI に反映する。
+    func reorder(boardId: Int64, to newIndex: Int) async throws {
+        _ = try await dbWriter.write { db in
+            let all = try Pinboard.order(Pinboard.Columns.sortOrder).fetchAll(db)
+            var working = all.filter { $0.id != boardId }
+            guard let moving = all.first(where: { $0.id == boardId }) else { return }
+            let clampedIndex = max(0, min(newIndex, working.count))
+            working.insert(moving, at: clampedIndex)
+            for (i, b) in working.enumerated() {
+                guard let bid = b.id else { continue }
+                try db.execute(sql: "UPDATE pinboards SET sortOrder = ? WHERE id = ?",
+                               arguments: [i, bid])
+            }
+        }
+        try reload()
+    }
+
     static func defaultBoards() -> [(String, String)] {
         [("Inbox", "#7C8CF8"),
          ("Work", "#34C759"),
