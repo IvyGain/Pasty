@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty v0.8.5-beta — リリースノート</title>
-<meta name="description" content="Pasty v0.8.5-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<title>Pasty v0.8.6-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.8.6-beta のリリースノート — 新機能・改善・修正の詳細。" />
 <link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
 <style>
 :root {
@@ -124,37 +124,17 @@ body::before {
 <div class="wrap">
   <a class="back" href="../index.html">← Pasty トップへ</a>
   <article class="card">
-    <span class="eyebrow">v0.8.5-beta</span>
-    <h1>Pasty v0.8.5-beta</h1>
-    <div class="meta">2026-06-18 リリース</div>
-    <h1>Pasty 0.8.5-beta</h1>
-<p>ノッチが「降りてくる」を超えて、ついに「<strong>そこに在る</strong>」レベルに到達しました。</p>
-<h2>⚡️ ノッチ「瞬間表示」へ</h2>
+    <span class="eyebrow">v0.8.6-beta</span>
+    <h1>Pasty v0.8.6-beta</h1>
+    
+    <h1>Pasty 0.8.6-beta</h1>
 <ul>
-<li>v0.8.4 で残っていた hover→show の <strong>マイクロ遅延を全撤去</strong> しました</li>
-<li>ノッチ起動の <code>dwellDelay</code> を 80ms → <strong>0ms</strong> (即時) に変更</li>
-<li>パネルが降りてくる <strong>アニメーション (120ms) を撤去</strong> し、最終位置に一発配置</li>
-<li>起動時の prewarm で <code>makeKey()</code> と マウス/キー モニタも事前装備 → 初回 hover でも「初回コスト」がゼロ</li>
-<li><code>scheduleShow</code> の <code>DispatchWorkItem</code> 経由を 0ms 時に skip し、同じ run-loop tick で <code>show()</code> を叩く</li>
+<li>⚡️ <strong>show ホットパスを根治</strong> — H1 WheelCatcher 常駐撤廃 / H2 二重 layout 削除</li>
+<li>🖐 <strong>フォルダタブをドラッグで並べ替え可能に</strong> — 「履歴」は固定、Pinboard タブを直感的に</li>
+<li>🔬 <strong>パフォーマンスログ</strong> (設定 → プライバシー → トグル ON) — Console.app で <code>io.pasty.perf</code> をフィルタすると各 show のミリ秒が見えます</li>
 </ul>
-<h2>🎚 ノッチ起動遅延スライダー</h2>
-<p>Settings → サーフェス に 2 つのピッカーを追加しました。</p>
-<ul>
-<li><strong>ノッチ起動遅延</strong>: 0ms (即時) / 50ms / 100ms / 200ms。デフォルト <strong>0ms</strong></li>
-<li><strong>ノッチアニメ</strong>: 0ms (瞬間表示) / 60ms / 120ms。デフォルト <strong>0ms</strong></li>
-</ul>
-<p>「ふっと触れただけで開く」が気になる方は 50ms / 100ms に上げてください。アニメだけ戻したい場合は 60ms / 120ms を選べます。</p>
-<h2>🐛 残っていた遅延要因の根治</h2>
-<ul>
-<li>初回 show 時に <code>panel.makeKey()</code> を毎回払っていたのを prewarm に移動</li>
-<li><code>installMouseMonitors</code> を起動時の <code>installPersistentMonitors</code> に変更し、show ごとに <code>addGlobalMonitorForEvents</code> ×3 を呼ぶコストを削除</li>
-<li><code>show()</code> の <code>orderFrontRegardless</code> 直前に <code>layoutSubtreeIfNeeded</code> を再度呼び、初回 real show の SwiftUI 再評価コストを潰す</li>
-<li><code>dismiss()</code> も anim=0 時に <code>setFrame</code> を skip して <code>orderOut</code> 一発で閉じる</li>
-</ul>
-<hr />
-<p>体感が変わらない場合は <strong>Settings → サーフェス → ノッチ起動遅延 = 0ms / ノッチアニメ = 0ms</strong> に設定されているか確認してください。</p>
     <a class="dl"
-       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.5-beta"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.6-beta"
        target="_blank" rel="noopener">
       GitHub Releases で詳細を見る ↗
     </a>
