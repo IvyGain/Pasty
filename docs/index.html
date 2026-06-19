@@ -1005,10 +1005,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.0-beta · 複数選択 UX 完成形 · オンボーディング全面刷新 · 新機能ミニチュート · プレビュー崩れ修正 · MIT</span>
+      <span class="eyebrow">v0.9.1-beta · D&amp;D 中 · フォルダ並べ替え · 影響範囲 · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.0-beta の最新アップデートはリリースノートをご覧ください。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.1-beta の最新アップデートはリリースノートをご覧ください。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1618,7 +1618,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.0-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.1-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1667,7 +1667,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.0-beta+ 推奨</span>
+          <span>Pasty v0.9.1-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -1924,10 +1924,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.0-beta</div>
+        <div class="ver">v0.9.1-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.0-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.1-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -1940,9 +1940,39 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.0-beta</span>
+        <span class="v">v0.9.1-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty 0.9.1-beta — D&amp;D 体験ホットフィックス</h1>
+<h2>🛠 D&amp;D 中のドラッグ表示を不可視化</h2>
+<ul>
+<li>クリップをフォルダタブへドラッグした際に表示されていた半透明の「重なりカード」プレビューを廃止</li>
+<li>カーソルに追従する SwiftUI ドラッグ画像を 1×1 の透明ビューに置き換え、macOS ネイティブのドラッグカーソルだけが表示されるように</li>
+<li>ドロップ先のフォルダタブが常に視認でき、どのフォルダに渡るのかが一目で分かるようになりました</li>
+</ul>
+<h2>🛠 フォルダ並べ替えの青い縦線を復活</h2>
+<ul>
+<li>v0.9.0 で発生していた「フォルダタブをドラッグしてもタブ間の青い縦線ガイドが出ず、並べ替えが効かない」回帰を修正</li>
+<li><code>folderTab</code> の SwiftUI モディファイア順を入れ替え、<code>.draggable(PinboardDragItem)</code> を <code>.acceptClipReferenceDrop</code> より先に適用することで、ギャップ側の <code>dropDestination</code> が正しくホバーを受け取れるように</li>
+<li>並べ替え操作 (ドラッグ → 青い縦線 → ドロップで <code>PinboardStore.reorder</code> 発火) が v0.8.7 / v0.8.8 と同じ感触で復活しました</li>
+</ul>
+<h2>影響範囲</h2>
+<ul>
+<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップなど、Transferable ペイロードや外部ドロップ経路は一切変更なし</li>
+<li>プレビュー描画ロジックのみ差し替え、モディファイア順を <code>folderTab</code> 内で 1 箇所スワップしただけのピンポイント修正</li>
+</ul>
+        <a class="permalink" href="whats-new/0.9.1-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.0-beta</span>
+        
+        <span class="date">2026-06-19</span>
       </summary>
       <div class="body">
 <h1>Pasty 0.9.0-beta — 使い心地の完成形</h1>
