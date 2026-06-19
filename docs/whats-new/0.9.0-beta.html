@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty v0.8.9-beta — リリースノート</title>
-<meta name="description" content="Pasty v0.8.9-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<title>Pasty v0.9.0-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.9.0-beta のリリースノート — 新機能・改善・修正の詳細。" />
 <link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
 <style>
 :root {
@@ -124,17 +124,40 @@ body::before {
 <div class="wrap">
   <a class="back" href="../index.html">← Pasty トップへ</a>
   <article class="card">
-    <span class="eyebrow">v0.8.9-beta</span>
-    <h1>Pasty v0.8.9-beta</h1>
-    <div class="meta">2026-06-19 リリース</div>
-    <h1>Pasty 0.8.9-beta</h1>
+    <span class="eyebrow">v0.9.0-beta</span>
+    <h1>Pasty v0.9.0-beta</h1>
+    
+    <h1>Pasty 0.9.0-beta — 使い心地の完成形</h1>
+<h2>🎯 複数選択 UX 完成形</h2>
 <ul>
-<li>🔧 <strong>Enter キーで貼付が安定して動くように</strong> — 検索バーやシート操作後に Enter が反応しないまれなバグを根治</li>
-<li>🔧 <strong>複数選択時の貼付バグ修正</strong> — 「最後の 1 件しか貼られない」を解消、全選択クリップが選んだ順番どおりに貼られます</li>
-<li>🖱 <strong>クリック時の中央スクロールを停止</strong> — 自分でスクロールしたい派に。キーボード矢印 (↑↓←→) では引き続き中央スクロールでアシスト</li>
+<li><strong>ペースト完了で自動解除</strong> — 1 回貼り終わるたびに選択がクリアされ、次に開いたときは常にまっさらな状態から始められます</li>
+<li><strong>Esc は 2 段階</strong> — 多選択中は 1 回目で選択解除、2 回目でパネルを閉じる直感的な挙動 (通常モードは従来どおり 1 発で閉じます)</li>
+<li><strong>Enter で順番にまとめて貼付</strong> — 多選択中に Enter を押すだけで、選んだ順番どおりに連続貼付されます</li>
+<li><strong>ドラッグでまとめて運ぶ</strong> — 多選択中に 1 件をドラッグすると、選んだ全件まとめて他アプリやフォルダタブへドロップできます</li>
+</ul>
+<h2>📖 オンボーディング全面刷新</h2>
+<ul>
+<li>9 ステップ → 14 ステップに拡張。v0.8 系で追加された新機能 (ノッチホイール / フォルダドラッグ並べ替え / AI マクロ / 機密モード ⌃⌥⇧P / クイック貼付 ⌃⌥1-5) をすべてインフォグラフィックで案内</li>
+<li>冒頭にカテゴリ別チップ (基本操作 / ノッチ / フォルダ / AI / ショートカット) を追加 — 必要なところだけ読めます</li>
+<li>KeyCap の押下アニメーション、SF Symbol の pulse / bounce を駆使した動きある案内</li>
+</ul>
+<h2>✨ 新機能ミニチュート</h2>
+<ul>
+<li>リリースのたびに「今回追加された新機能」を 3-4 枚の小さなカードで自動表示</li>
+<li>WhatsNew のリリースノートと連動して、何が新しくなったかを忘れません</li>
+</ul>
+<h2>🖼 プレビュー崩れ修正</h2>
+<ul>
+<li>複数選択中に画像クリップのサムネがカード枠を超えてはみ出る不具合を解消</li>
+</ul>
+<h2>🔗 URL プレビュー</h2>
+<ul>
+<li>リンククリップにタイトル + favicon + ドメインを表示する軽量プレビューを追加</li>
+<li>メモリ + ディスクキャッシュで高速、5 秒タイムアウト付き</li>
+<li>設定 → サーフェス →「URL プレビュー (軽量フェッチ)」で OFF にも切り替え可</li>
 </ul>
     <a class="dl"
-       href="https://github.com/IvyGain/Pasty/releases/tag/v0.8.9-beta"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.0-beta"
        target="_blank" rel="noopener">
       GitHub Releases で詳細を見る ↗
     </a>
