@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Pasty v0.9.1-beta — リリースノート</title>
-<meta name="description" content="Pasty v0.9.1-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<title>Pasty v0.9.2-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.9.2-beta のリリースノート — 新機能・改善・修正の詳細。" />
 <link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
 <style>
 :root {
@@ -124,29 +124,24 @@ body::before {
 <div class="wrap">
   <a class="back" href="../index.html">← Pasty トップへ</a>
   <article class="card">
-    <span class="eyebrow">v0.9.1-beta</span>
-    <h1>Pasty v0.9.1-beta</h1>
-    <div class="meta">2026-06-19 リリース</div>
-    <h1>Pasty 0.9.1-beta — D&amp;D 体験ホットフィックス</h1>
-<h2>🛠 D&amp;D 中のドラッグ表示を不可視化</h2>
+    <span class="eyebrow">v0.9.2-beta</span>
+    <h1>Pasty v0.9.2-beta</h1>
+    
+    <h1>Pasty 0.9.2-beta — フォルダドラッグの視認性ホットフィックス</h1>
+<h2>🎯 フォルダドラッグ中のタブを半透明に</h2>
 <ul>
-<li>クリップをフォルダタブへドラッグした際に表示されていた半透明の「重なりカード」プレビューを廃止</li>
-<li>カーソルに追従する SwiftUI ドラッグ画像を 1×1 の透明ビューに置き換え、macOS ネイティブのドラッグカーソルだけが表示されるように</li>
-<li>ドロップ先のフォルダタブが常に視認でき、どのフォルダに渡るのかが一目で分かるようになりました</li>
-</ul>
-<h2>🛠 フォルダ並べ替えの青い縦線を復活</h2>
-<ul>
-<li>v0.9.0 で発生していた「フォルダタブをドラッグしてもタブ間の青い縦線ガイドが出ず、並べ替えが効かない」回帰を修正</li>
-<li><code>folderTab</code> の SwiftUI モディファイア順を入れ替え、<code>.draggable(PinboardDragItem)</code> を <code>.acceptClipReferenceDrop</code> より先に適用することで、ギャップ側の <code>dropDestination</code> が正しくホバーを受け取れるように</li>
-<li>並べ替え操作 (ドラッグ → 青い縦線 → ドロップで <code>PinboardStore.reorder</code> 発火) が v0.8.7 / v0.8.8 と同じ感触で復活しました</li>
+<li>フォルダタブを掴んで並べ替えるとき、掴んでいるタブが opacity 0.2 まで薄くフェードするようになりました</li>
+<li>これによりドロップ先 (タブ間の青い縦線インジケータ) が見やすくなり、目的のスロットを正確に狙えるように</li>
+<li>ドロップ完了時もキャンセル時 (Esc / ウィンドウ外でリリース) も、opacity は確実に 1.0 に復帰します</li>
 </ul>
 <h2>影響範囲</h2>
 <ul>
-<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップなど、Transferable ペイロードや外部ドロップ経路は一切変更なし</li>
-<li>プレビュー描画ロジックのみ差し替え、モディファイア順を <code>folderTab</code> 内で 1 箇所スワップしただけのピンポイント修正</li>
+<li>フォルダタブ並べ替え (<code>PinboardDragItem</code>) のドラッグ表示のみ変更</li>
+<li>クリップドラッグ (<code>ClipDragItem</code> / <code>MultiClipDragItem</code>) はフォルダタブをフェードさせません — v0.9.1 と同じ挙動</li>
+<li>v0.8.7 以降の青い縦線インジケータ / <code>folderDropGap.dropDestination</code> ロジックには変更なし</li>
 </ul>
     <a class="dl"
-       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.1-beta"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.2-beta"
        target="_blank" rel="noopener">
       GitHub Releases で詳細を見る ↗
     </a>
