@@ -329,8 +329,6 @@ struct StripView: View {
             Button("フォルダ名を変更…") { promptRename(board) }
             Button("削除", role: .destructive) { promptDelete(board) }
         }
-        .acceptClipReferenceDrop(pinboardId: board.id,
-                                 pinboards: pinboards, store: store)
         // v0.8.8: フォルダ並び替えのドラッグペイロードを `PinboardDragItem`
         // (独自 UTType `app.pasty.pinboard-tab`) に切替。これにより
         // 1) タブ本体の `dropDestination(for: String.self)` には流れ込まず、
@@ -339,6 +337,12 @@ struct StripView: View {
         //    受信し、縦線インジケータ + reorder が走る。
         // 3) クリップドラッグ (= `ClipDragItem`/String 系) はこの UTType に
         //    conform しないため、ギャップでインジケータが出ない。
+        //
+        // v0.9.1: `.draggable` を `.acceptClipReferenceDrop` より先に適用。
+        // SwiftUI のヒットテストはタブ本体の clip drop destination を優先して
+        // しまい、ギャップ側 `PinboardDragItem` の dropDestination が反応せず
+        // 青い縦線インジケータが消える回帰があった。順序を入れ替えることで
+        // タブ自体のドラッグ開始が手前に来て、ギャップが正しく受信する。
         .draggable(PinboardDragItem(boardID: board.id ?? -1)) {
             // ドラッグプレビュー: タブの簡易レプリカ。色付きドット + 名前。
             HStack(spacing: 6) {
@@ -359,6 +363,8 @@ struct StripView: View {
             )
             .onAppear { draggedBoardId = board.id }
         }
+        .acceptClipReferenceDrop(pinboardId: board.id,
+                                 pinboards: pinboards, store: store)
     }
 
     /// v0.8.7: フォルダタブ間に挟まる "ギャップ"。8pt 幅の不可視ドロップ領域 +

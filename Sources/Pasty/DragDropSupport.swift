@@ -155,14 +155,14 @@ extension View {
                        additionalSelected: [ClipItem] = []) -> some View {
         if additionalSelected.isEmpty {
             self.draggable(ClipDragItem(clip: clip)) {
-                ClipDragCard(primary: clip, others: additionalSelected)
+                Color.clear.frame(width: 1, height: 1)
             }
         } else {
             // 「掴んだクリップを先頭」にして選択順を維持。重複排除のため
             // additionalSelected から primary を除外して連結する。
             let ordered = [clip] + additionalSelected.filter { $0.id != clip.id }
             self.draggable(MultiClipDragItem(clips: ordered)) {
-                ClipDragCard(primary: clip, others: additionalSelected)
+                Color.clear.frame(width: 1, height: 1)
             }
         }
     }
