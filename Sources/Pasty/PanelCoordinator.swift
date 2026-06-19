@@ -266,6 +266,15 @@ final class PanelCoordinator: ObservableObject {
             // makeKey はその後に呼んで KeyHandlingView が動作する状態にする。
             panel.orderFrontRegardless()
             panel.makeKey()
+            // v0.8.9: prewarm の viewDidMoveToWindow が冪等でなく、二度目の showStrip で
+            // KeyCatcher が firstResponder にならない事象を補正。contentView の subview
+            // を深さ優先で走査し、acceptsFirstResponder=true の最初の NSView を選出。
+            DispatchQueue.main.async { [weak panel] in
+                guard let panel else { return }
+                if let keyCatcher = panel.contentView?.findKeyCatcher() {
+                    panel.makeFirstResponder(keyCatcher)
+                }
+            }
             // v0.8.7: SwiftUI 内の KeyHandlingView が何らかの理由でフォーカスを
             // 失っていても確実に Esc を捕まえる安全網。AIActionPanel と同じ
             // パターン。多重登録しないように既存があれば一旦撤去。

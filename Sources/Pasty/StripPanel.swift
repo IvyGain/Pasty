@@ -164,6 +164,15 @@ struct StripView: View {
                 editingClip = nil
             }
         }
+        .onChange(of: showingNewFolder) { _, isOpen in
+            if !isOpen { restoreStripFirstResponder() }
+        }
+        .onChange(of: showingNewSnippet) { _, isOpen in
+            if !isOpen { restoreStripFirstResponder() }
+        }
+        .onChange(of: editingClip == nil) { _, isNil in
+            if isNil { restoreStripFirstResponder() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .pastyVideoThumbReady)) { _ in
             reload()
         }
@@ -175,7 +184,10 @@ struct StripView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 8) {
             // 折り畳み式の検索バー (アイコンのみ → クリック/フォーカスで展開)
-            ModernSearchField(text: $query, collapsible: true, expandedWidth: 280)
+            ModernSearchField(text: $query, collapsible: true, expandedWidth: 280, onSubmit: {
+                // v0.8.9: 検索バー内で Enter → 動的 Enter ロジックに橋渡し
+                onReturn(plain: false)
+            })
 
             // 履歴タブ + フォルダタブを同じ行に統合 (横スクロール可能)
             // 右側の他要素を押し出さないよう layoutPriority 0 + frame(minWidth) で柔軟に縮める。
@@ -475,8 +487,11 @@ struct StripView: View {
                 .padding(.horizontal, 14).padding(.vertical, 12)
             }
             .onChange(of: selection.cursorIndex) { old, n in
-                // v0.8.1: 隣接カードクリックでも 120ms スクロールアニメが
-                // 走るのを抑制。3 カード以上ジャンプした時だけアニメする。
+                // v0.8.9: クリック起源の cursor 移動では scrollTo を走らせない。
+                // ユーザーが見えている位置をクリックしたのに中央へジャンプさせる
+                // のは UX 違反。キーボード矢印 (↑/↓/←/→) では引き続き
+                // 中央スクロールでアシストする。
+                guard selection.lastCursorChangeSource == .keyboard else { return }
                 if abs(n - old) > 2 {
                     withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(n, anchor: .center) }
                 } else {
@@ -587,7 +602,8 @@ struct StripView: View {
                 .padding(.horizontal, 8).padding(.vertical, 8)
             }
             .onChange(of: selection.cursorIndex) { old, n in
-                // v0.8.1: 隣接行クリックではアニメをスキップして即時スクロール。
+                // v0.8.9: クリック起源の cursor 移動では scrollTo を走らせない。
+                guard selection.lastCursorChangeSource == .keyboard else { return }
                 if abs(n - old) > 2 {
                     withAnimation(.easeOut(duration: 0.12)) {
                         proxy.scrollTo(n, anchor: .center)
@@ -931,7 +947,7 @@ struct StripView: View {
         if selection.multiMode {
             _ = selection.tap(at: index, in: items)
         } else {
-            selection.cursorIndex = index
+            selection.setCursor(index, source: .tap)
         }
     }
 
@@ -940,16 +956,47 @@ struct StripView: View {
         // v0.8.1: 貼付直前に hover プレビューを完全に消す。
         HoverPreviewController.shared.dismissNow()
         guard items.indices.contains(index) else { return }
+        // v0.8.9: 複数選択中のダブルクリックは「選んだ全てを結合貼付」に振る。
+        // 以前は multiMode を無視して 1 件だけ貼付していたため、ユーザーが「複数選択
+        // → ダブルクリックで全部貼れる」と期待した時に最後の 1 件感が出ていた。
+        if selection.multiMode && selection.count >= 2 {
+            selection.setCursor(index, source: .tap)
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 16_666_667)
+                onDismiss()
+                pasteSelectedAfterDismiss(join: true, plain: false)
+            }
+            return
+        }
         // v0.8.4: cursorIndex を即時更新して、選択状態を視覚的にコミットしてから
         // 1 フレーム遅らせて dismiss → paste を撃つ。これで「クリックしたのに
         // 一発目が反映されない」現象 (最初のクリックで cursor が動いた後、
         // SwiftUI のフレーム差で paste 経路が握りつぶされる) を防ぐ。
-        selection.cursorIndex = index
+        selection.setCursor(index, source: .tap)
         let clip = items[index]
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 16_666_667)  // ~1 frame at 60Hz
             onDismiss()
             PasteAutomator.shared.paste(clip)
+        }
+    }
+
+    /// v0.8.9: onDismiss を呼んだ後に結合 / 順次貼付を発火するための内部ヘルパー。
+    /// 既存の `pasteSelected` は `onDismiss()` を内部で呼ぶため、ダブルクリック経路
+    /// では二重 dismiss を避けるためにこちらを使う。
+    private func pasteSelectedAfterDismiss(join: Bool, plain: Bool) {
+        let selected = selection.selectedItems(from: items)
+        guard !selected.isEmpty else { return }
+        if join {
+            PasteAutomator.shared.pasteSequence(
+                selected, asPlainText: plain,
+                strategy: .join(separator: "\n")
+            )
+        } else {
+            PasteAutomator.shared.pasteSequence(
+                selected, asPlainText: plain,
+                strategy: .sequence(delayBetween: 0.25)
+            )
         }
     }
 
@@ -972,6 +1019,18 @@ struct StripView: View {
         }
     }
 
+    /// v0.8.9: Sheet を閉じた直後に firstResponder を KeyCatcher に戻す。
+    /// SwiftUI は sheet dismiss 後に親 view 階層へフォーカスを返してくれない
+    /// ことがあり、Enter が完全に死ぬ症状が発生していた。
+    private func restoreStripFirstResponder() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let win = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0 is StripPanel }) else { return }
+            if let kc = win.contentView?.findKeyCatcher() {
+                win.makeFirstResponder(kc)
+            }
+        }
+    }
+
     private func pasteCurrent(plain: Bool) {
         guard items.indices.contains(selection.cursorIndex) else { return }
         let clip = items[selection.cursorIndex]
@@ -982,7 +1041,7 @@ struct StripView: View {
     private func pasteByIndex(_ n: Int) {
         let idx = n - 1
         guard items.indices.contains(idx) else { return }
-        selection.cursorIndex = idx
+        selection.setCursor(idx, source: .keyboard)
         pasteCurrent(plain: false)
     }
 
@@ -998,7 +1057,7 @@ struct StripView: View {
         } else {
             PasteAutomator.shared.pasteSequence(
                 selected, asPlainText: plain,
-                strategy: .sequence(delayBetween: 0.12)
+                strategy: .sequence(delayBetween: 0.25)
             )
         }
     }

@@ -23,6 +23,20 @@ final class SelectionModel: ObservableObject {
     /// Shift+矢印 / Shift+クリック の範囲選択アンカー。
     @Published var anchorIndex: Int? = nil
 
+    /// v0.8.9: cursorIndex を変更した「最後の発火源」。.onChange で scrollTo を
+    /// 走らせるかどうかをこの値で分岐する。タップ起源の場合はユーザーが既に
+    /// 視認している位置なので scrollTo は不要。キーボード操作は scrollTo が要る。
+    enum CursorChangeSource { case tap, keyboard }
+    @Published private(set) var lastCursorChangeSource: CursorChangeSource = .keyboard
+
+    /// v0.8.9: cursorIndex を外部から代入するときに source を併記する setter。
+    /// StripPanel / SpotlightPanel などの呼び出し側がクリック起源か
+    /// キーボード起源かを明示するためのエントリポイント。
+    func setCursor(_ index: Int, source: CursorChangeSource) {
+        lastCursorChangeSource = source
+        cursorIndex = index
+    }
+
     var hasSelection: Bool { !orderedSelectedIDs.isEmpty }
     var count: Int { orderedSelectedIDs.count }
 
@@ -35,6 +49,7 @@ final class SelectionModel: ObservableObject {
     }
 
     func clearAll() {
+        lastCursorChangeSource = .keyboard
         orderedSelectedIDs.removeAll()
         anchorIndex = nil
         multiMode = false
@@ -46,6 +61,7 @@ final class SelectionModel: ObservableObject {
         // v0.8.4: cursorIndex 移動はユーザー操作なので、隣接カードの
         // scale/offset を控えめに補間したい。StripCard 側の .animation を外した
         // ぶんを、ここで一瞬だけかけ直す。
+        lastCursorChangeSource = .tap
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = index
         }
@@ -67,6 +83,7 @@ final class SelectionModel: ObservableObject {
         guard items.indices.contains(index) else { return }
         let id = items[index].id ?? -1
         multiMode = true
+        lastCursorChangeSource = .tap
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = index
         }
@@ -79,6 +96,7 @@ final class SelectionModel: ObservableObject {
         guard items.indices.contains(index) else { return }
         multiMode = true
         let from = anchorIndex ?? cursorIndex
+        lastCursorChangeSource = .tap
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = index
         }
@@ -90,6 +108,7 @@ final class SelectionModel: ObservableObject {
         guard items.indices.contains(cursorIndex) else { return }
         let id = items[cursorIndex].id ?? -1
         multiMode = true
+        lastCursorChangeSource = .keyboard
         toggle(id: id)
         anchorIndex = cursorIndex
     }
@@ -98,6 +117,7 @@ final class SelectionModel: ObservableObject {
     func moveCursor(by delta: Int, in items: [ClipItem]) {
         guard !items.isEmpty else { return }
         let next = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        lastCursorChangeSource = .keyboard
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = next
         }
@@ -109,6 +129,7 @@ final class SelectionModel: ObservableObject {
         if anchorIndex == nil { anchorIndex = cursorIndex }
         multiMode = true
         let next = (cursorIndex + delta).clamped(to: 0...(items.count - 1))
+        lastCursorChangeSource = .keyboard
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = next
         }
@@ -123,6 +144,7 @@ final class SelectionModel: ObservableObject {
         orderedSelectedIDs = items.compactMap { $0.id }
         anchorIndex = 0
         let last = max(0, items.count - 1)
+        lastCursorChangeSource = .keyboard
         withAnimation(.easeOut(duration: 0.12)) {
             self.cursorIndex = last
         }

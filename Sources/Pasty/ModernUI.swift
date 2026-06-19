@@ -63,6 +63,7 @@ struct ModernSearchField: View {
     /// true なら非フォーカス時は折り畳み (アイコンのみ)、フォーカス時に展開
     var collapsible: Bool = false
     var expandedWidth: CGFloat = 320
+    var onSubmit: (() -> Void)? = nil
 
     @FocusState private var focused: Bool
     @State private var hovering = false
@@ -84,6 +85,14 @@ struct ModernSearchField: View {
                     .tracking(-0.1)
                     .focused($focused)
                     .frame(minWidth: 0)
+                    .onSubmit {
+                        // v0.8.9: Enter は親 (StripPanel) に橋渡しして貼付を発火させる。
+                        // 検索フィールドにフォーカスがあるときに Enter が死ぬ問題を解消。
+                        if let cb = onSubmit {
+                            focused = false  // KeyCatcher にフォーカスを返す前段
+                            cb()
+                        }
+                    }
             }
             if isExpanded, !text.isEmpty {
                 Button(action: { text = "" }) {

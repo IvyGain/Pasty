@@ -124,3 +124,15 @@ struct KeyHandlingView: NSViewRepresentable {
         }
     }
 }
+
+/// v0.8.9: contentView 階層を深さ優先で走査し、最初に見つかった KeyCatcher を返す。
+/// PanelCoordinator / StripPanel から `panel.contentView?.findKeyCatcher()` で呼ぶ。
+extension NSView {
+    func findKeyCatcher() -> NSView? {
+        if self is KeyHandlingView.KeyCatcher { return self }
+        for sub in subviews {
+            if let found = sub.findKeyCatcher() { return found }
+        }
+        return nil
+    }
+}

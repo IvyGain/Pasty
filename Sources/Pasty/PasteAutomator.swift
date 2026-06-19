@@ -163,15 +163,21 @@ final class PasteAutomator {
                     return
                 }
                 await PreviousAppTracker.shared.restoreFocus()
+                // v0.8.9: place → emit → sleep(delay) の順番に修正。
+                // 旧実装は place → sleep(delay) → emit だったため、2 件目の place が
+                // 1 件目のペースト完了前に pasteboard を上書きし、Slack/Notion など
+                // 反応が遅いアプリで「最後の 1 件しか入らない」競合が起きていた。
+                // delay も 0.12s → 0.25s に拡大して受信側の autocomplete 等を待つ。
+                let interItemDelay = max(delay, 0.25)
                 for (idx, item) in items.enumerated() {
                     place(item, asPlainText: asPlainText)
-                    // 1 つ目は restoreFocus 直後なので待ちなし、2 つ目以降は短い間を空ける
-                    if idx > 0 {
-                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    }
+                    // pasteboard 反映直後の race を避けるため、emit 前に短いマージンを置く。
+                    try? await Task.sleep(nanoseconds: 30_000_000) // 30 ms
                     emitCommandV()
-                    // ペースト後、レシーバが文字を入れる時間を確保
-                    try? await Task.sleep(nanoseconds: 60_000_000) // 60 ms
+                    // 受信側が ⌘V を消化する時間。最終アイテムだけは詰める必要がない。
+                    if idx < items.count - 1 {
+                        try? await Task.sleep(nanoseconds: UInt64(interItemDelay * 1_000_000_000))
+                    }
                 }
             }
         }
