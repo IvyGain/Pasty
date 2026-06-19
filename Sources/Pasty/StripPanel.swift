@@ -329,6 +329,8 @@ struct StripView: View {
             Button("フォルダ名を変更…") { promptRename(board) }
             Button("削除", role: .destructive) { promptDelete(board) }
         }
+        .opacity(draggedBoardId == board.id ? 0.2 : 1.0)
+        .animation(.easeOut(duration: 0.15), value: draggedBoardId)
         // v0.8.8: フォルダ並び替えのドラッグペイロードを `PinboardDragItem`
         // (独自 UTType `app.pasty.pinboard-tab`) に切替。これにより
         // 1) タブ本体の `dropDestination(for: String.self)` には流れ込まず、
@@ -343,6 +345,8 @@ struct StripView: View {
         // しまい、ギャップ側 `PinboardDragItem` の dropDestination が反応せず
         // 青い縦線インジケータが消える回帰があった。順序を入れ替えることで
         // タブ自体のドラッグ開始が手前に来て、ギャップが正しく受信する。
+        // v0.9.2: ドラッグ中はタブ本体を opacity 0.2 にフェード。`draggedBoardId` を
+        // 既存の onAppear で立て、reorder 確定 or キャンセル時にクリアする既存ロジックを再利用。
         .draggable(PinboardDragItem(boardID: board.id ?? -1)) {
             // ドラッグプレビュー: タブの簡易レプリカ。色付きドット + 名前。
             HStack(spacing: 6) {
@@ -362,6 +366,11 @@ struct StripView: View {
                 Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
             )
             .onAppear { draggedBoardId = board.id }
+            // v0.9.2: ドラッグキャンセル (esc / ウィンドウ外でリリース) でも
+            // フェードを 1.0 に戻すため、プレビュー View 消滅時に状態をクリア。
+            // 成功 drop パスは folderDropGap 側で既に nil 化しているので二重代入
+            // になるが、SwiftUI の二重代入は安全。
+            .onDisappear { draggedBoardId = nil }
         }
         .acceptClipReferenceDrop(pinboardId: board.id,
                                  pinboards: pinboards, store: store)
