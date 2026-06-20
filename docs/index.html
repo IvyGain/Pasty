@@ -1005,10 +1005,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.3-beta · フォルダ並べ替え · ドラッグプレビュー · 半透明フェードは引き続き有効 · 影響範囲 · MIT</span>
+      <span class="eyebrow">v0.9.4-beta · フォルダ並べ替え · クリップドラッグ preview を薄い四角に · ドロップ先フォルダ · v0.9.3 からの変更点 · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.3-beta の最新アップデートはリリースノートをご覧ください。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.4-beta の最新アップデートはリリースノートをご覧ください。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1618,7 +1618,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.3-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.4-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1667,7 +1667,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.3-beta+ 推奨</span>
+          <span>Pasty v0.9.4-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -1924,10 +1924,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.3-beta</div>
+        <div class="ver">v0.9.4-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.3-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.4-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -1940,9 +1940,60 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.3-beta</span>
+        <span class="v">v0.9.4-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty 0.9.4-beta — フォルダ並べ替えの再設計とクリップドラッグの再構築</h1>
+<h2>🛠 フォルダ並べ替えを設計からやり直し</h2>
+<ul>
+<li>SwiftUI の <code>.draggable</code> + <code>.dropDestination</code> (高レベル <code>Transferable</code> API) で組んでいたフォルダタブの並べ替えを廃止</li>
+<li>v0.8.7 → v0.9.0 → v0.9.1 → v0.9.2 → v0.9.3 と連発していた「モディファイア順を 1 つ入れ替えただけで青い縦線インジケータが消える」回帰連鎖を、API レイヤを下げて根本的に断ち切った</li>
+<li>専用 UTType <code>app.pasty.pinboard-tab</code> を新設し、フォルダ並べ替え専用のドラッグペイロード <code>PinboardDragItem</code> をクリップ系ペイロードと完全に分離</li>
+<li>並べ替え受け側は新規 <code>PinboardReorderDelegate</code> (<code>DropDelegate</code>) に集約。<code>validateDrop</code> / <code>dropEntered</code> / <code>dropExited</code> / <code>performDrop</code> をすべて明示的にハンドリングし、<code>pastyPinboardTab</code> 以外のドロップは確実に弾く</li>
+<li>ギャップ側ビューは <code>.onDrop(of: [.pastyPinboardTab], delegate: PinboardReorderDelegate(...))</code> だけのシンプルな構造に。SwiftUI の再評価で順序が入れ替わってもヒットテストが壊れない</li>
+</ul>
+<h2>🎯 クリップドラッグ preview を薄い四角に</h2>
+<ul>
+<li>クリップを他アプリやフォルダタブにドラッグ中に表示されるカーソル追従プレビューを、新規 <code>MiniClipDragPreview</code> に置き換え</li>
+<li>サイズは <code>80×24</code>、<code>.regularMaterial</code> ベース + opacity <code>0.55</code> の半透明四角に統一</li>
+<li>複数選択時は右端に件数バッジを表示 (<code>2</code>, <code>3</code>, ... )</li>
+<li>旧プレビュー (テキスト本文の長文プレビュー / 巨大なカードスナップショット) は画面の広い面積を占有していたため、操作中の視界を遮らない最小限の表現に切り替え</li>
+</ul>
+<h2>✨ ドロップ先フォルダの強ハイライト</h2>
+<ul>
+<li>クリップをドラッグしてフォルダタブの上にカーソルを乗せた瞬間、対象タブが Capsule + <code>Color.accentColor</code> ストロークで強く縁取られる</li>
+<li>同時にタブ全体が <code>scale 1.05</code> に <code>spring(response: 0.3, dampingFraction: 0.7)</code> でリアクティブに浮き上がり、「ここに入る」を強く視覚化</li>
+<li>ホバー解除 / ドロップ完了 / Esc キャンセル時はすべて <code>scale 1.0</code> + 縁取り消失に滑らかに復帰</li>
+<li>既存のフォルダ並べ替え時の青い縦線インジケータとは責務が分離されているため、両者が同時に発火することはない</li>
+</ul>
+<h2>v0.9.3 からの変更点</h2>
+<ul>
+<li>v0.9.3 まではフォルダ並べ替えを SwiftUI の高レベル <code>Transferable</code> API (<code>.draggable</code> + <code>.dropDestination</code>) で実装しており、モディファイアの積層順や SwiftUI 内部の差分検知に強く依存していた</li>
+<li>「順序を入れ替えただけで動かなくなる」「v0.9.2 で動いて v0.9.3 で再回帰する」という連鎖的な回帰が複数バージョンに渡って発生</li>
+<li>v0.9.4 ではフォルダ並べ替えだけを中レベル API (<code>.onDrop(of:delegate:)</code> + <code>DropDelegate</code>) に降格させ、SwiftUI の自動再評価から独立した明示的なステートマシンに作り直した</li>
+<li>クリップのドラッグ自体は引き続き <code>Transferable</code> 経路を維持し、影響範囲を最小化</li>
+</ul>
+<h2>技術的な詳細</h2>
+<ul>
+<li>新規型: <code>PinboardReorderDelegate</code> (DropDelegate), <code>MiniClipDragPreview</code> (View)</li>
+<li>新規 UTType: <code>app.pasty.pinboard-tab</code> (exported, conformsTo <code>public.data</code>)</li>
+<li>影響ファイル: <code>Sources/Pasty/DragDropSupport.swift</code>, <code>Sources/Pasty/StripPanel.swift</code></li>
+<li>設計ドキュメント: <code>docs/design/v0.9.4-folder-reorder-redesign.md</code></li>
+<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップ・<code>Transferable</code> ペイロード経路は変更なし</li>
+<li><code>PinboardStore.reorder</code> のロジックには変更なし</li>
+</ul>
+        <a class="permalink" href="whats-new/0.9.4-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.3-beta</span>
+        
+        <span class="date">2026-06-19</span>
       </summary>
       <div class="body">
 <h1>Pasty 0.9.3-beta — フォルダ並べ替え回帰ホットフィックス</h1>

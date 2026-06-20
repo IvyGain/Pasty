@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Pasty v0.9.4-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.9.4-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
+<style>
+:root {
+  --bg: #fbfbfd;
+  --bg-soft: #f5f5f7;
+  --bg-card: rgba(255,255,255,0.7);
+  --text: #1d1d1f;
+  --text-soft: #6e6e73;
+  --line: rgba(0,0,0,0.08);
+  --line-strong: rgba(0,0,0,0.18);
+  --accent: #6366f1;
+  --accent-2: #a855f7;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+          "Helvetica Neue", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000;
+    --bg-soft: #0a0a0a;
+    --bg-card: rgba(28,28,30,0.65);
+    --text: #f5f5f7;
+    --text-soft: #c7c7cc;
+    --line: rgba(255,255,255,0.10);
+    --line-strong: rgba(255,255,255,0.22);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  letter-spacing: -0.011em;
+  padding: 48px 24px 80px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vw 50vh at 80% -20%, rgba(99,102,241,0.15), transparent 60%),
+    radial-gradient(50vw 50vh at -10% 30%, rgba(168,85,247,0.12), transparent 60%);
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-soft); font-size: 14px; text-decoration: none;
+  margin-bottom: 28px;
+}
+.back:hover { color: var(--text); }
+.eyebrow {
+  display: inline-block;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 5px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 36px 36px 44px;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,0.18);
+}
+@media (max-width: 600px) { .card { padding: 28px 22px 36px; } }
+.card h1 {
+  font-size: clamp(28px, 5vw, 40px);
+  letter-spacing: -0.02em; line-height: 1.15;
+  margin-bottom: 8px;
+}
+.card .meta {
+  color: var(--text-soft); font-size: 13px; margin-bottom: 28px;
+}
+.card h2 {
+  font-size: 22px; letter-spacing: -0.015em;
+  margin: 32px 0 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.card h3 { font-size: 17px; margin: 22px 0 8px; }
+.card h4 { font-size: 15px; margin: 18px 0 6px; }
+.card p { margin: 10px 0; color: var(--text); }
+.card ul { margin: 10px 0 10px 22px; }
+.card li { margin: 4px 0; }
+.card a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.card a:hover { border-bottom-style: solid; }
+.card code {
+  font-family: var(--mono); font-size: 0.9em;
+  background: var(--bg-soft);
+  padding: 1px 6px; border-radius: 5px;
+}
+.card pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 18px; overflow-x: auto;
+  margin: 14px 0;
+}
+.card pre code { background: transparent; padding: 0; font-size: 13px; }
+.card hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+.dl {
+  display: inline-flex; gap: 8px; align-items: center;
+  margin-top: 28px;
+  padding: 12px 22px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white; font-weight: 600; text-decoration: none;
+  box-shadow: 0 12px 30px -8px rgba(99,102,241,0.5);
+}
+.dl:hover { transform: translateY(-1px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../index.html">← Pasty トップへ</a>
+  <article class="card">
+    <span class="eyebrow">v0.9.4-beta</span>
+    <h1>Pasty v0.9.4-beta</h1>
+    
+    <h1>Pasty 0.9.4-beta — フォルダ並べ替えの再設計とクリップドラッグの再構築</h1>
+<h2>🛠 フォルダ並べ替えを設計からやり直し</h2>
+<ul>
+<li>SwiftUI の <code>.draggable</code> + <code>.dropDestination</code> (高レベル <code>Transferable</code> API) で組んでいたフォルダタブの並べ替えを廃止</li>
+<li>v0.8.7 → v0.9.0 → v0.9.1 → v0.9.2 → v0.9.3 と連発していた「モディファイア順を 1 つ入れ替えただけで青い縦線インジケータが消える」回帰連鎖を、API レイヤを下げて根本的に断ち切った</li>
+<li>専用 UTType <code>app.pasty.pinboard-tab</code> を新設し、フォルダ並べ替え専用のドラッグペイロード <code>PinboardDragItem</code> をクリップ系ペイロードと完全に分離</li>
+<li>並べ替え受け側は新規 <code>PinboardReorderDelegate</code> (<code>DropDelegate</code>) に集約。<code>validateDrop</code> / <code>dropEntered</code> / <code>dropExited</code> / <code>performDrop</code> をすべて明示的にハンドリングし、<code>pastyPinboardTab</code> 以外のドロップは確実に弾く</li>
+<li>ギャップ側ビューは <code>.onDrop(of: [.pastyPinboardTab], delegate: PinboardReorderDelegate(...))</code> だけのシンプルな構造に。SwiftUI の再評価で順序が入れ替わってもヒットテストが壊れない</li>
+</ul>
+<h2>🎯 クリップドラッグ preview を薄い四角に</h2>
+<ul>
+<li>クリップを他アプリやフォルダタブにドラッグ中に表示されるカーソル追従プレビューを、新規 <code>MiniClipDragPreview</code> に置き換え</li>
+<li>サイズは <code>80×24</code>、<code>.regularMaterial</code> ベース + opacity <code>0.55</code> の半透明四角に統一</li>
+<li>複数選択時は右端に件数バッジを表示 (<code>2</code>, <code>3</code>, ... )</li>
+<li>旧プレビュー (テキスト本文の長文プレビュー / 巨大なカードスナップショット) は画面の広い面積を占有していたため、操作中の視界を遮らない最小限の表現に切り替え</li>
+</ul>
+<h2>✨ ドロップ先フォルダの強ハイライト</h2>
+<ul>
+<li>クリップをドラッグしてフォルダタブの上にカーソルを乗せた瞬間、対象タブが Capsule + <code>Color.accentColor</code> ストロークで強く縁取られる</li>
+<li>同時にタブ全体が <code>scale 1.05</code> に <code>spring(response: 0.3, dampingFraction: 0.7)</code> でリアクティブに浮き上がり、「ここに入る」を強く視覚化</li>
+<li>ホバー解除 / ドロップ完了 / Esc キャンセル時はすべて <code>scale 1.0</code> + 縁取り消失に滑らかに復帰</li>
+<li>既存のフォルダ並べ替え時の青い縦線インジケータとは責務が分離されているため、両者が同時に発火することはない</li>
+</ul>
+<h2>v0.9.3 からの変更点</h2>
+<ul>
+<li>v0.9.3 まではフォルダ並べ替えを SwiftUI の高レベル <code>Transferable</code> API (<code>.draggable</code> + <code>.dropDestination</code>) で実装しており、モディファイアの積層順や SwiftUI 内部の差分検知に強く依存していた</li>
+<li>「順序を入れ替えただけで動かなくなる」「v0.9.2 で動いて v0.9.3 で再回帰する」という連鎖的な回帰が複数バージョンに渡って発生</li>
+<li>v0.9.4 ではフォルダ並べ替えだけを中レベル API (<code>.onDrop(of:delegate:)</code> + <code>DropDelegate</code>) に降格させ、SwiftUI の自動再評価から独立した明示的なステートマシンに作り直した</li>
+<li>クリップのドラッグ自体は引き続き <code>Transferable</code> 経路を維持し、影響範囲を最小化</li>
+</ul>
+<h2>技術的な詳細</h2>
+<ul>
+<li>新規型: <code>PinboardReorderDelegate</code> (DropDelegate), <code>MiniClipDragPreview</code> (View)</li>
+<li>新規 UTType: <code>app.pasty.pinboard-tab</code> (exported, conformsTo <code>public.data</code>)</li>
+<li>影響ファイル: <code>Sources/Pasty/DragDropSupport.swift</code>, <code>Sources/Pasty/StripPanel.swift</code></li>
+<li>設計ドキュメント: <code>docs/design/v0.9.4-folder-reorder-redesign.md</code></li>
+<li>クリップ単発 / 複数選択ドラッグ・他アプリへのテキストドロップ・<code>Transferable</code> ペイロード経路は変更なし</li>
+<li><code>PinboardStore.reorder</code> のロジックには変更なし</li>
+</ul>
+    <a class="dl"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.4-beta"
+       target="_blank" rel="noopener">
+      GitHub Releases で詳細を見る ↗
+    </a>
+  </article>
+</div>
+</body>
+</html>
