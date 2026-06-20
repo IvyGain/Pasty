@@ -20,11 +20,77 @@ extension UTType {
 /// v0.8.8: フォルダタブを掴んで並び替える時の Transferable。
 /// クリップドラッグの `String` 系 representation とは UTType レベルで分離されており、
 /// `.acceptClipReferenceDrop` (= `dropDestination(for: String.self)`) には流れ込まない。
+///
+/// v0.9.4: `.onDrag { NSItemProvider() }` + `DropDelegate` 経路に移行したため、
+/// JSON エンコード経由でも運べるよう `Codable` のままにしておく
+/// (`registerDataRepresentation` 用に `JSONEncoder` で直接シリアライズする)。
 struct PinboardDragItem: Codable, Transferable {
     let boardID: Int64
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .pastyPinboardTab)
+    }
+}
+
+// MARK: - PinboardReorderDelegate (v0.9.4)
+
+/// v0.9.4: フォルダタブの並べ替えドロップを受け持つ `DropDelegate`。
+///
+/// 高レベル API (`.dropDestination(for: PinboardDragItem.self)`) は SwiftUI の
+/// ヒットテスト解決を経由するため、`.draggable` / `.acceptClipReferenceDrop` の
+/// **モディファイア順** に依存して経路が崩れる回帰が v0.8.8 - v0.9.3 で 4 連続
+/// 発生した。中レベル API (`.onDrop(of:delegate:)` + `DropDelegate`) はビュー階層
+/// の暗黙解決を経由しないため、モディファイア順から完全に切り離される。
+///
+/// - `validateDrop`: 専用 UTType `app.pasty.pinboard-tab` (= `PinboardDragItem`) のみ受理。
+///   クリップドラッグの `String`/`plainText` 系 representation はここで弾かれる。
+/// - `dropEntered`: `folderDropTargetIndex` を自身の `targetIndex` に切替。
+///   次のギャップの `dropEntered` が即座に上書きするので、`dropExited` は no-op で問題ない。
+/// - `performDrop`: `NSItemProvider.loadDataRepresentation` で JSON デコードした
+///   `PinboardDragItem` を取り出し、`onReorder` に渡す。失敗時は state を必ずクリア。
+struct PinboardReorderDelegate: DropDelegate {
+    let targetIndex: Int
+    @Binding var folderDropTargetIndex: Int?
+    @Binding var draggedBoardId: Int64?
+    let onReorder: (Int64, Int) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [UTType.pastyPinboardTab.identifier])
+    }
+
+    func dropEntered(info: DropInfo) {
+        folderDropTargetIndex = targetIndex
+    }
+
+    func dropExited(info: DropInfo) {
+        // noop; 次のギャップの dropEntered が即座に上書きするので、
+        // ここで nil 化するとちらつきが発生する。
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: [UTType.pastyPinboardTab.identifier]).first else {
+            return false
+        }
+        provider.loadDataRepresentation(forTypeIdentifier: UTType.pastyPinboardTab.identifier) { data, _ in
+            guard let data = data,
+                  let item = try? JSONDecoder().decode(PinboardDragItem.self, from: data) else {
+                DispatchQueue.main.async {
+                    self.draggedBoardId = nil
+                    self.folderDropTargetIndex = nil
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                self.onReorder(item.boardID, self.targetIndex)
+                self.draggedBoardId = nil
+                self.folderDropTargetIndex = nil
+            }
+        }
+        return true
     }
 }
 
@@ -155,16 +221,50 @@ extension View {
                        additionalSelected: [ClipItem] = []) -> some View {
         if additionalSelected.isEmpty {
             self.draggable(ClipDragItem(clip: clip)) {
-                Color.clear.frame(width: 1, height: 1)
+                MiniClipDragPreview(count: 1)
             }
         } else {
             // 「掴んだクリップを先頭」にして選択順を維持。重複排除のため
             // additionalSelected から primary を除外して連結する。
             let ordered = [clip] + additionalSelected.filter { $0.id != clip.id }
             self.draggable(MultiClipDragItem(clips: ordered)) {
-                Color.clear.frame(width: 1, height: 1)
+                MiniClipDragPreview(count: ordered.count)
             }
         }
+    }
+}
+
+// MARK: - MiniClipDragPreview (v0.9.4)
+
+/// v0.9.4: クリップドラッグ時の **薄く小さな** プレビュー。
+///
+/// v0.9.3 までの `ClipDragCard` (220×100 + 3 層シャドウ + 件数バッジ) は
+/// フォルダタブ上にホバーした瞬間に「タブが完全に見えなくなる」ため、
+/// どのフォルダに落ちるかが分からないという UX 上の致命傷を抱えていた。
+/// 並列で `pastyDragTargetHovered` 通知で隠す回避策を入れていたが、
+/// 出し入れのちらつきが残っていた。
+///
+/// v0.9.4 では 80×24pt の薄い `regularMaterial` 矩形 + 件数バッジに置き換え、
+/// 元々のフォルダタブのハイライト (`acceptClipReferenceDrop` 側の
+/// scale/ring/+ バッジ) を主役に戻す。プレビュー側は完全に脇役へ。
+@MainActor
+struct MiniClipDragPreview: View {
+    let count: Int
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay(
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 10))
+                    Text(count == 1 ? "1 件" : "\(count) 件")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(.primary.opacity(0.85))
+            )
+            .frame(width: 80, height: 24)
+            .opacity(0.55)
     }
 }
 
@@ -298,6 +398,9 @@ struct ClipReceiveDropTarget: ViewModifier {
     let pinboards: PinboardStore
     let store: ClipStore
     let visualFeedback: Bool
+    /// v0.9.4: 外部 (例: `folderTab`) にホバー状態を伝搬する optional binding。
+    /// `nil` の時は完全に no-op (後方互換)。
+    let externalIsTargeted: Binding<Bool>?
 
     @State private var isTargeted: Bool = false
     @State private var pulse: Bool = false
@@ -349,6 +452,9 @@ struct ClipReceiveDropTarget: ViewModifier {
                     isTargeted = hovering
                 }
                 pulse = hovering
+                // v0.9.4: フォルダタブ側の overlay/scale を駆動するため、
+                // 外部 binding にもホバー状態を伝搬する。
+                externalIsTargeted?.wrappedValue = hovering
                 // ドラッグカードを「フォルダの上だけ消して」フォルダがよく見えるように。
                 // 通知で DragDropOverlayController に隠す/出すを伝える。
                 NotificationCenter.default.post(
@@ -450,12 +556,14 @@ extension View {
     func acceptClipReferenceDrop(pinboardId: Int64?,
                                  pinboards: PinboardStore,
                                  store: ClipStore,
-                                 visualFeedback: Bool = true) -> some View {
+                                 visualFeedback: Bool = true,
+                                 isTargeted: Binding<Bool>? = nil) -> some View {
         modifier(ClipReceiveDropTarget(
             pinboardId: pinboardId,
             pinboards: pinboards,
             store: store,
-            visualFeedback: visualFeedback
+            visualFeedback: visualFeedback,
+            externalIsTargeted: isTargeted
         ))
     }
 

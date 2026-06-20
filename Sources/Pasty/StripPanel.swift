@@ -1,6 +1,7 @@
 import AppKit
 import QuartzCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Pasty のメインモーダル — 下から立ち上がるカルーセル/グリッド。
 /// Notch Hover でも同じ View を使うため、UI ロジックは全部 `StripView` 側へ。
@@ -87,6 +88,10 @@ struct StripView: View {
     // という挿入位置 (0..pinboards.boards.count) を保持。タブ間のギャップに
     // 縦線インジケータを表示するためだけに使う。`nil` は表示なし。
     @State private var folderDropTargetIndex: Int? = nil
+    // v0.9.4: クリップがフォルダタブ上にホバーした時のハイライトを駆動するための
+    // 「board.id → hovering」マップ。`acceptClipReferenceDrop(isTargeted:)` の
+    // 外部 binding から書き込まれ、stroke + scale + animation の overlay に渡る。
+    @State private var folderClipHover: [Int64: Bool] = [:]
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -312,8 +317,22 @@ struct StripView: View {
     /// v0.8.7: 並び替え対象のフォルダタブ。ドラッグ中も opacity は落とさず
     /// (位置インジケータが視覚キューを担うため)、コンテキストメニューや
     /// クリップ参照ドロップ受け入れは従来どおり。
+    ///
+    /// v0.9.4: ドラッグ並べ替えを高レベル `.draggable(Transferable)` から
+    /// 中レベル `.onDrag { NSItemProvider() }` + `DropDelegate` に切替。
+    /// SwiftUI のヒットテスト解決をバイパスするため、モディファイア順への
+    /// 暗黙依存が解消される。クリップドロップ側のホバー状態を
+    /// `acceptClipReferenceDrop(isTargeted:)` の binding 経由で受け取り、
+    /// stroke + scale + spring animation のハイライトを重ねる。
     @ViewBuilder
     private func folderTab(board: Pinboard, idx: Int) -> some View {
+        let boardID = board.id ?? -1
+        let clipHovering = folderClipHover[boardID] ?? false
+        let clipHoverBinding = Binding<Bool>(
+            get: { folderClipHover[boardID] ?? false },
+            set: { folderClipHover[boardID] = $0 }
+        )
+
         ModernFolderTab(
             name: board.name,
             colorHex: board.colorHex,
@@ -322,6 +341,15 @@ struct StripView: View {
             isSelected: folderID == board.id,
             action: { folderID = board.id }
         )
+        // v0.9.4: クリップがフォルダタブ上でホバー中の時のハイライト。
+        // 既存の脈動グロー (`ClipReceiveDropTarget` 内の Capsule + pulse) は
+        // そのまま残し、ここでは accent ボーダー (2pt) + 1.05x スケールを上乗せ。
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.accentColor, lineWidth: clipHovering ? 2 : 0)
+        )
+        .scaleEffect(clipHovering ? 1.05 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: clipHovering)
         .opacity(draggedBoardId == board.id ? 0.2 : 1.0)
         .animation(.easeOut(duration: 0.15), value: draggedBoardId)
         .contextMenu {
@@ -332,39 +360,34 @@ struct StripView: View {
             Button("削除", role: .destructive) { promptDelete(board) }
         }
         .acceptClipReferenceDrop(pinboardId: board.id,
-                                 pinboards: pinboards, store: store)
-        // v0.8.8: フォルダ並び替えのドラッグペイロードを `PinboardDragItem`
-        // (独自 UTType `app.pasty.pinboard-tab`) に切替。これにより
-        // 1) タブ本体の `dropDestination(for: String.self)` には流れ込まず、
-        //    フォルダタブのボディに drop してもクリップとして取り込まれない。
-        // 2) タブ間ギャップの `dropDestination(for: PinboardDragItem.self)` だけが
-        //    受信し、縦線インジケータ + reorder が走る。
-        // 3) クリップドラッグ (= `ClipDragItem`/String 系) はこの UTType に
-        //    conform しないため、ギャップでインジケータが出ない。
+                                 pinboards: pinboards, store: store,
+                                 isTargeted: clipHoverBinding)
+        // v0.9.4: 並べ替えのドラッグソースを `.onDrag` (中レベル API) に切替。
+        // `NSItemProvider.registerDataRepresentation` で UTType
+        // `app.pasty.pinboard-tab` にだけ載せるので、クリップ用の
+        // `dropDestination(for: String.self)` には UTType レベルで合致せず流れ込まない。
+        // 旧 `.draggable(PinboardDragItem)` + `dropDestination(for: PinboardDragItem.self)`
+        // は SwiftUI のヒットテスト順に依存して v0.8.8 - v0.9.3 で 4 連続回帰した。
         //
-        // v0.9.1: `.draggable` を `.acceptClipReferenceDrop` より後に適用 (= 最外側)。
-        // SwiftUI のヒットテストはタブ本体の clip drop destination を優先して
-        // しまい、ギャップ側 `PinboardDragItem` の dropDestination が反応せず
-        // 青い縦線インジケータが消える回帰があった。`.draggable` を最外側に
-        // 置くことでタブ自体のドラッグ開始が手前に来て、ギャップが正しく受信する。
-        //
-        // v0.9.2 回帰: モディファイア順を入れ替え `.acceptClipReferenceDrop` が
-        // 最外側になっていたため、`dropDestination(for: String.self)` が
-        // `PinboardDragItem` の経路を遮り、ギャップでの縦線インジケータと並び替えが
-        // 動作しなくなった。v0.9.3 で v0.9.1 のチェーン (draggable 最外側) に戻す。
-        //
-        // v0.9.3: ドラッグ中はタブ本体を opacity 0.2 にフェード。`draggedBoardId` は
-        // プレビュー内部の onAppear で立て、reorder 確定 or キャンセル時には
-        // folderDropGap 側 / 後段の onDrop ハンドラ側で nil 化される。
-        // `.onDisappear { draggedBoardId = nil }` は早期発火でフリッカを引き起こすため削除。
-        .draggable(PinboardDragItem(boardID: board.id ?? -1)) {
-            // v0.9.3: ドラッグプレビューを実質非表示 (1pt 透明矩形) にしてシステムの
-            // 既定スナップショットに任せる。`onAppear` のみで draggedBoardId を立てる。
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: 1, height: 1)
-                .opacity(0)
-                .onAppear { draggedBoardId = board.id }
+        // プレビューは macOS 既定スナップショット (現在のタブの見た目をフリーズ) に任せ、
+        // 実体側の opacity 0.2 フェードでドラッグ中であることを示す。
+        .onDrag {
+            draggedBoardId = boardID
+            let provider = NSItemProvider()
+            let item = PinboardDragItem(boardID: boardID)
+            provider.registerDataRepresentation(
+                forTypeIdentifier: UTType.pastyPinboardTab.identifier,
+                visibility: .ownProcess
+            ) { completion in
+                do {
+                    let data = try JSONEncoder().encode(item)
+                    completion(data, nil)
+                } catch {
+                    completion(nil, error)
+                }
+                return nil
+            }
+            return provider
         }
     }
 
@@ -375,6 +398,11 @@ struct StripView: View {
     /// v0.8.8: 受信を `PinboardDragItem` (独自 UTType) 限定に切替。
     /// クリップドラッグ (= `ClipDragItem`/String 系) は UTType レベルで合致せず、
     /// 縦線インジケータも reorder も発火しない。
+    ///
+    /// v0.9.4: 高レベル `.dropDestination(for: PinboardDragItem.self)` から
+    /// 中レベル `.onDrop(of:delegate:)` + `PinboardReorderDelegate` に切替。
+    /// SwiftUI のヒットテスト解決を経由しないので、`folderTab` 側のモディファイア順
+    /// (`.acceptClipReferenceDrop` / `.onDrag` / `.opacity` 等) に依存しなくなる。
     @ViewBuilder
     private func folderDropGap(at index: Int) -> some View {
         let isActive = (folderDropTargetIndex == index)
@@ -390,31 +418,22 @@ struct StripView: View {
         // タブ側の padding と合算されて違和感のない 5〜8pt に収まる。
         .frame(width: 8, height: 28)
         .contentShape(Rectangle())
-        .dropDestination(for: PinboardDragItem.self) { items, _ in
-            // 並び替えは drop された時点で確定。`isTargeted` 解除よりも前に
-            // インデックスを掴むため、reorder を Task で発火する。
-            guard let item = items.first else {
-                folderDropTargetIndex = nil
-                draggedBoardId = nil
-                return false
-            }
-            let sourceId = item.boardID
-            let target = index
-            Task { @MainActor in
-                try? await pinboards.reorder(boardId: sourceId, to: target)
-                draggedBoardId = nil
-                folderDropTargetIndex = nil
-            }
-            return true
-        } isTargeted: { hovering in
-            if hovering {
-                folderDropTargetIndex = index
-            } else if folderDropTargetIndex == index {
-                // 別のギャップに渡る前にこちらが先に exit するので、自身が
-                // 現在のターゲットの場合だけクリアする (ちらつき防止)。
-                folderDropTargetIndex = nil
-            }
-        }
+        .onDrop(
+            of: [UTType.pastyPinboardTab],
+            delegate: PinboardReorderDelegate(
+                targetIndex: index,
+                folderDropTargetIndex: $folderDropTargetIndex,
+                draggedBoardId: $draggedBoardId,
+                onReorder: { boardID, targetIdx in
+                    // 旧 `.dropDestination(for: PinboardDragItem.self)` 内の reorder 呼び出しを
+                    // そのままここに移植。並び替えは drop された時点で確定し、
+                    // state クリーンアップは delegate 側で実施される。
+                    Task { @MainActor in
+                        try? await pinboards.reorder(boardId: boardID, to: targetIdx)
+                    }
+                }
+            )
+        )
     }
 
     /// shadcn セグメント風の種類フィルタチップ。
