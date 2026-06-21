@@ -1056,13 +1056,6 @@
     box-shadow: 0 8px 24px -8px rgba(99, 102, 241, 0.15);
   }
 
-  /* Magnetic button — stronger pull, with hover scale */
-  .magnetic-btn {
-    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform;
-  }
-  .magnetic-btn:hover { transform: scale(1.02); }
-
   /* Gradient border — visible spin */
   @property --pasty-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
   .btn.gradient-border, .cta.gradient-border, a.gradient-border, button.gradient-border {
@@ -1188,7 +1181,7 @@
       <li><a href="#privacy">プライバシー</a></li>
       <li><a href="#download">ダウンロード</a></li>
       <li><a href="#guide">使い方</a></li>
-      <li class="cta-li"><a class="cta magnetic-btn gradient-border" href="#download" data-magnetic>ダウンロード</a></li>
+      <li class="cta-li"><a class="cta gradient-border" href="#download">ダウンロード</a></li>
     </ul>
   </div>
 </nav>
@@ -1210,11 +1203,11 @@
         macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.4-beta の最新アップデートはリリースノートをご覧ください。
       </p>
       <div class="ctas" data-reveal style="--i:4">
-        <a class="btn primary magnetic-btn gradient-border" data-magnetic href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
+        <a class="btn primary gradient-border" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Pasty.dmg をダウンロード
           <small>· 5.8 MB · macOS 14 以降</small>
         </a>
-        <a class="btn ghost magnetic-btn" data-magnetic href="#download">
+        <a class="btn ghost" href="#download">
           Raycast 拡張をインストール
           <small>· ワンライナーで簡単セットアップ</small>
         </a>
@@ -1876,7 +1869,7 @@ $ open .build/release/Pasty.app</pre>
           <strong style="color:#FF8E8E">Raycast Store 公開準備中</strong>。当面は下のワンライナーで簡単にセットアップできます。
         </p>
         <div class="ctas">
-          <button class="btn primary magnetic-btn" id="copy-raycast-install" data-magnetic style="background:linear-gradient(135deg,#FF6363,#FF3D3D);box-shadow:0 12px 30px -8px rgba(255,99,99,0.55);cursor:pointer;border:none;color:#fff">
+          <button class="btn primary" id="copy-raycast-install" style="background:linear-gradient(135deg,#FF6363,#FF3D3D);box-shadow:0 12px 30px -8px rgba(255,99,99,0.55);cursor:pointer;border:none;color:#fff">
             <span id="copy-raycast-install-label">📋 インストールコマンドをコピー</span>
             <small>· ターミナルに貼って実行</small>
           </button>
@@ -2985,7 +2978,7 @@ $ npx ray develop
     });
   })();
 
-  // ---- Pasty Super-Upgrade: data-reveal + data-magnetic ------------------
+  // ---- Pasty Super-Upgrade: data-reveal ---------------------------------
   (function () {
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const revealEls = document.querySelectorAll('[data-reveal]');
@@ -3001,17 +2994,6 @@ $ npx ray develop
         });
       }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
       revealEls.forEach(el => io.observe(el));
-
-      document.querySelectorAll('[data-magnetic]').forEach(btn => {
-        btn.addEventListener('mousemove', e => {
-          const r = btn.getBoundingClientRect();
-          const x = (e.clientX - r.left - r.width / 2) * 0.18;
-          const y = (e.clientY - r.top - r.height / 2) * 0.18;
-          // Compose magnetic translate with :hover scale(1.02)
-          btn.style.transform = `translate(${x}px, ${y}px) scale(1.02)`;
-        });
-        btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
-      });
     }
   })();
 </script>
