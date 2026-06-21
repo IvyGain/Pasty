@@ -114,11 +114,12 @@
   nav.top ul a:hover { color: var(--text); }
   nav.top .cta {
     padding: 7px 14px; border-radius: 999px;
-    background: var(--text); color: var(--bg);
+    background: var(--accent); color: #fff;
     font-size: 13px; font-weight: 600;
-    transition: transform .2s, opacity .2s;
+    transition: transform .2s, opacity .2s, box-shadow .2s;
+    box-shadow: 0 1px 2px rgba(99,102,241,0.18);
   }
-  nav.top .cta:hover { transform: translateY(-1px); opacity: 0.9; }
+  nav.top .cta:hover { transform: translateY(-1px); opacity: 0.92; box-shadow: 0 2px 6px rgba(99,102,241,0.28); }
   @media (max-width: 720px) {
     nav.top ul li:not(.cta-li) { display: none; }
   }
@@ -976,11 +977,11 @@
   /* ---- Pasty Super-Upgrade animations — round 2 amplified (2026-06-21) ---- */
   [data-reveal] {
     opacity: 0;
-    transform: translateY(40px);
+    transform: translateY(16px);
     transition:
-      opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
-      transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: calc(var(--i, 0) * 70ms);
+      opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 40ms);
     will-change: opacity, transform;
   }
   [data-reveal].revealed { opacity: 1; transform: none; }
@@ -1002,8 +1003,8 @@
     max-width: 720px;
     max-height: 720px;
     border-radius: 50%;
-    filter: blur(60px) saturate(1.5);
-    opacity: 0.65;
+    filter: blur(120px) saturate(1.0);
+    opacity: 0.12;
     mix-blend-mode: screen;
     will-change: transform;
   }
@@ -1015,20 +1016,13 @@
   }
   .hero-mesh .blob.b2 {
     background: radial-gradient(circle at 50% 50%, #a855f7 0%, rgba(168,85,247,0) 65%);
-    top: 10%;
+    bottom: -20%;
     right: -15%;
     animation: mesh-drift-2 14s ease-in-out infinite alternate;
     animation-delay: -3s;
   }
-  .hero-mesh .blob.b3 {
-    background: radial-gradient(circle at 50% 50%, #ec4899 0%, rgba(236,72,153,0) 65%);
-    bottom: -20%;
-    left: 30%;
-    animation: mesh-drift-3 16s ease-in-out infinite alternate;
-    animation-delay: -6s;
-  }
   @media (prefers-color-scheme: dark) {
-    .hero-mesh .blob { opacity: 0.55; }
+    .hero-mesh .blob { opacity: 0.18; }
   }
   @keyframes mesh-drift-1 {
     from { transform: translate3d(0, 0, 0) scale(1); }
@@ -1038,15 +1032,11 @@
     from { transform: translate3d(0, 0, 0) scale(1.05); }
     to   { transform: translate3d(-18%, 22%, 0) scale(0.9); }
   }
-  @keyframes mesh-drift-3 {
-    from { transform: translate3d(0, 0, 0) scale(0.95); }
-    to   { transform: translate3d(15%, -25%, 0) scale(1.15); }
-  }
 
   /* Glassmorphic — wider coverage */
   .glass-card {
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
     border: 1px solid rgba(255,255,255,0.18);
     background: rgba(255,255,255,0.04);
   }
@@ -1062,10 +1052,8 @@
     will-change: transform;
   }
   .lift-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow:
-      0 24px 48px -16px rgba(99, 102, 241, 0.35),
-      0 16px 32px -16px rgba(168, 85, 247, 0.25);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px -8px rgba(99, 102, 241, 0.15);
   }
 
   /* Magnetic button — stronger pull, with hover scale */
@@ -1087,22 +1075,22 @@
   button.gradient-border::before {
     content: "";
     position: absolute;
-    inset: -2px;
+    inset: -1px;
     border-radius: 999px;
-    padding: 2px;
+    padding: 1px;
     background: conic-gradient(
       from var(--pasty-angle),
-      #6366f1 0deg,
-      #a855f7 120deg,
-      #ec4899 240deg,
-      #6366f1 360deg
+      rgba(99,102,241,0.6) 0deg,
+      rgba(168,85,247,0.6) 120deg,
+      rgba(236,72,153,0.6) 240deg,
+      rgba(99,102,241,0.6) 360deg
     );
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
     z-index: -1;
-    animation: pasty-spin 3.5s linear infinite;
+    animation: pasty-spin 8s linear infinite;
     pointer-events: none;
   }
   @keyframes pasty-spin { to { --pasty-angle: 360deg; } }
@@ -1129,6 +1117,7 @@
     overflow: hidden;
     padding: 24px 0;
     margin: 24px 0 0;
+    opacity: 0.5;
     -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
     mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
   }
@@ -1149,7 +1138,7 @@
     border: 1px solid var(--line);
     font-size: 14px;
     font-weight: 500;
-    color: var(--text-soft);
+    color: var(--text-dim);
     white-space: nowrap;
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -1211,13 +1200,12 @@
   <div class="hero-mesh" aria-hidden="true">
     <div class="blob b1"></div>
     <div class="blob b2"></div>
-    <div class="blob b3"></div>
   </div>
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal" data-reveal style="--i:0">
       <span class="eyebrow" data-reveal style="--i:1">v0.9.4-beta · フォルダ並べ替え · クリップドラッグ preview を薄い四角に · ドロップ先フォルダ · v0.9.3 からの変更点 · MIT</span>
-      <h1 class="headline" data-reveal style="--i:2">クリップボードを、<br/><span class="accent gradient-text">倉庫に。</span></h1>
+      <h1 class="headline" data-reveal style="--i:2">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle" data-reveal style="--i:3">
         macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.4-beta の最新アップデートはリリースノートをご覧ください。
       </p>
@@ -1307,7 +1295,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">3 つの呼び出し方</span>
-      <h2 class="section-title">同じ履歴。<span class="accent gradient-text">下から、上から、Raycast から。</span></h2>
+      <h2 class="section-title">同じ履歴。<span class="accent">下から、上から、Raycast から。</span></h2>
       <p class="section-sub">下部ストリップが主役。ノッチからは同じカルーセルが上から降りてきます。Raycast 拡張はサード。表示位置と起動方法が違うだけで、履歴・フォルダ・定型文はすべて同じデータベースを共有します。</p>
     </div>
 
@@ -1513,7 +1501,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">フォルダ＝倉庫 — v0.3 で強化</span>
-      <h2 class="section-title">クリップボードを、<span class="accent gradient-text">倉庫として持ち歩く。</span></h2>
+      <h2 class="section-title">クリップボードを、<span class="accent">倉庫として持ち歩く。</span></h2>
       <p class="section-sub">Paste の「ピンボード」を、もう少し深く。色付きフォルダを好きなだけ作って、定型文・画像・URL・JSON・コードを分類して貯めていけます。⌘C で流れてきた一瞬を、ずっと使える資産に。</p>
     </div>
 
@@ -1557,7 +1545,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">v0.4 で投入した革命</span>
-      <h2 class="section-title">クリップボードに、<span class="accent gradient-text">プレビューと AI と賢さを。</span></h2>
+      <h2 class="section-title">クリップボードに、<span class="accent">プレビューと AI と賢さを。</span></h2>
       <p class="section-sub">v0.4 は、Pasty を「貯める道具」から「使い倒す道具」へ引き上げる更新です。全画面プレビュー、テンプレ差し込み、Apple Intelligence による書き直し・翻訳・要約、自動カテゴリ分類、スマートフォルダ — すべてオンデバイスで完結します。</p>
     </div>
 
@@ -1652,7 +1640,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">検索 DSL</span>
-      <h2 class="section-title">Spotlight を、<span class="accent gradient-text">コピーした履歴に。</span></h2>
+      <h2 class="section-title">Spotlight を、<span class="accent">コピーした履歴に。</span></h2>
       <p class="section-sub">サンプルを押すか、自分で入力してみてください。入力に合わせて結果がリアルタイムに更新されます。このデモはブラウザ上で、Pasty 本体と同じ DSL ロジックを動かしています。</p>
     </div>
 
@@ -1837,7 +1825,7 @@
   <div class="container">
     <div class="reveal" style="text-align:center;margin-bottom:48px">
       <span class="eyebrow">ダウンロード</span>
-      <h2 class="section-title" style="margin:0 auto 18px;text-align:center">Pasty を、<span class="accent gradient-text">はじめる。</span></h2>
+      <h2 class="section-title" style="margin:0 auto 18px;text-align:center">Pasty を、<span class="accent">はじめる。</span></h2>
       <p class="section-sub" style="margin:0 auto;text-align:center">macOS アプリ本体と、Raycast 拡張。両方ともローカルファースト、両方とも無料、同じ履歴を共有します。</p>
     </div>
 
@@ -3017,8 +3005,8 @@ $ npx ray develop
       document.querySelectorAll('[data-magnetic]').forEach(btn => {
         btn.addEventListener('mousemove', e => {
           const r = btn.getBoundingClientRect();
-          const x = (e.clientX - r.left - r.width / 2) * 0.35;
-          const y = (e.clientY - r.top - r.height / 2) * 0.35;
+          const x = (e.clientX - r.left - r.width / 2) * 0.18;
+          const y = (e.clientY - r.top - r.height / 2) * 0.18;
           // Compose magnetic translate with :hover scale(1.02)
           btn.style.transform = `translate(${x}px, ${y}px) scale(1.02)`;
         });
