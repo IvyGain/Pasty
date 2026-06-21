@@ -973,75 +973,210 @@
   /* ---- Misc ---- */
   ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
 
-  /* ---- Pasty Super-Upgrade animations (2026-06-21) ---- */
+  /* ---- Pasty Super-Upgrade animations — round 2 amplified (2026-06-21) ---- */
   [data-reveal] {
     opacity: 0;
-    transform: translateY(28px);
-    transition: opacity 700ms cubic-bezier(.2,.7,.2,1), transform 700ms cubic-bezier(.2,.7,.2,1);
+    transform: translateY(40px);
+    transition:
+      opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 70ms);
     will-change: opacity, transform;
   }
   [data-reveal].revealed { opacity: 1; transform: none; }
 
-  .hero-mesh { position: relative; }
-  .hero-mesh::before {
-    content: "";
+  /* Hero gradient mesh — actually visible now (round 2) */
+  .hero { min-height: 65vh; position: relative; overflow: hidden; isolation: isolate; }
+  .hero > * { position: relative; z-index: 1; }
+  .hero-mesh {
     position: absolute;
-    inset: -10%;
-    background:
-      conic-gradient(from 180deg at 50% 50%, var(--accent), var(--accent-2), var(--accent-3), var(--accent)),
-      radial-gradient(circle at 30% 30%, var(--accent-2), transparent 60%),
-      radial-gradient(circle at 70% 70%, var(--accent-3), transparent 60%);
-    filter: blur(48px);
-    opacity: 0.45;
+    inset: 0;
+    z-index: 0;
     pointer-events: none;
-    z-index: -1;
-    animation: mesh-drift 18s ease-in-out infinite;
+    overflow: hidden;
+  }
+  .hero-mesh .blob {
+    position: absolute;
+    width: 55vw;
+    height: 55vw;
+    max-width: 720px;
+    max-height: 720px;
+    border-radius: 50%;
+    filter: blur(60px) saturate(1.5);
+    opacity: 0.65;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+  .hero-mesh .blob.b1 {
+    background: radial-gradient(circle at 30% 30%, #6366f1 0%, rgba(99,102,241,0) 65%);
+    top: -10%;
+    left: -10%;
+    animation: mesh-drift-1 12s ease-in-out infinite alternate;
+  }
+  .hero-mesh .blob.b2 {
+    background: radial-gradient(circle at 50% 50%, #a855f7 0%, rgba(168,85,247,0) 65%);
+    top: 10%;
+    right: -15%;
+    animation: mesh-drift-2 14s ease-in-out infinite alternate;
+    animation-delay: -3s;
+  }
+  .hero-mesh .blob.b3 {
+    background: radial-gradient(circle at 50% 50%, #ec4899 0%, rgba(236,72,153,0) 65%);
+    bottom: -20%;
+    left: 30%;
+    animation: mesh-drift-3 16s ease-in-out infinite alternate;
+    animation-delay: -6s;
+  }
+  @media (prefers-color-scheme: dark) {
+    .hero-mesh .blob { opacity: 0.55; }
+  }
+  @keyframes mesh-drift-1 {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(20%, 15%, 0) scale(1.2); }
+  }
+  @keyframes mesh-drift-2 {
+    from { transform: translate3d(0, 0, 0) scale(1.05); }
+    to   { transform: translate3d(-18%, 22%, 0) scale(0.9); }
+  }
+  @keyframes mesh-drift-3 {
+    from { transform: translate3d(0, 0, 0) scale(0.95); }
+    to   { transform: translate3d(15%, -25%, 0) scale(1.15); }
   }
 
+  /* Glassmorphic — wider coverage */
   .glass-card {
-    background: color-mix(in srgb, var(--bg-card) 80%, transparent);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid var(--glass-stroke);
-    border-radius: var(--radius-md);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    .glass-card { border-color: rgba(255,255,255,0.08); }
   }
 
-  .lift-card { transition: transform .3s ease, box-shadow .3s ease; }
-  .lift-card:hover { transform: translateY(-4px); box-shadow: 0 18px 48px rgba(0,0,0,0.28); }
+  /* Lift card — exaggerated */
+  .lift-card {
+    transition:
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.3s ease;
+    will-change: transform;
+  }
+  .lift-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow:
+      0 24px 48px -16px rgba(99, 102, 241, 0.35),
+      0 16px 32px -16px rgba(168, 85, 247, 0.25);
+  }
 
-  .magnetic-btn { transition: transform .15s ease; will-change: transform; }
+  /* Magnetic button — stronger pull, with hover scale */
+  .magnetic-btn {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+  .magnetic-btn:hover { transform: scale(1.02); }
 
+  /* Gradient border — visible spin */
   @property --pasty-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-  .btn.gradient-border, .cta.gradient-border { position: relative; isolation: isolate; }
-  .btn.gradient-border::before, .cta.gradient-border::before {
+  .btn.gradient-border, .cta.gradient-border, a.gradient-border, button.gradient-border {
+    position: relative;
+    isolation: isolate;
+  }
+  .btn.gradient-border::before,
+  .cta.gradient-border::before,
+  a.gradient-border::before,
+  button.gradient-border::before {
     content: "";
     position: absolute;
     inset: -2px;
     border-radius: 999px;
     padding: 2px;
-    background: conic-gradient(from var(--pasty-angle), var(--accent), var(--accent-2), var(--accent-3), var(--accent));
+    background: conic-gradient(
+      from var(--pasty-angle),
+      #6366f1 0deg,
+      #a855f7 120deg,
+      #ec4899 240deg,
+      #6366f1 360deg
+    );
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
     z-index: -1;
-    animation: pasty-spin 6s linear infinite;
+    animation: pasty-spin 3.5s linear infinite;
+    pointer-events: none;
   }
   @keyframes pasty-spin { to { --pasty-angle: 360deg; } }
 
-  @keyframes mesh-drift {
-    0%, 100% { transform: translate3d(0,0,0) scale(1); }
-    50% { transform: translate3d(2%, -3%, 0) scale(1.06); }
+  /* Gradient text — animated */
+  .gradient-text {
+    background: linear-gradient(110deg, #6366f1, #a855f7, #ec4899, #6366f1);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: gradient-pan 6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes gradient-pan {
+    0%   { background-position: 0 0; }
+    100% { background-position: 300% 0; }
+  }
+
+  /* Marquee feature strip */
+  .marquee {
+    position: relative;
+    overflow: hidden;
+    padding: 24px 0;
+    margin: 24px 0 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    gap: 36px;
+    width: max-content;
+    animation: marquee-scroll 30s linear infinite;
+  }
+  .marquee-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 12px 22px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-soft);
+    white-space: nowrap;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+  .marquee-item::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+  }
+  @keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
   }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
-      transition-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }
     [data-reveal] { opacity: 1 !important; transform: none !important; }
+    .marquee-track { animation: none !important; }
+    .hero-mesh .blob { animation: none !important; }
   }
 </style>
 </head>
@@ -1073,26 +1208,31 @@
 
 <!-- HERO ============================================ -->
 <header class="hero">
+  <div class="hero-mesh" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
   <div class="container">
 <!-- HERO:BEGIN -->
-    <div class="reveal">
-      <span class="eyebrow">v0.9.4-beta · フォルダ並べ替え · クリップドラッグ preview を薄い四角に · ドロップ先フォルダ · v0.9.3 からの変更点 · MIT</span>
-      <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
-      <p class="subtitle">
+    <div class="reveal" data-reveal style="--i:0">
+      <span class="eyebrow" data-reveal style="--i:1">v0.9.4-beta · フォルダ並べ替え · クリップドラッグ preview を薄い四角に · ドロップ先フォルダ · v0.9.3 からの変更点 · MIT</span>
+      <h1 class="headline" data-reveal style="--i:2">クリップボードを、<br/><span class="accent gradient-text">倉庫に。</span></h1>
+      <p class="subtitle" data-reveal style="--i:3">
         macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.4-beta の最新アップデートはリリースノートをご覧ください。
       </p>
-      <div class="ctas">
-        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
+      <div class="ctas" data-reveal style="--i:4">
+        <a class="btn primary magnetic-btn gradient-border" data-magnetic href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Pasty.dmg をダウンロード
           <small>· 5.8 MB · macOS 14 以降</small>
         </a>
-        <a class="btn ghost" href="#download">
+        <a class="btn ghost magnetic-btn" data-magnetic href="#download">
           Raycast 拡張をインストール
           <small>· ワンライナーで簡単セットアップ</small>
         </a>
       </div>
 
-      <div class="hero-icon" aria-hidden="true">
+      <div class="hero-icon" aria-hidden="true" data-reveal style="--i:5">
         <img src="assets/icon-512.png" alt="Pasty のアプリアイコン" width="220" height="220" />
       </div>
     </div>
@@ -1142,12 +1282,32 @@
   </div>
 </header>
 
+<!-- MARQUEE FEATURE STRIP ============================================ -->
+<div class="marquee" aria-hidden="true" data-reveal>
+  <div class="marquee-track">
+    <span class="marquee-item">ローカル</span>
+    <span class="marquee-item">Open Source</span>
+    <span class="marquee-item">MIT License</span>
+    <span class="marquee-item">Sparkle 自動更新</span>
+    <span class="marquee-item">macOS 14+</span>
+    <span class="marquee-item">プライバシー重視</span>
+    <span class="marquee-item">クリップボードマネージャ</span>
+    <span class="marquee-item">ローカル</span>
+    <span class="marquee-item">Open Source</span>
+    <span class="marquee-item">MIT License</span>
+    <span class="marquee-item">Sparkle 自動更新</span>
+    <span class="marquee-item">macOS 14+</span>
+    <span class="marquee-item">プライバシー重視</span>
+    <span class="marquee-item">クリップボードマネージャ</span>
+  </div>
+</div>
+
 <!-- THREE SURFACES ============================================ -->
 <section id="surfaces" data-reveal>
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">3 つの呼び出し方</span>
-      <h2 class="section-title">同じ履歴。<span class="accent">下から、上から、Raycast から。</span></h2>
+      <h2 class="section-title">同じ履歴。<span class="accent gradient-text">下から、上から、Raycast から。</span></h2>
       <p class="section-sub">下部ストリップが主役。ノッチからは同じカルーセルが上から降りてきます。Raycast 拡張はサード。表示位置と起動方法が違うだけで、履歴・フォルダ・定型文はすべて同じデータベースを共有します。</p>
     </div>
 
@@ -1266,32 +1426,32 @@
     </div>
 
     <div class="features reveal">
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:0">
         <div class="ico">⚡</div>
         <h3>Maccy より軽い。</h3>
         <p>常時 60 MB 未満。コールドスタート 0.2 秒以下。慎重なポーリング、必要十分なメモリ。4.0 MB の dmg がそれを物語っています。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:1">
         <div class="ico">🔒</div>
         <h3>すべて、ローカルだけで。</h3>
         <p>あなたの Mac から外には何も出ません。クラウドアカウントなし、テレメトリなし、解析なし。データは SQLite ファイル 1 つに入っているので、いつでも自分で覗けます。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:2">
         <div class="ico">⌥</div>
         <h3>ノッチが、動詞になる。</h3>
         <p>ノッチをインタラクティブにした世界初のクリップボードマネージャ。乗せて呼び出し、ドラッグして貼り付ける。キーボードに触れる必要はありません。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:3">
         <div class="ico">{}</div>
         <h3>開発者のために。</h3>
         <p>7 言語の構文ハイライト。<code style="font-family:var(--mono);font-size:13px">{{date}} {{cursor}} {{uuid}}</code> といったスニペットは貼付の瞬間に展開。差分ビュー内蔵。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:4">
         <div class="ico">🔍</div>
         <h3>意図を読む検索。</h3>
         <p>SQLite FTS5 による全文検索の上に、本物の DSL。<code style="font-family:var(--mono);font-size:12px">type:link source:Safari /TODO/ &gt;7d</code> のように grep のように組み合わせ、Spotlight のように速く。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card" data-reveal style="--i:5">
         <div class="ico">∞</div>
         <h3>無料・OSS・ずっと。</h3>
         <p>MIT ライセンス、コードはぜんぶ GitHub。サブスクなし、卒業するプランなし、後出しの値上げなし。フォークして、配って、好きにしてください。</p>
@@ -1310,22 +1470,22 @@
     </div>
 
     <div class="features reveal" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="feature">
+      <div class="feature lift-card glass-card" data-reveal style="--i:0">
         <div class="ico">⇧</div>
         <h3>Shift クリックで範囲選択。</h3>
         <p>1 枚目を選んで、<code style="font-family:var(--mono);font-size:13px">⇧</code> を押しながら次のカードをクリック。間にあるカードがすべて選択されます。Finder、メール、エディタと同じ流儀。個別に足したい/外したいときは <code style="font-family:var(--mono);font-size:13px">⌘</code> を押しながらクリック。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card glass-card" data-reveal style="--i:1">
         <div class="ico">␣</div>
         <h3>キーボードでも同じ操作で。</h3>
         <p><code style="font-family:var(--mono);font-size:13px">␣</code> で現在のカードを選択/解除。<code style="font-family:var(--mono);font-size:13px">⇧↑/↓</code> で範囲を広げる。<code style="font-family:var(--mono);font-size:13px">⌘A</code> で全件選択。マウスとキーボードは同じ「選択状態」を共有するので、好きな方法を行き来できます。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card glass-card" data-reveal style="--i:2">
         <div class="ico">↩</div>
         <h3>Return で順番に貼り付け。</h3>
         <p>選択中に <code style="font-family:var(--mono);font-size:13px">↩</code> を押すと、各カードに対して <code style="font-family:var(--mono);font-size:13px">⌘V</code> を少し間隔を空けて送ります。複数欄のフォームをまとめて埋めたいとき向け。</p>
       </div>
-      <div class="feature">
+      <div class="feature lift-card glass-card" data-reveal style="--i:3">
         <div class="ico">⌥↩</div>
         <h3>Option+Return でまとめて 1 ブロック。</h3>
         <p>選択したカードを改行で連結して、1 回のペーストとして送信。Slack のあちこちから集めたメモを 1 つの議事録にまとめる時に最適です。</p>
@@ -1353,7 +1513,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">フォルダ＝倉庫 — v0.3 で強化</span>
-      <h2 class="section-title">クリップボードを、<span class="accent">倉庫として持ち歩く。</span></h2>
+      <h2 class="section-title">クリップボードを、<span class="accent gradient-text">倉庫として持ち歩く。</span></h2>
       <p class="section-sub">Paste の「ピンボード」を、もう少し深く。色付きフォルダを好きなだけ作って、定型文・画像・URL・JSON・コードを分類して貯めていけます。⌘C で流れてきた一瞬を、ずっと使える資産に。</p>
     </div>
 
@@ -1397,7 +1557,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">v0.4 で投入した革命</span>
-      <h2 class="section-title">クリップボードに、<span class="accent">プレビューと AI と賢さを。</span></h2>
+      <h2 class="section-title">クリップボードに、<span class="accent gradient-text">プレビューと AI と賢さを。</span></h2>
       <p class="section-sub">v0.4 は、Pasty を「貯める道具」から「使い倒す道具」へ引き上げる更新です。全画面プレビュー、テンプレ差し込み、Apple Intelligence による書き直し・翻訳・要約、自動カテゴリ分類、スマートフォルダ — すべてオンデバイスで完結します。</p>
     </div>
 
@@ -1492,7 +1652,7 @@
   <div class="container">
     <div class="reveal">
       <span class="eyebrow">検索 DSL</span>
-      <h2 class="section-title">Spotlight を、<span class="accent">コピーした履歴に。</span></h2>
+      <h2 class="section-title">Spotlight を、<span class="accent gradient-text">コピーした履歴に。</span></h2>
       <p class="section-sub">サンプルを押すか、自分で入力してみてください。入力に合わせて結果がリアルタイムに更新されます。このデモはブラウザ上で、Pasty 本体と同じ DSL ロジックを動かしています。</p>
     </div>
 
@@ -1677,7 +1837,7 @@
   <div class="container">
     <div class="reveal" style="text-align:center;margin-bottom:48px">
       <span class="eyebrow">ダウンロード</span>
-      <h2 class="section-title" style="margin:0 auto 18px;text-align:center">Pasty を、<span class="accent">はじめる。</span></h2>
+      <h2 class="section-title" style="margin:0 auto 18px;text-align:center">Pasty を、<span class="accent gradient-text">はじめる。</span></h2>
       <p class="section-sub" style="margin:0 auto;text-align:center">macOS アプリ本体と、Raycast 拡張。両方ともローカルファースト、両方とも無料、同じ履歴を共有します。</p>
     </div>
 
@@ -2857,9 +3017,10 @@ $ npx ray develop
       document.querySelectorAll('[data-magnetic]').forEach(btn => {
         btn.addEventListener('mousemove', e => {
           const r = btn.getBoundingClientRect();
-          const x = (e.clientX - r.left - r.width / 2) * 0.15;
-          const y = (e.clientY - r.top - r.height / 2) * 0.15;
-          btn.style.transform = `translate(${x}px, ${y}px)`;
+          const x = (e.clientX - r.left - r.width / 2) * 0.35;
+          const y = (e.clientY - r.top - r.height / 2) * 0.35;
+          // Compose magnetic translate with :hover scale(1.02)
+          btn.style.transform = `translate(${x}px, ${y}px) scale(1.02)`;
         });
         btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
       });
