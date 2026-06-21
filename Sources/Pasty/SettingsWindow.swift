@@ -302,8 +302,35 @@ struct SettingsView: View {
             }
             Divider()
             autoCategorizerSection
+            Divider()
+            perAppRetentionSection
+            Divider()
+            ocrSection
         }
         .padding()
+    }
+
+    @ViewBuilder
+    private var perAppRetentionSection: some View {
+        Section("アプリ別保持期間") {
+            Text("特定のアプリからのコピーは別の期間で保持できます (グローバル設定をオーバーライド)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            PerAppRetentionEditor(settings: settings)
+        }
+    }
+
+    @ViewBuilder
+    private var ocrSection: some View {
+        Section("画像から自動でテキスト抽出") {
+            Text("画像クリップを取り込んだ直後に Vision OCR でテキストを抽出し、検索ヒット可能にします")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Toggle("画像 OCR を有効化", isOn: $settings.autoTagOCRImages)
+            if settings.autoTagOCRImages {
+                OCRLanguageEditor(settings: settings)
+            }
+        }
     }
 
     @ViewBuilder
@@ -336,6 +363,10 @@ struct SettingsView: View {
                 Toggle("ノッチホバー", isOn: $settings.notchHoverEnabled)
                 Toggle("ホイールで横スクロール", isOn: $settings.notchScrollWheelEnabled)
                 Toggle("URL プレビュー (軽量フェッチ)", isOn: $settings.urlPreviewEnabled)
+                if settings.urlPreviewEnabled {
+                    Toggle("URL favicon を取得", isOn: $settings.urlPreviewFaviconEnabled)
+                        .padding(.leading, 18)
+                }
                 Picker("ノッチ起動遅延", selection: $settings.notchDwellMs) {
                     Text("0ms (即時)").tag(0)
                     Text("50ms").tag(50)
@@ -373,6 +404,16 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section("ホバープレビュー") {
+                Toggle("PDF プレビュー (1 ページ目サムネ)", isOn: $settings.hoverPreviewPDFEnabled)
+                    .disabled(!settings.hoverPreviewEnabled)
+                Toggle("動画プレビュー (0:00 サムネ)", isOn: $settings.hoverPreviewVideoEnabled)
+                    .disabled(!settings.hoverPreviewEnabled)
+                Text("ファイルクリップにホバーした際、PDF や動画の先頭フレームをプレビューに描画します。「ホバープレビュー」が OFF のときは無効です。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("貼付") {
@@ -706,6 +747,11 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 4)
+
+            SnippetCounterEditor(settings: settings)
+                .padding(.top, 10)
+                .frame(maxWidth: 480)
+
             Spacer()
         }
         .padding()
@@ -926,6 +972,393 @@ private struct CustomRulesEditor: View {
             condition: .contentContains(""),
             pinboardId: firstBoardId
         ))
+    }
+}
+
+// MARK: - v0.9.5-beta: Per-App Retention Editor (B3)
+
+@MainActor
+private struct PerAppRetentionEditor: View {
+    @ObservedObject var settings: SettingsStore
+    @State private var manualBundleId: String = ""
+    @State private var showingManualInput: Bool = false
+
+    /// 表示 / 保存上の選択肢。`-1` = 無期限。
+    private static let dayPresets: [(label: String, value: Int)] = [
+        ("1 日", 1),
+        ("7 日", 7),
+        ("30 日", 30),
+        ("90 日", 90),
+        ("365 日", 365),
+        ("無期限", -1)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if settings.perAppRetentionRules.isEmpty {
+                Text("ルールはまだありません。グローバル保持期間 (一般タブ) が全アプリに適用されます。")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(settings.perAppRetentionRules) { rule in
+                    ruleRow(rule)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    addFrontmostApp()
+                } label: {
+                    Label("最前面のアプリを追加", systemImage: "macwindow.badge.plus")
+                }
+                Button {
+                    showingManualInput.toggle()
+                    manualBundleId = ""
+                } label: {
+                    Label("Bundle ID を手入力", systemImage: "keyboard")
+                }
+            }
+            .padding(.top, 4)
+
+            if showingManualInput {
+                HStack(spacing: 6) {
+                    TextField("com.example.app", text: $manualBundleId)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                    Button("追加") {
+                        let trimmed = manualBundleId.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        addRule(bundleId: trimmed, displayName: nil)
+                        manualBundleId = ""
+                        showingManualInput = false
+                    }
+                    .disabled(manualBundleId.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("キャンセル") {
+                        manualBundleId = ""
+                        showingManualInput = false
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func ruleRow(_ rule: PerAppRetentionRule) -> some View {
+        HStack(spacing: 8) {
+            appIcon(for: rule.bundleId)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(rule.displayName ?? friendlyName(for: rule.bundleId))
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Text(rule.bundleId)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Picker("", selection: bindingForDays(rule)) {
+                ForEach(Self.dayPresets, id: \.value) { preset in
+                    Text(preset.label).tag(preset.value)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 110)
+            Button(role: .destructive) {
+                removeRule(id: rule.id)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help("このルールを削除")
+        }
+        .padding(.vertical, 2)
+    }
+
+    // MARK: helpers
+
+    private func bindingForDays(_ rule: PerAppRetentionRule) -> Binding<Int> {
+        Binding(
+            get: { rule.days },
+            set: { newValue in
+                guard let idx = settings.perAppRetentionRules.firstIndex(where: { $0.id == rule.id }) else { return }
+                settings.perAppRetentionRules[idx].days = newValue
+            }
+        )
+    }
+
+    private func addFrontmostApp() {
+        let workspace = NSWorkspace.shared
+        // Settings ウィンドウ自身が最前面の場合は、Pasty 自身を除外。
+        guard let app = workspace.frontmostApplication,
+              let bundleId = app.bundleIdentifier,
+              bundleId != Bundle.main.bundleIdentifier else {
+            // Fallback: 候補一覧を表示 (今回はシンプルに手入力導線にフォールバック)
+            showingManualInput = true
+            return
+        }
+        let displayName = app.localizedName
+        addRule(bundleId: bundleId, displayName: displayName)
+    }
+
+    private func addRule(bundleId: String, displayName: String?) {
+        if settings.perAppRetentionRules.contains(where: { $0.bundleId == bundleId }) {
+            return
+        }
+        settings.perAppRetentionRules.append(
+            PerAppRetentionRule(
+                bundleId: bundleId,
+                displayName: displayName,
+                days: 30
+            )
+        )
+    }
+
+    private func removeRule(id: String) {
+        settings.perAppRetentionRules.removeAll { $0.id == id }
+    }
+
+    @ViewBuilder
+    private func appIcon(for bundleId: String) -> some View {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            Image(nsImage: icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "app.dashed")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func friendlyName(for bundleId: String) -> String {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId),
+           let bundle = Bundle(url: url),
+           let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
+                ?? (bundle.infoDictionary?["CFBundleDisplayName"] as? String)
+                ?? (bundle.infoDictionary?["CFBundleName"] as? String) {
+            return name
+        }
+        return bundleId.components(separatedBy: ".").last ?? bundleId
+    }
+}
+
+// MARK: - v0.9.5-beta: OCR Language Editor (B6)
+
+@MainActor
+private struct OCRLanguageEditor: View {
+    @ObservedObject var settings: SettingsStore
+    @State private var pendingLanguage: String = "ja-JP"
+
+    /// Vision が広くサポートする BCP-47 言語タグの代表。
+    private static let availableLanguages: [(tag: String, label: String)] = [
+        ("ja-JP", "日本語 (ja-JP)"),
+        ("en-US", "English US (en-US)"),
+        ("en-GB", "English UK (en-GB)"),
+        ("zh-Hans", "中文 簡体 (zh-Hans)"),
+        ("zh-Hant", "中文 繁體 (zh-Hant)"),
+        ("ko-KR", "한국어 (ko-KR)"),
+        ("fr-FR", "Français (fr-FR)"),
+        ("de-DE", "Deutsch (de-DE)"),
+        ("es-ES", "Español (es-ES)"),
+        ("it-IT", "Italiano (it-IT)"),
+        ("pt-BR", "Português BR (pt-BR)")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("認識言語")
+                .font(.caption.weight(.semibold))
+
+            // 現在登録済みの言語タグを chip 表示。
+            FlowChipsView(
+                items: settings.ocrLanguages,
+                onRemove: { tag in
+                    settings.ocrLanguages.removeAll { $0 == tag }
+                }
+            )
+
+            HStack(spacing: 6) {
+                Picker("", selection: $pendingLanguage) {
+                    ForEach(Self.availableLanguages, id: \.tag) { lang in
+                        Text(lang.label).tag(lang.tag)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 260)
+                Button("追加") {
+                    addLanguage(pendingLanguage)
+                }
+                .disabled(settings.ocrLanguages.contains(pendingLanguage))
+            }
+            Text("上位の言語ほど優先されます。1 つ以上残してください。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func addLanguage(_ tag: String) {
+        guard !settings.ocrLanguages.contains(tag) else { return }
+        settings.ocrLanguages.append(tag)
+    }
+}
+
+/// 単純な横並び chip ビュー (削除ボタン付き)。SwiftUI の `Layout` を避けて
+/// 視覚的に折り返す軽量実装。並列で触っているファイルを増やしたくないので
+/// この場で完結させる。
+@MainActor
+private struct FlowChipsView: View {
+    let items: [String]
+    let onRemove: (String) -> Void
+
+    var body: some View {
+        if items.isEmpty {
+            Text("(言語が登録されていません)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        } else {
+            // VStack + HStack で折り返し相当を実現。3 列固定で十分。
+            let columns = 3
+            let rows = items.chunked(into: columns)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(0..<rows.count, id: \.self) { rowIdx in
+                    HStack(spacing: 6) {
+                        ForEach(rows[rowIdx], id: \.self) { tag in
+                            chip(tag)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+
+    private func chip(_ tag: String) -> some View {
+        HStack(spacing: 4) {
+            Text(tag)
+                .font(.system(size: 11, design: .monospaced))
+            Button {
+                onRemove(tag)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("\(tag) を削除")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(Color.primary.opacity(0.07))
+        )
+        .overlay(
+            Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+        )
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
+// MARK: - v0.9.5-beta: Snippet Counter Editor (B9)
+
+@MainActor
+private struct SnippetCounterEditor: View {
+    @ObservedObject var settings: SettingsStore
+    @State private var expanded: Bool = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("{{counter:name}} で参照される永続カウンタの一覧 + リセット")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if settings.snippetCounters.isEmpty {
+                    Text("カウンタはまだ使用されていません。スニペットで {{counter:invoice}} のように参照すると、ここに表示されます。")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.vertical, 4)
+                } else {
+                    let sortedKeys = settings.snippetCounters.keys.sorted()
+                    ForEach(sortedKeys, id: \.self) { name in
+                        counterRow(name: name, value: settings.snippetCounters[name] ?? 0)
+                    }
+
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            resetAll()
+                        } label: {
+                            Label("全てリセット", systemImage: "arrow.counterclockwise.circle")
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "number")
+                    .foregroundStyle(.tint)
+                Text("スニペットカウンタ")
+                    .font(.system(size: 12, weight: .medium))
+                if !settings.snippetCounters.isEmpty {
+                    Text("(\(settings.snippetCounters.count))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func counterRow(name: String, value: Int) -> some View {
+        HStack(spacing: 8) {
+            Text(name)
+                .font(.system(size: 12, design: .monospaced))
+                .lineLimit(1)
+            Spacer()
+            Text("\(value)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .frame(minWidth: 40, alignment: .trailing)
+                .foregroundStyle(.primary)
+            Button("リセット") {
+                resetOne(name: name)
+            }
+            .controlSize(.small)
+            Button(role: .destructive) {
+                removeOne(name: name)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help("\(name) を削除")
+        }
+        .padding(.vertical, 1)
+    }
+
+    private func resetOne(name: String) {
+        settings.snippetCounters[name] = 0
+    }
+
+    private func removeOne(name: String) {
+        settings.snippetCounters.removeValue(forKey: name)
+    }
+
+    private func resetAll() {
+        for key in settings.snippetCounters.keys {
+            settings.snippetCounters[key] = 0
+        }
     }
 }
 

@@ -143,13 +143,71 @@ enum ClipDnDPayload {
 ///   `PASTY|<id>|<preview>` をデコードして clip 参照を復元する。
 /// - 外部アプリ (Notion / Slack / Finder / Safari など) には marker を含まない
 ///   素のテキストや URL が渡るよう、複数の `ProxyRepresentation` を登録する。
+///
+/// v0.9.5-beta X1: 画像 / ファイル / 動画クリップを他アプリにドロップしたとき
+/// preview 文字列 ("Screenshot" 等) しか渡らず、ホストアプリがカーソル位置に
+/// 画像を貼れない不具合 (= Enter 経路と D&D 経路の挙動差) を解消するため、
+/// `DataRepresentation` (画像 binary) と `FileRepresentation` (ファイル URL)
+/// を追加する。非対応 kind では closure 内で throw し、その representation を
+/// 無効化することで、テキスト経路へクリーンにフォールバックさせる。
 struct ClipDragItem: Transferable {
     let clip: ClipItem
 
     static var transferRepresentation: some TransferRepresentation {
         // 内部 D&D 用: marker 付き文字列。dropDestination(for: String.self) で識別される。
         ProxyRepresentation(exporting: \ClipDragItem.markerString)
+
+        // 外部 D&D (画像): blob の生バイナリを image content type で export。
+        // TextEdit / Notes / Slack / Pages 等はこの representation を選んで
+        // カーソル位置に画像を貼り付ける。
+        // 非画像 kind では throw して当 representation を無効化する。
+        DataRepresentation(exportedContentType: .png) { item in
+            guard item.clip.kind == .image,
+                  item.imageContentType == .png,
+                  let data = item.imageData else {
+                throw CocoaError(.featureUnsupported)
+            }
+            return data
+        }
+        DataRepresentation(exportedContentType: .jpeg) { item in
+            guard item.clip.kind == .image,
+                  item.imageContentType == .jpeg,
+                  let data = item.imageData else {
+                throw CocoaError(.featureUnsupported)
+            }
+            return data
+        }
+        DataRepresentation(exportedContentType: .tiff) { item in
+            guard item.clip.kind == .image,
+                  item.imageContentType == .tiff,
+                  let data = item.imageData else {
+                throw CocoaError(.featureUnsupported)
+            }
+            return data
+        }
+        DataRepresentation(exportedContentType: .gif) { item in
+            guard item.clip.kind == .image,
+                  item.imageContentType == .gif,
+                  let data = item.imageData else {
+                throw CocoaError(.featureUnsupported)
+            }
+            return data
+        }
+
+        // 外部 D&D (ファイル/動画/画像): 実ファイル URL も併せて提供する。
+        // Finder にドロップすると blob ファイル自体がコピーされ、リッチエディタ
+        // 系 (Pages / Keynote / Word) では「画像ファイルとして埋め込み」する経路
+        // に乗る。Pasty の blob ストアの実体を晒すので `exporting` で済ませる
+        // (オリジナルファイルとして扱われる)。
+        FileRepresentation(exportedContentType: .data) { item in
+            guard let url = item.imageFileURL else {
+                throw CocoaError(.featureUnsupported)
+            }
+            return SentTransferredFile(url, allowAccessingOriginalFile: true)
+        }
+
         // 外部テキスト D&D 用: marker なしの素のテキスト。
+        // 上の DataRepresentation/FileRepresentation が選ばれなかった時のフォールバック。
         ProxyRepresentation(exporting: \ClipDragItem.plainText)
         // 外部 URL D&D 用: link kind の時のみ有意味な URL を返す。
         ProxyRepresentation(exporting: \ClipDragItem.linkURL)
@@ -175,6 +233,37 @@ struct ClipDragItem: Transferable {
             return u
         }
         return URL(string: "about:blank")!
+    }
+
+    // MARK: - v0.9.5-beta X1: image / file binary representation helpers
+
+    /// 画像クリップの blob 実体を Data として読み出す。
+    /// 非画像 kind / dataPath 無し / 読込失敗時は nil。
+    var imageData: Data? {
+        guard clip.kind == .image, let p = clip.dataPath else { return nil }
+        let url = ClipBlobs.blobURL(for: p)
+        return try? Data(contentsOf: url)
+    }
+
+    /// 画像/ファイル/動画クリップの blob 実体ファイル URL。
+    /// 非バイナリ kind / dataPath 無しは nil。Finder ドロップ・FileRepresentation 用。
+    var imageFileURL: URL? {
+        guard clip.kind == .image || clip.kind == .file || clip.kind == .video,
+              let p = clip.dataPath else { return nil }
+        return ClipBlobs.blobURL(for: p)
+    }
+
+    /// blob ファイル拡張子から推定する画像 UTType。
+    /// 未知 / 拡張子無しは `.png` を既定とする (PasteboardObserver は PNG 保存が主)。
+    var imageContentType: UTType {
+        guard let url = imageFileURL else { return .png }
+        switch url.pathExtension.lowercased() {
+        case "jpg", "jpeg": return .jpeg
+        case "tiff", "tif": return .tiff
+        case "gif": return .gif
+        case "png": return .png
+        default: return .png
+        }
     }
 }
 

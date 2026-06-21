@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PDFKit
 
 // MARK: - LinkMetadata stub
 //
@@ -38,6 +39,11 @@ struct ClipPreviewView: View {
 
     @State private var linkMeta: LinkMetadata? = nil
     @State private var linkLoading: Bool = false
+    /// PDF / 動画サムネが非同期で揃ったときに view を再評価するための tick。
+    /// 値そのものに意味はなく、`.id(thumbRefreshTick)` 的に使う代わりに
+    /// `fileView()` / `videoView()` 内で参照することで SwiftUI が
+    /// `@State` の変化として検知してくれる。
+    @State private var thumbRefreshTick: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: isCompact ? 6 : 10) {
@@ -75,6 +81,12 @@ struct ClipPreviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
         .task(id: clip.id) {
             await loadLinkMetaIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pastyPDFThumbReady)) { _ in
+            thumbRefreshTick &+= 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pastyVideoThumbReady)) { _ in
+            thumbRefreshTick &+= 1
         }
     }
 
@@ -146,8 +158,10 @@ struct ClipPreviewView: View {
                 richTextView()
             case .image:
                 imageView()
-            case .file, .video:
+            case .file:
                 fileView()
+            case .video:
+                videoView()
             case .link:
                 linkView()
             case .color:
@@ -298,24 +312,38 @@ struct ClipPreviewView: View {
     private func fileView() -> some View {
         let name = clip.preview
         let path = clip.dataPath.map { ClipBlobs.blobURL(for: $0).path } ?? "—"
+        let ext = clip.fileExtension?.lowercased() ?? ""
+        let isPDF = ext == "pdf"
+        let pdfEnabled = SettingsStore.shared.hoverPreviewPDFEnabled
+        // PDF サムネが取れるなら最優先で出す。`thumbRefreshTick` を読むことで
+        // 非同期キャッシュ完了通知に応じて view が再評価される。
+        let pdfThumb: NSImage? = {
+            guard isPDF, pdfEnabled else { return nil }
+            _ = thumbRefreshTick
+            return PDFThumbnailCache.shared.image(for: clip)
+        }()
 
         VStack(alignment: .leading, spacing: isCompact ? 6 : 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "doc.fill")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: isCompact ? 36 : 56, height: isCompact ? 36 : 56)
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(name)
-                        .font(isCompact ? PastyTheme.subtitleFont : PastyTheme.titleFont)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                    Text(formattedBytes(clip.byteSize))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if let thumb = pdfThumb {
+                pdfThumbnailCard(image: thumb, name: name)
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: isPDF ? "doc.richtext.fill" : "doc.fill")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: isCompact ? 36 : 56, height: isCompact ? 36 : 56)
+                        .foregroundStyle(.tint)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name)
+                            .font(isCompact ? PastyTheme.subtitleFont : PastyTheme.titleFont)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                        Text(formattedBytes(clip.byteSize))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
             if !isCompact {
                 Text(path)
@@ -326,6 +354,130 @@ struct ClipPreviewView: View {
                     .textSelection(.enabled)
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    /// PDF 1 ページ目のサムネ + ファイル名のカード。hover preview / explorer
+    /// どちらでも違和感がない縦並びレイアウト。
+    @ViewBuilder
+    private func pdfThumbnailCard(image: NSImage, name: String) -> some View {
+        VStack(alignment: .leading, spacing: isCompact ? 6 : 10) {
+            ZStack(alignment: .topLeading) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity,
+                           maxHeight: isCompact ? 280 : 420,
+                           alignment: .topLeading)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                    )
+                // PDF バッジ
+                Text("PDF")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.red.opacity(0.85))
+                    )
+                    .foregroundStyle(.white)
+                    .padding(6)
+            }
+            HStack(spacing: 6) {
+                Text(name)
+                    .font(isCompact ? PastyTheme.subtitleFont : PastyTheme.titleFont)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Text(formattedBytes(clip.byteSize))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Video
+
+    @ViewBuilder
+    private func videoView() -> some View {
+        let name = clip.preview
+        let videoEnabled = SettingsStore.shared.hoverPreviewVideoEnabled
+        let videoThumb: NSImage? = {
+            guard videoEnabled else { return nil }
+            _ = thumbRefreshTick
+            return VideoThumbnailCache.shared.image(for: clip)
+        }()
+
+        VStack(alignment: .leading, spacing: isCompact ? 6 : 12) {
+            if let thumb = videoThumb {
+                videoThumbnailCard(image: thumb, name: name)
+            } else {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Image(systemName: "play.rectangle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: isCompact ? 36 : 56, height: isCompact ? 36 : 56)
+                            .foregroundStyle(.tint)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name)
+                            .font(isCompact ? PastyTheme.subtitleFont : PastyTheme.titleFont)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                        Text(formattedBytes(clip.byteSize))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// 動画サムネ + 中央の再生アイコン overlay + ファイル名。
+    @ViewBuilder
+    private func videoThumbnailCard(image: NSImage, name: String) -> some View {
+        VStack(alignment: .leading, spacing: isCompact ? 6 : 10) {
+            ZStack {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity,
+                           maxHeight: isCompact ? 280 : 420,
+                           alignment: .center)
+                    .background(Color.black.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                    )
+                // 中央の再生アイコン
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: isCompact ? 38 : 56, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .shadow(color: .black.opacity(0.45), radius: 6, x: 0, y: 2)
+            }
+            HStack(spacing: 6) {
+                Image(systemName: "play.rectangle")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(name)
+                    .font(isCompact ? PastyTheme.subtitleFont : PastyTheme.titleFont)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Text(formattedBytes(clip.byteSize))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

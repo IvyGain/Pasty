@@ -24,6 +24,11 @@ struct ClipItem: Identifiable, Codable, FetchableRecord, MutablePersistableRecor
     var sourceAppName: String?
     var contentHash: String    // sha256 for dedupe
 
+    /// v0.9.5-beta (B6): Vision OCR で抽出した画像内テキスト。
+    /// image kind のときに後続 codegen が埋める。`nil` は未処理 or 非画像。
+    /// FTS は B6 codegen 側で `clips_fts` に追加する想定。
+    var extractedOCRText: String? = nil
+
     /// Non-stored. フォルダ内で表示する「ユーザーが付けたカード名」。
     /// `PinboardStore.items(in:)` がメモリ上で詰めるだけで、`clips` テーブル
     /// には保存されない（`pinboard_items.title` 由来）。
@@ -34,11 +39,13 @@ struct ClipItem: Identifiable, Codable, FetchableRecord, MutablePersistableRecor
     enum Columns: String, ColumnExpression {
         case id, createdAt, kind, preview, content, dataPath, byteSize
         case sourceBundleId, sourceAppName, contentHash
+        case extractedOCRText
     }
 
     enum CodingKeys: String, CodingKey {
         case id, createdAt, kind, preview, content, dataPath, byteSize
         case sourceBundleId, sourceAppName, contentHash
+        case extractedOCRText
         // pinDisplayTitle はあえて含めない（DB / Codable から除外）。
     }
 

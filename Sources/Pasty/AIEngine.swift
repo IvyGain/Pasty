@@ -105,7 +105,7 @@ enum AIEngine {
 
     // MARK: - OCR
 
-    static func ocr(image data: Data) async -> String? {
+    static func ocr(image data: Data, languages: [String] = ["ja-JP", "en-US"]) async -> String? {
         #if canImport(Vision)
         guard let image = NSImage(data: data),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
@@ -113,7 +113,7 @@ enum AIEngine {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["ja", "en-US"]
+        request.recognitionLanguages = languages
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         do {
             try handler.perform([request])

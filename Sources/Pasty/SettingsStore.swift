@@ -147,6 +147,49 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    // MARK: - v0.9.5-beta: foundation for parallel codegen
+    // 後続 codegen (B3 perApp retention / P1 favicon / B6 OCR / B5 hover) が肉付け
+    // する前提の足場。ロジックは別タスクで載るが、ストレージは一括でここに揃える。
+
+    /// B3: アプリごとに保持期間を上書きするルール。bundleId をキーに、`days` を
+    /// 設定する。`days == -1` は無期限。空配列ならグローバル `maxRetentionDays` のみ。
+    @Published var perAppRetentionRules: [PerAppRetentionRule] {
+        didSet { persistPerAppRetentionRules() }
+    }
+
+    /// P1: LINK kind カードのプレビュー時にファビコンも取得して合成表示する。
+    /// OFF にすると `URLLinkPreview` の従来表示 (タイトルのみ) に戻る。
+    @Published var urlPreviewFaviconEnabled: Bool {
+        didSet { defaults.set(urlPreviewFaviconEnabled, forKey: Keys.urlPreviewFaviconEnabled) }
+    }
+
+    /// B6: 画像クリップに対して Vision で OCR を走らせ、抽出テキストを
+    /// `extractedOCRText` カラムにキャッシュ + `clips_fts` で検索可能にする。
+    @Published var autoTagOCRImages: Bool {
+        didSet { defaults.set(autoTagOCRImages, forKey: Keys.autoTagOCRImages) }
+    }
+
+    /// B6: Vision OCR の認識言語 (BCP-47)。 [ja-JP, en-US] が既定。
+    @Published var ocrLanguages: [String] {
+        didSet { persistOCRLanguages() }
+    }
+
+    /// B5: ファイル kind が PDF のとき、hover プレビューで 1 ページ目を描画する。
+    @Published var hoverPreviewPDFEnabled: Bool {
+        didSet { defaults.set(hoverPreviewPDFEnabled, forKey: Keys.hoverPreviewPDFEnabled) }
+    }
+
+    /// B5: ファイル kind が動画のとき、hover プレビューで先頭フレームを描画する。
+    @Published var hoverPreviewVideoEnabled: Bool {
+        didSet { defaults.set(hoverPreviewVideoEnabled, forKey: Keys.hoverPreviewVideoEnabled) }
+    }
+
+    /// B9: SnippetEngine の `{{counter:name}}` プレースホルダ用のカウンタ状態。
+    /// name → 現在値。展開のたびに +1 され、ここに永続化される。
+    @Published var snippetCounters: [String: Int] {
+        didSet { persistSnippetCounters() }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -179,6 +222,14 @@ final class SettingsStore: ObservableObject {
         static let cloudSyncEnabled       = "pasty.cloudSyncEnabled"
         static let urlPreviewEnabled      = "pasty.urlPreviewEnabled"
         static let perfLogEnabled         = "pasty.perfLogEnabled"
+        // v0.9.5-beta foundation
+        static let perAppRetentionRules   = "pasty.perAppRetentionRules.v1"
+        static let urlPreviewFaviconEnabled = "pasty.urlPreviewFaviconEnabled"
+        static let autoTagOCRImages       = "pasty.autoTagOCRImages"
+        static let ocrLanguages           = "pasty.ocrLanguages.v1"
+        static let hoverPreviewPDFEnabled = "pasty.hoverPreviewPDFEnabled"
+        static let hoverPreviewVideoEnabled = "pasty.hoverPreviewVideoEnabled"
+        static let snippetCounters        = "pasty.snippetCounters.v1"
     }
 
     private init() {
@@ -217,6 +268,11 @@ final class SettingsStore: ObservableObject {
             Keys.cloudSyncEnabled: false,
             Keys.urlPreviewEnabled: true,
             Keys.perfLogEnabled: false,
+            // v0.9.5-beta foundation defaults
+            Keys.urlPreviewFaviconEnabled: true,
+            Keys.autoTagOCRImages: true,
+            Keys.hoverPreviewPDFEnabled: true,
+            Keys.hoverPreviewVideoEnabled: true,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -274,11 +330,53 @@ final class SettingsStore: ObservableObject {
                 defaults.set(data, forKey: Keys.aiMacros)
             }
         }
+
+        // v0.9.5-beta foundation: load JSON-encoded collections + scalar toggles
+        if let data = defaults.data(forKey: Keys.perAppRetentionRules),
+           let decoded = try? JSONDecoder().decode([PerAppRetentionRule].self, from: data) {
+            self.perAppRetentionRules = decoded
+        } else {
+            self.perAppRetentionRules = []
+        }
+        self.urlPreviewFaviconEnabled = defaults.bool(forKey: Keys.urlPreviewFaviconEnabled)
+        self.autoTagOCRImages = defaults.bool(forKey: Keys.autoTagOCRImages)
+        if let data = defaults.data(forKey: Keys.ocrLanguages),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            self.ocrLanguages = decoded
+        } else {
+            self.ocrLanguages = ["ja-JP", "en-US"]
+        }
+        self.hoverPreviewPDFEnabled = defaults.bool(forKey: Keys.hoverPreviewPDFEnabled)
+        self.hoverPreviewVideoEnabled = defaults.bool(forKey: Keys.hoverPreviewVideoEnabled)
+        if let data = defaults.data(forKey: Keys.snippetCounters),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.snippetCounters = decoded
+        } else {
+            self.snippetCounters = [:]
+        }
     }
 
     private func persistAIMacros() {
         if let data = try? JSONEncoder().encode(aiMacros) {
             defaults.set(data, forKey: Keys.aiMacros)
+        }
+    }
+
+    private func persistPerAppRetentionRules() {
+        if let data = try? JSONEncoder().encode(perAppRetentionRules) {
+            defaults.set(data, forKey: Keys.perAppRetentionRules)
+        }
+    }
+
+    private func persistOCRLanguages() {
+        if let data = try? JSONEncoder().encode(ocrLanguages) {
+            defaults.set(data, forKey: Keys.ocrLanguages)
+        }
+    }
+
+    private func persistSnippetCounters() {
+        if let data = try? JSONEncoder().encode(snippetCounters) {
+            defaults.set(data, forKey: Keys.snippetCounters)
         }
     }
 
@@ -356,3 +454,21 @@ final class SettingsStore: ObservableObject {
         capturingEnabled = true
     }
 }
+
+// MARK: - v0.9.5-beta: PerAppRetentionRule
+
+/// B3: アプリごとの保持期間ルール。`days == -1` は無期限。
+/// 後続 codegen (B3) が `ClipStore` の cleanup タスクから参照する。
+public struct PerAppRetentionRule: Codable, Hashable, Identifiable {
+    public var id: String { bundleId }
+    public var bundleId: String
+    public var displayName: String?
+    public var days: Int   // -1 = 無期限
+
+    public init(bundleId: String, displayName: String? = nil, days: Int) {
+        self.bundleId = bundleId
+        self.displayName = displayName
+        self.days = days
+    }
+}
+

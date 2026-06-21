@@ -92,6 +92,19 @@ struct StripView: View {
     // 「board.id → hovering」マップ。`acceptClipReferenceDrop(isTargeted:)` の
     // 外部 binding から書き込まれ、stroke + scale + animation の overlay に渡る。
     @State private var folderClipHover: [Int64: Bool] = [:]
+    // v0.9.5 P2: フォルダタブのドラッグを **gap 外でキャンセル** した際の
+    // `draggedBoardId` opacity リーク対策で使う `NSEvent` ローカル監視ハンドル。
+    // `PinboardReorderDelegate.performDrop` は gap 上でドロップした時しか走らず、
+    // gap の外側 (空白部分やパネル外) でリリースされた場合は delegate がそもそも
+    // 呼ばれないため、ソースタブが opacity 0.2 のまま残り、次回 reorder 成功まで
+    // 復帰しなかった。
+    //
+    // 対策: パネル表示中だけ `.leftMouseUp` をローカル監視し、`draggedBoardId`
+    // が非 nil な状態で mouseUp を観測したら次の runloop で nil に戻す。
+    // delegate の `performDrop` と二重に nil 化されても idempotent。
+    // クリップドラッグ (`ClipDragItem`) はこの state を触らないので影響なし。
+    // `Any?` で受けるのは `addLocalMonitorForEvents` の戻り値型に合わせるため。
+    @State private var folderDragMouseUpMonitor: AnyObject? = nil
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -137,6 +150,28 @@ struct StripView: View {
             ) { _ in
                 Task { @MainActor in cycleFolder(by: -1) }
             }
+            // v0.9.5 P2: フォルダタブ drag を gap 外 (空白 / パネル外) で
+            // キャンセルした時に `draggedBoardId` が nil に戻らず source タブが
+            // opacity 0.2 のまま残るリーク対策。`.leftMouseUp` を全イベント横断で
+            // ローカル監視し、ドラッグ終端を確実に拾って state をリセットする。
+            // delegate の performDrop と二重に nil 化されても idempotent。
+            if folderDragMouseUpMonitor == nil {
+                let monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { event in
+                    DispatchQueue.main.async {
+                        if draggedBoardId != nil {
+                            draggedBoardId = nil
+                        }
+                        // 並行して走り得る gap インジケータも一緒に掃除しておく
+                        // (drop 成功時は delegate 側で既に nil 化済みだが、
+                        // キャンセル時は残ることがあるため保険として消す)。
+                        if folderDropTargetIndex != nil {
+                            folderDropTargetIndex = nil
+                        }
+                    }
+                    return event
+                }
+                folderDragMouseUpMonitor = monitor as AnyObject?
+            }
         }
         .onChange(of: store.recent) { _, _ in reload() }
         .onChange(of: query) { _, newValue in
@@ -181,7 +216,20 @@ struct StripView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pastyVideoThumbReady)) { _ in
             reload()
         }
-        .onDisappear { HoverPreviewController.shared.dismissNow() }
+        .onDisappear {
+            HoverPreviewController.shared.dismissNow()
+            // v0.9.5 P2: フォルダタブ drag mouseUp 監視を必ず解除。
+            // パネルが閉じられた瞬間に残置した監視がリークしないよう、
+            // onAppear と対称な作りで撤去する。
+            if let monitor = folderDragMouseUpMonitor {
+                NSEvent.removeMonitor(monitor)
+                folderDragMouseUpMonitor = nil
+            }
+            // パネル閉鎖時はドラッグ状態も合わせてクリア (Esc + ⌘⇧V 再オープン時
+            // に opacity が残らないように)。
+            draggedBoardId = nil
+            folderDropTargetIndex = nil
+        }
     }
 
     // MARK: - Header

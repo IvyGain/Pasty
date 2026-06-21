@@ -152,6 +152,60 @@ final class ClipStore: ObservableObject {
         // 起動後にバックグラウンドで分割実行する。大容量 clips テーブルでの
         // 起動ストールを避けるため。フラグは UserDefaults で 1 回だけ完了判定する。
 
+        // v0.9.5-beta (B3): perApp retention は SettingsStore.perAppRetentionRules で
+        // 値を持つので、clips テーブルへの新規カラムは不要。schema バージョン番号だけ
+        // 進めて、後続 codegen が cleanup ロジックを足したときの参照点にする。
+        migrator.registerMigration("v6.perAppRetentionDays") { _ in
+            // intentionally empty: storage lives in UserDefaults via SettingsStore.
+        }
+
+        // v0.9.5-beta (B6): 画像クリップに対する Vision OCR 結果のキャッシュカラム。
+        // FTS5 (`clips_fts`) への組み込みは B6 ロジック codegen で別途行う。
+        migrator.registerMigration("v7.extractedOCRText") { db in
+            try db.execute(sql: "ALTER TABLE clips ADD COLUMN extractedOCRText TEXT")
+        }
+
+        // v0.9.5-beta (B6): FTS5 仮想テーブルを再構築して extractedOCRText を
+        // 検索対象に含める。content='clips' / content_rowid='id' で外部 content
+        // モードに切り替え、INSERT/UPDATE/DELETE トリガーで本体テーブルと同期する。
+        // 既存行はマイグレーション時に一括 backfill する。
+        migrator.registerMigration("v8.fts5_with_ocr") { db in
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_ai")
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_au")
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_ad")
+            try db.execute(sql: "DROP TABLE IF EXISTS clips_fts")
+            try db.execute(sql: """
+                CREATE VIRTUAL TABLE clips_fts USING fts5(
+                    preview, content, sourceAppName, extractedOCRText,
+                    content='clips', content_rowid='id'
+                )
+                """)
+            try db.execute(sql: """
+                INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                SELECT id, preview, content, sourceAppName, extractedOCRText FROM clips
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER clips_ai AFTER INSERT ON clips BEGIN
+                  INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES (new.id, new.preview, new.content, new.sourceAppName, new.extractedOCRText);
+                END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER clips_au AFTER UPDATE ON clips BEGIN
+                  INSERT INTO clips_fts(clips_fts, rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES ('delete', old.id, old.preview, old.content, old.sourceAppName, old.extractedOCRText);
+                  INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES (new.id, new.preview, new.content, new.sourceAppName, new.extractedOCRText);
+                END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER clips_ad AFTER DELETE ON clips BEGIN
+                  INSERT INTO clips_fts(clips_fts, rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES ('delete', old.id, old.preview, old.content, old.sourceAppName, old.extractedOCRText);
+                END
+                """)
+        }
+
         try migrator.migrate(dbWriter)
     }
 
@@ -340,11 +394,101 @@ final class ClipStore: ObservableObject {
         try reloadInitial()
     }
 
+    /// v0.9.5-beta (B6): Vision OCR の結果を該当クリップに永続化する。
+    /// FTS5 トリガー (clips_au) が走るため検索インデックスも同時に更新される。
+    /// `reloadInitial()` を呼ばないのは、OCR はバックグラウンド処理で
+    /// UI 上のレコード並びには影響しない／頻繁に走り得るため。
+    func updateOCRText(clipId: Int64, text: String) async throws {
+        _ = try await dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE clips SET extractedOCRText = ?, updated_at = ? WHERE id = ?",
+                arguments: [text, Date().timeIntervalSince1970, clipId]
+            )
+        }
+    }
+
     func delete(clipId: Int64) async throws {
         _ = try await dbWriter.write { db in
             try db.execute(sql: "DELETE FROM clips WHERE id = ?", arguments: [clipId])
         }
         try reloadInitial()
+    }
+
+    /// v0.9.5-beta (B3): アプリ別 + グローバル保持期間に基づく soft delete。
+    ///
+    /// - `globalDays`: ルール対象外の `sourceBundleId` を持つクリップに適用する
+    ///   既定の保持日数。`<= 0` の場合はグローバル cleanup を行わない (= 無期限)。
+    ///   SettingsStore の `maxRetentionDays` が `-1` のときは無期限扱い。
+    /// - `perAppRules`: アプリ別の上書きルール。`rule.days == -1` は当該アプリの
+    ///   クリップを無期限保護する (cleanup 対象から外す)。`rule.days > 0` は
+    ///   そのアプリのクリップを当該日数で soft delete する。
+    ///
+    /// 削除は **soft delete** (`deleted_at` をセット) で行う。物理 DELETE を
+    /// 走らせると C1 phase 2 の iCloud 同期 (tombstone 起点) と衝突するため。
+    /// UI 側のリスト/検索クエリは将来的に `deleted_at IS NULL` を付けて読み出す。
+    ///
+    /// 戻り値は影響を受けたクリップ件数 (global + perApp の合計)。テスト用途。
+    @discardableResult
+    func cleanupOld(globalDays: Int,
+                    perAppRules: [PerAppRetentionRule]) async throws -> Int {
+        // 早期 return: globalDays <= 0 かつ perAppRules も全件無期限なら何もしない。
+        let perAppExpiring = perAppRules.filter { $0.days > 0 }
+        let globalActive = globalDays > 0
+        if !globalActive && perAppExpiring.isEmpty {
+            return 0
+        }
+
+        let now = Date()
+        let nowTS = now.timeIntervalSince1970
+        let knownBundleIds = perAppRules.map { $0.bundleId }
+
+        let affected: Int = try await dbWriter.write { db in
+            var total = 0
+
+            // 1. global cleanup: knownBundleIds に含まれない (= ルールなし) 行を
+            //    globalDays で soft delete。`sourceBundleId IS NULL` の行も
+            //    "ルールなし" なのでこちらに乗る。
+            if globalActive {
+                let cutoff = now.addingTimeInterval(-Double(globalDays) * 86400)
+                var sql = """
+                    UPDATE clips
+                    SET deleted_at = ?, updated_at = ?
+                    WHERE deleted_at IS NULL
+                      AND createdAt < ?
+                    """
+                var args: [DatabaseValueConvertible] = [nowTS, nowTS, cutoff]
+                if !knownBundleIds.isEmpty {
+                    let placeholders = knownBundleIds.map { _ in "?" }.joined(separator: ",")
+                    sql += " AND (sourceBundleId IS NULL OR sourceBundleId NOT IN (\(placeholders)))"
+                    args.append(contentsOf: knownBundleIds.map { $0 as DatabaseValueConvertible })
+                }
+                try db.execute(sql: sql, arguments: StatementArguments(args))
+                total += db.changesCount
+            }
+
+            // 2. per-app cleanup: rule.days > 0 のものだけ実行。
+            //    rule.days == -1 (無期限) は knownBundleIds に含まれているので
+            //    上の global cleanup の `NOT IN` で保護されている。
+            for rule in perAppExpiring {
+                let cutoff = now.addingTimeInterval(-Double(rule.days) * 86400)
+                try db.execute(sql: """
+                    UPDATE clips
+                    SET deleted_at = ?, updated_at = ?
+                    WHERE deleted_at IS NULL
+                      AND createdAt < ?
+                      AND sourceBundleId = ?
+                    """, arguments: [nowTS, nowTS, cutoff, rule.bundleId])
+                total += db.changesCount
+            }
+
+            return total
+        }
+
+        // 削除されたクリップが recent / totalCount に反映されるよう再読み込み。
+        if affected > 0 {
+            try reloadInitial()
+        }
+        return affected
     }
 }
 

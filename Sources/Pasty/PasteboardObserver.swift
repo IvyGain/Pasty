@@ -63,9 +63,34 @@ final class PasteboardObserver: ObservableObject {
                 // dedupe 済みなので問題なし）。
                 if let inserted = store.recent.first {
                     AutoCategorizer.shared.tryAutoPin(clip: inserted, store: store)
+                    // v0.9.5-beta (B6): 画像クリップなら Vision OCR を裏で走らせ、
+                    // extractedOCRText を更新して FTS 検索に乗せる。
+                    scheduleOCRIfNeeded(for: inserted)
                 }
             } catch {
                 NSLog("Pasty insert failed: \(error)")
+            }
+        }
+    }
+
+    /// 画像クリップに対して Vision OCR をバックグラウンドで実行し、
+    /// 結果を `extractedOCRText` に保存する。設定でオフ／非画像／blob 不在の
+    /// 場合は何もしない。`Task.detached` で MainActor を離れて重い処理を回し、
+    /// DB 書き戻しのみ store の actor で行う。
+    private func scheduleOCRIfNeeded(for clip: ClipItem) {
+        guard SettingsStore.shared.autoTagOCRImages else { return }
+        guard clip.kind == .image, let id = clip.id, let dataPath = clip.dataPath else { return }
+        let languages = SettingsStore.shared.ocrLanguages
+        let storeRef = store
+        Task.detached(priority: .background) {
+            let url = ClipBlobs.blobURL(for: dataPath)
+            guard let data = try? Data(contentsOf: url) else { return }
+            guard let text = await AIEngine.ocr(image: data, languages: languages),
+                  !text.isEmpty else { return }
+            do {
+                try await storeRef.updateOCRText(clipId: id, text: text)
+            } catch {
+                NSLog("Pasty OCR update failed for clip #\(id): \(error)")
             }
         }
     }
