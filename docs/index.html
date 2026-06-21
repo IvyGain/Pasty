@@ -1196,16 +1196,16 @@
   </div>
   <div class="container">
 <!-- HERO:BEGIN -->
-    <div class="reveal" data-reveal style="--i:0">
-      <span class="eyebrow" data-reveal style="--i:1">v0.9.4-beta · フォルダ並べ替え · クリップドラッグ preview を薄い四角に · ドロップ先フォルダ · v0.9.3 からの変更点 · MIT</span>
-      <h1 class="headline" data-reveal style="--i:2">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
-      <p class="subtitle" data-reveal style="--i:3">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.4-beta の最新アップデートはリリースノートをご覧ください。
+    <div class="reveal">
+      <span class="eyebrow">v0.9.5-beta · 新機能・修正 · MIT</span>
+      <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
+      <p class="subtitle">
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「クリップを賢く、フォルダを安定に。」
       </p>
-      <div class="ctas" data-reveal style="--i:4">
-        <a class="btn primary gradient-border" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Pasty.dmg をダウンロード
-          <small>· 5.8 MB · macOS 14 以降</small>
+          <small>· 5.9 MB · macOS 14 以降</small>
         </a>
         <a class="btn ghost" href="#download">
           Raycast 拡張をインストール
@@ -1213,7 +1213,7 @@
         </a>
       </div>
 
-      <div class="hero-icon" aria-hidden="true" data-reveal style="--i:5">
+      <div class="hero-icon" aria-hidden="true">
         <img src="assets/icon-512.png" alt="Pasty のアプリアイコン" width="220" height="220" />
       </div>
     </div>
@@ -1830,14 +1830,14 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.4-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.5-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
         <div class="ctas">
           <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
             Pasty.dmg をダウンロード
-            <small>· 5.8 MB</small>
+            <small>· 5.9 MB</small>
           </a>
         </div>
 <!-- DOWNLOAD_CARD:END -->
@@ -1879,7 +1879,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.4-beta+ 推奨</span>
+          <span>Pasty v0.9.5-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -2136,10 +2136,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.4-beta</div>
+        <div class="ver">v0.9.5-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.4-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.5-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -2152,9 +2152,53 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.4-beta</span>
+        <span class="v">v0.9.5-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty v0.9.5-beta — 7 件パッケージ</h1>
+<p>「クリップを賢く、フォルダを安定に。」</p>
+<h2>✨ 新機能・修正</h2>
+<h3>🖼 画像クリップを D&amp;D でカーソル位置に貼れるように (X1)</h3>
+<p>これまで画像クリップをドラッグ&amp;ドロップで貼ろうとすると、TextEdit / Notes / Slack 等のアプリでカーソル位置に画像が埋め込まれませんでした。今回、ClipDragItem の Transferable 経路に PNG/JPEG/TIFF/GIF の binary representation と FileRepresentation を追加。Enter キー貼付と同等の体感で D&amp;D も画像をカーソル位置に貼り付けます。</p>
+<h3>🔗 URL プレビューに favicon を表示 (P1)</h3>
+<p>URL クリップの hover プレビューが favicon を取得して表示するようになりました。LPLinkMetadata の iconProvider を NSImage に解決し、メモリ + ディスクキャッシュ。「サイトの顔」が見えて識別しやすく。設定 → サーフェス → URL プレビューで OFF にもできます。</p>
+<h3>🎯 フォルダドラッグの opacity リーク修正 (P2)</h3>
+<p>フォルダタブをドラッグして gap の外でキャンセルすると、ソースタブが薄いままになるバグを修正。StripView に NSEvent .leftMouseUp local monitor を仕掛けて、ドラッグ終了時に確実に opacity 1.0 へ復帰します。</p>
+<h3>🕒 アプリ別の自動保持期間 (B3)</h3>
+<p>「特定のアプリからのコピーは別の期間で保持する」設定を追加。例: Chrome は 7 日、メールは 90 日、Notion は無期限。グローバル保持期間とのオーバーライド方式。設定 → キャプチャ → 「アプリ別保持期間」から bundle ID + 日数を登録できます。</p>
+<h3>📹 PDF / 動画クリップのホバープレビュー (B5)</h3>
+<p>PDF クリップは 1 ページ目のサムネ、動画クリップは 0:00 のサムネ + ▶ icon を hover で表示。PDFKit + AVFoundation の thumbnail を NSCache + ディスクキャッシュで効率化。設定 → サーフェス → ホバープレビューで個別に OFF にできます。</p>
+<h3>🔍 画像から自動でテキスト抽出 (Vision OCR) (B6)</h3>
+<p>画像クリップを取り込んだ直後に Vision の VNRecognizeTextRequest が background でテキストを抽出し、FTS5 にも index されるので <strong>画像内の文字列で検索ヒット</strong> します。ja-JP / en-US デフォルト、設定 → キャプチャから言語追加可能。OCR が走ってもパネル操作のレスポンスは犠牲にしません。</p>
+<h3>🔢 スニペット拡張: counter / if (B9)</h3>
+<ul>
+<li><code>{{counter:invoice}}</code> — 名前付き永続カウンタ。参照ごとに +1、UserDefaults persist</li>
+<li><code>{{counter:invoice|format:%04d}}</code> — printf 形式の format</li>
+<li><code>{{counter:invoice|reset}}</code> — カウンタをリセット</li>
+<li><code>{{if hasField name}}Hi {{name}}{{endif}}</code> — mail-merge field の有無で条件分岐</li>
+<li><code>{{if equals lang "ja"}}こんにちは{{endif}}</code> — 文字列一致の条件分岐</li>
+</ul>
+<p>設定 → Pasty について → 「スニペットカウンタ」で一覧とリセットボタン提供。</p>
+<h2>🛠 内部改善</h2>
+<ul>
+<li>ClipStore migration v6 (perApp retention placeholder) + v7 (extractedOCRText column) + v8 (FTS5 rebuild with OCR text)</li>
+<li>SettingsStore に 7 個の persist 設定追加</li>
+<li>全 16 テスト pass (3 既存 ClipStore + 2 B3 cleanup + 1 B6 OCR + 11 B9 SnippetEngine)</li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.5-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.9.5-beta</a></p>
+        <a class="permalink" href="whats-new/0.9.5-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.4-beta</span>
+        
+        <span class="date">2026-06-20</span>
       </summary>
       <div class="body">
 <h1>Pasty 0.9.4-beta — フォルダ並べ替えの再設計とクリップドラッグの再構築</h1>
