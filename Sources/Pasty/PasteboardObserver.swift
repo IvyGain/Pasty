@@ -24,6 +24,11 @@ final class PasteboardObserver: ObservableObject {
     private var lastTextString: String?
     private var lastTextHash: String?
 
+    // v0.9.8-beta Wave 1A: throttle auto-trim invocations from the insert
+    // hot path. Trimming on every clip would hammer SQLite with redundant
+    // UPDATEs; once per minute is plenty given the cap is a soft ceiling.
+    private var lastTrimAt: Date?
+
     init(store: ClipStore, pasteboard: NSPasteboard = .general) {
         self.store = store
         self.pasteboard = pasteboard
@@ -74,6 +79,22 @@ final class PasteboardObserver: ObservableObject {
                     // v0.9.5-beta (B6): 画像クリップなら Vision OCR を裏で走らせ、
                     // extractedOCRText を更新して FTS 検索に乗せる。
                     scheduleOCRIfNeeded(for: inserted)
+                }
+                // v0.9.8-beta Wave 1A: post-insert auto-trim with 60s throttle.
+                // Run on a background-priority detached Task so SQLite work
+                // never blocks the pasteboard polling loop. trimToMaxClips is
+                // nonisolated and idempotent — repeated calls when no excess
+                // exists are O(1) on the count query.
+                if SettingsStore.shared.autoTrimEnabled {
+                    let now = Date()
+                    if lastTrimAt == nil || now.timeIntervalSince(lastTrimAt!) >= 60 {
+                        lastTrimAt = now
+                        let max = SettingsStore.shared.autoTrimMaxClips
+                        let storeRef = store
+                        Task.detached(priority: .background) {
+                            do { _ = try storeRef.trimToMaxClips(max) } catch { /* silent */ }
+                        }
+                    }
                 }
             } catch {
                 NSLog("Pasty insert failed: \(error)")

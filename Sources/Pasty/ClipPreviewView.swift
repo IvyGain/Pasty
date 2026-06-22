@@ -71,14 +71,14 @@ struct ClipPreviewView: View {
             alignment: .topLeading
         )
         .background(
-            RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
-                .fill(.thinMaterial.opacity(0.6))
+            RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
+                .fill(.regularMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(PastyTheme.strokeOpacity), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
+                .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous))
         .task(id: clip.id) {
             await loadLinkMetaIfNeeded()
         }

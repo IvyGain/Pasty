@@ -198,6 +198,19 @@ final class SettingsStore: ObservableObject {
         didSet { persistSnippetCounters() }
     }
 
+    /// v0.9.8-beta Wave 1A: クリップ上限の自動 trim。ON のとき、起動時と
+    /// 新規クリップ挿入時 (60 秒スロットル) に最も古い未ピン留めクリップを
+    /// `autoTrimMaxClips` 件まで soft delete する。ピン留め済みは保護対象。
+    @Published var autoTrimEnabled: Bool {
+        didSet { defaults.set(autoTrimEnabled, forKey: Keys.autoTrimEnabled) }
+    }
+
+    /// v0.9.8-beta Wave 1A: 自動 trim の上限件数。0 = 無制限 (trim を実行しない)。
+    /// プリセット: 500 / 1000 / 5000 / 10000 / 0 (無制限)。
+    @Published var autoTrimMaxClips: Int {
+        didSet { defaults.set(autoTrimMaxClips, forKey: Keys.autoTrimMaxClips) }
+    }
+
     private enum Keys {
         static let primarySurface         = "pasty.primarySurface"
         static let capturingEnabled       = "pasty.capturing"
@@ -239,6 +252,9 @@ final class SettingsStore: ObservableObject {
         static let hoverPreviewPDFEnabled = "pasty.hoverPreviewPDFEnabled"
         static let hoverPreviewVideoEnabled = "pasty.hoverPreviewVideoEnabled"
         static let snippetCounters        = "pasty.snippetCounters.v1"
+        // v0.9.8-beta Wave 1A
+        static let autoTrimEnabled        = "autoTrimEnabled"
+        static let autoTrimMaxClips       = "autoTrimMaxClips"
     }
 
     private init() {
@@ -283,6 +299,9 @@ final class SettingsStore: ObservableObject {
             Keys.redactOCRSensitiveData: true,
             Keys.hoverPreviewPDFEnabled: true,
             Keys.hoverPreviewVideoEnabled: true,
+            // v0.9.8-beta Wave 1A: auto-trim defaults
+            Keys.autoTrimEnabled: true,
+            Keys.autoTrimMaxClips: 1000,
         ])
         // v0.3 でメインサーフェスを Strip に切り替えたので、明示的な
         // 「これは Strip だよ」マイグレーションフラグを使う。フラグがない
@@ -365,6 +384,9 @@ final class SettingsStore: ObservableObject {
         } else {
             self.snippetCounters = [:]
         }
+        // v0.9.8-beta Wave 1A: auto-trim settings
+        self.autoTrimEnabled = defaults.bool(forKey: Keys.autoTrimEnabled)
+        self.autoTrimMaxClips = defaults.integer(forKey: Keys.autoTrimMaxClips)
     }
 
     private func persistAIMacros() {

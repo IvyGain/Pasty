@@ -39,11 +39,14 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             tabBar
-            Divider()
+                .background(.ultraThinMaterial)
+            Rectangle()
+                .fill(PastyDesign.Color.border)
+                .frame(height: 0.5)
             ScrollView(.vertical, showsIndicators: false) {
                 content
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .padding(.top, 4)
+                    .padding(.top, PastyDesign.Spacing.xs)
             }
             .background(Color(NSColor.windowBackgroundColor).opacity(0.5))
         }
@@ -191,6 +194,20 @@ struct SettingsView: View {
                 Text("プリセットボタンで素早く設定、または Stepper で日単位調整。「無期限」を選ぶと削除されません。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section("クリップ上限") {
+                Toggle("自動 trim を有効にする", isOn: $settings.autoTrimEnabled)
+                Picker("クリップ上限", selection: $settings.autoTrimMaxClips) {
+                    Text("500 件").tag(500)
+                    Text("1000 件").tag(1000)
+                    Text("5000 件").tag(5000)
+                    Text("10000 件").tag(10000)
+                    Text("無制限").tag(0)
+                }
+                .disabled(!settings.autoTrimEnabled)
+                Text("ピン留めしたクリップは保護されます。トーストは表示されません。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             Section("言語") {
                 Picker("", selection: $settings.locale) {
@@ -816,7 +833,7 @@ private struct SettingsTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: PastyDesign.Spacing.xs - 1) {
                 Image(systemName: systemImage)
                     .font(.system(size: 18, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
@@ -826,27 +843,28 @@ private struct SettingsTabButton: View {
                     .tracking(-0.05)
                     .lineLimit(1)
                     .fixedSize()
+                // 2pt accent underline marks the active tab (luxury cue)
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(isSelected ? PastyDesign.Color.accent : .clear)
+                    .frame(height: 2)
+                    .frame(maxWidth: 22)
+                    .padding(.top, 1)
             }
-            .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.75))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .foregroundStyle(isSelected ? PastyDesign.Color.accent : PastyDesign.Color.textSecondary)
+            .padding(.horizontal, PastyDesign.Spacing.md)
+            .padding(.vertical, PastyDesign.Spacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: PastyDesign.Radius.md, style: .continuous)
                     .fill(isSelected
-                          ? Color.accentColor.opacity(0.14)
-                          : (hovering ? Color.primary.opacity(0.06) : .clear))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.32) : .clear,
-                                  lineWidth: 1)
+                          ? PastyDesign.Color.accent.opacity(0.10)
+                          : (hovering ? PastyDesign.Color.surfaceElevated : .clear))
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: isSelected)
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(PastyDesign.Animation.snappy, value: isSelected)
+        .animation(PastyDesign.Animation.snappy, value: hovering)
     }
 }
 

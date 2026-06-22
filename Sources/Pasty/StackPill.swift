@@ -241,12 +241,12 @@ private struct StackPillRootView: View {
             }
         }
         .background(VisualEffectBackground())
-        .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(PastyTheme.strokeOpacity), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
+                .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 6)
+        .pastyShadow(PastyDesign.Shadow.lifted)
     }
 }
 
@@ -257,14 +257,14 @@ private struct StackPillBadgeView: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: 8) {
+            HStack(spacing: PastyDesign.Spacing.sm) {
                 Image(systemName: "square.stack.3d.up.fill")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(PastyDesign.Color.accent)
                 Text("\(count)")
-                    .font(PastyTheme.titleFont)
+                    .font(PastyDesign.TypeRamp.title)
                     .monospacedDigit()
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(PastyDesign.Color.textPrimary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -296,18 +296,23 @@ private struct StackPillExpandedView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             Button(action: onPasteAll) {
-                HStack(spacing: 6) {
+                HStack(spacing: PastyDesign.Spacing.xs + 2) {
                     Image(systemName: "square.and.arrow.down.on.square")
                         .font(.system(size: 11, weight: .semibold))
                     Text("すべて貼付")
-                        .font(PastyTheme.subtitleFont)
+                        .font(PastyDesign.TypeRamp.caption)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .foregroundStyle(.white)
+                .padding(.horizontal, PastyDesign.Spacing.md - 2)
+                .padding(.vertical, PastyDesign.Spacing.xs + 2)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.18))
+                    RoundedRectangle(cornerRadius: PastyDesign.Radius.sm, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [PastyDesign.Color.accent, PastyDesign.Color.secondary],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
                 )
+                .pastyShadow(PastyDesign.Shadow.subtle)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -318,13 +323,17 @@ private struct StackPillExpandedView: View {
 
             Button(action: onClear) {
                 Text("クリア")
-                    .font(PastyTheme.subtitleFont)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .font(PastyDesign.TypeRamp.caption)
+                    .foregroundStyle(PastyDesign.Color.textSecondary)
+                    .padding(.horizontal, PastyDesign.Spacing.md - 2)
+                    .padding(.vertical, PastyDesign.Spacing.xs + 2)
                     .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.08))
+                        RoundedRectangle(cornerRadius: PastyDesign.Radius.sm, style: .continuous)
+                            .fill(PastyDesign.Color.surfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PastyDesign.Radius.sm, style: .continuous)
+                            .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
                     )
                     .contentShape(Rectangle())
             }
@@ -337,17 +346,18 @@ private struct StackPillExpandedView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: PastyDesign.Spacing.sm) {
             Image(systemName: "square.stack.3d.up.fill")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.tint)
+                .foregroundStyle(PastyDesign.Color.accent)
             Text("Stack")
-                .font(PastyTheme.titleFont)
+                .font(PastyDesign.TypeRamp.title)
+                .foregroundStyle(PastyDesign.Color.textPrimary)
             Spacer()
             Text("\(items.count)")
-                .font(PastyTheme.subtitleFont)
+                .font(PastyDesign.TypeRamp.caption)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(PastyDesign.Color.textSecondary)
             Button(action: onToggle) {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
@@ -393,22 +403,26 @@ private struct StackPillRow: View {
                 pasteInFlight = false
             }
         } label: {
-            HStack(spacing: 10) {
-                ClipThumbnail(clip: item, size: 24, corner: 6)
+            HStack(spacing: PastyDesign.Spacing.sm + 2) {
+                ClipThumbnail(clip: item, size: 24, corner: PastyDesign.Radius.sm)
                 Text(previewText)
-                    .font(PastyTheme.subtitleFont)
+                    .font(PastyDesign.TypeRamp.body)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(PastyDesign.Color.textPrimary)
                 Spacer(minLength: 0)
                 Text("⌘V")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .foregroundStyle(PastyDesign.Color.textSecondary)
+                    .padding(.horizontal, PastyDesign.Spacing.xs + 2)
+                    .padding(.vertical, PastyDesign.Spacing.xxs)
                     .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.primary.opacity(0.08))
+                        RoundedRectangle(cornerRadius: PastyDesign.Radius.xs, style: .continuous)
+                            .fill(PastyDesign.Color.surfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PastyDesign.Radius.xs, style: .continuous)
+                            .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
                     )
             }
             .padding(.horizontal, 8)

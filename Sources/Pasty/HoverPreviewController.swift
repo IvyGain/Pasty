@@ -278,13 +278,22 @@ private struct HoverPreviewHost: View {
     let clip: ClipItem
 
     var body: some View {
-        ClipPreviewView(clip: clip, isCompact: true)
-            .padding(10)
-            .background(VisualEffectBackground())
-            .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        VStack(spacing: 0) {
+            // Luxury 3pt accent strip — pinned to the top of the floating preview.
+            LinearGradient(
+                colors: [PastyDesign.Color.accent, PastyDesign.Color.secondary],
+                startPoint: .leading, endPoint: .trailing
             )
+            .frame(height: 3)
+            ClipPreviewView(clip: clip, isCompact: true)
+                .padding(PastyDesign.Spacing.lg)
+        }
+        .background(VisualEffectBackground())
+        .clipShape(RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
+                .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
+        )
+        .pastyShadow(PastyDesign.Shadow.prominent)
     }
 }

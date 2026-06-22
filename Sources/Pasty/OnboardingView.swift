@@ -1015,16 +1015,20 @@ private struct KeyCap: View {
     var body: some View {
         Text(label)
             .font(.system(size: size * 0.46, weight: .semibold, design: .rounded))
-            .foregroundStyle(pressed ? Color.accentColor : .primary)
+            .foregroundStyle(pressed ? PastyDesign.Color.accent : PastyDesign.Color.textPrimary)
             .frame(width: size, height: size)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    // 3D gradient surface — surface → surfaceElevated でガラス的奥行き
+                    RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
                         .fill(pressed
-                              ? AnyShapeStyle(Color.accentColor.opacity(0.12))
-                              : AnyShapeStyle(.regularMaterial))
-                    // 上端ハイライト
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                              ? AnyShapeStyle(PastyDesign.Color.accent.opacity(0.12))
+                              : AnyShapeStyle(LinearGradient(
+                                    colors: [PastyDesign.Color.surface, PastyDesign.Color.surfaceElevated],
+                                    startPoint: .top, endPoint: .bottom
+                                )))
+                    // 上端ハイライト (ガラス反射)
+                    RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
                         .stroke(LinearGradient(
                             colors: [Color.white.opacity(0.3), Color.clear],
                             startPoint: .top, endPoint: .center
@@ -1032,16 +1036,15 @@ private struct KeyCap: View {
                 }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: PastyDesign.Radius.lg, style: .continuous)
                     .stroke(
-                        pressed ? Color.accentColor.opacity(0.7) : Color.primary.opacity(0.12),
+                        pressed ? PastyDesign.Color.accent.opacity(0.7) : PastyDesign.Color.border,
                         lineWidth: pressed ? 1.0 : 0.5
                     )
             )
             .scaleEffect(pressed ? 0.92 : 1.0)
-            .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
-            .shadow(color: .black.opacity(0.14), radius: 8, x: 0, y: 4)
-            .animation(.spring(response: 0.25, dampingFraction: 0.65), value: pressed)
+            .pastyShadow(PastyDesign.Shadow.subtle)
+            .animation(PastyDesign.Animation.bouncy, value: pressed)
             .onAppear {
                 guard animatePressed else { return }
                 timer = Timer.scheduledTimer(withTimeInterval: 1.4, repeats: true) { _ in

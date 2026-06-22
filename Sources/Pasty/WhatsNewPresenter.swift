@@ -110,11 +110,13 @@ private struct WhatsNewView: View {
             heroHeader
             ScrollView {
                 renderedMarkdown
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, PastyDesign.Spacing.xl)
+                    .padding(.vertical, PastyDesign.Spacing.lg)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Divider().opacity(0.5)
+            Rectangle()
+                .fill(PastyDesign.Color.border)
+                .frame(height: 0.5)
             HStack {
                 Spacer()
                 Button("閉じる", action: onDismiss)
@@ -122,7 +124,7 @@ private struct WhatsNewView: View {
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
             }
-            .padding(16)
+            .padding(PastyDesign.Spacing.lg)
         }
         .frame(width: 540, height: 560)
         .background(VisualEffectBackground())
@@ -131,26 +133,44 @@ private struct WhatsNewView: View {
     private var heroHeader: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.accentColor.opacity(0.9), Color.accentColor.opacity(0.55)],
+                colors: [PastyDesign.Color.accent, PastyDesign.Color.secondary],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
-            HStack(spacing: 14) {
+            // Subtle gloss for a more luxurious surface
+            LinearGradient(
+                colors: [SwiftUI.Color.white.opacity(0.18), .clear],
+                startPoint: .top, endPoint: .center
+            )
+            HStack(spacing: PastyDesign.Spacing.md + 2) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 36, weight: .regular))
                     .foregroundStyle(.white)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Pasty \(version)")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                VStack(alignment: .leading, spacing: PastyDesign.Spacing.xs) {
+                    Text("Pasty の新機能")
+                        .font(PastyDesign.TypeRamp.hero)
                         .foregroundStyle(.white)
-                    Text("このバージョンの新機能")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
+                    // Version pill — luxury accent
+                    Text("v\(version)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, PastyDesign.Spacing.sm + 2)
+                        .padding(.vertical, PastyDesign.Spacing.xxs + 1)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(SwiftUI.Color.white.opacity(0.22))
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .strokeBorder(SwiftUI.Color.white.opacity(0.35), lineWidth: 0.5)
+                        )
                 }
                 Spacer()
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, PastyDesign.Spacing.xl)
         }
-        .frame(height: 90)
+        .frame(height: 110)
+        .pastyShadow(PastyDesign.Shadow.subtle)
     }
 
     @ViewBuilder
@@ -199,29 +219,55 @@ private struct WhatsNewView: View {
         switch block.level {
         case .h1:
             Text(attributed(block.text))
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .padding(.top, 6)
+                .font(PastyDesign.TypeRamp.hero)
+                .foregroundStyle(PastyDesign.Color.textPrimary)
+                .padding(.top, PastyDesign.Spacing.sm - 2)
         case .h2:
-            Text(attributed(block.text))
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .padding(.top, 10)
+            // Section title with leading accent icon "tile"
+            HStack(spacing: PastyDesign.Spacing.sm + 2) {
+                RoundedRectangle(cornerRadius: PastyDesign.Radius.md, style: .continuous)
+                    .fill(PastyDesign.Color.surfaceElevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PastyDesign.Radius.md, style: .continuous)
+                            .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
+                    )
+                    .overlay(
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(PastyDesign.Color.accent)
+                    )
+                    .frame(width: 28, height: 28)
+                Text(attributed(block.text))
+                    .font(PastyDesign.TypeRamp.title)
+                    .foregroundStyle(PastyDesign.Color.textPrimary)
+            }
+            .padding(.top, PastyDesign.Spacing.md - 2)
         case .h3:
             Text(attributed(block.text))
-                .font(.system(size: 14, weight: .semibold))
-                .padding(.top, 4)
+                .font(PastyDesign.TypeRamp.bodyMedium)
+                .foregroundStyle(PastyDesign.Color.textPrimary)
+                .padding(.top, PastyDesign.Spacing.xs)
         case .bullet:
-            HStack(alignment: .top, spacing: 8) {
-                Text("•").foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: PastyDesign.Spacing.sm) {
+                Circle()
+                    .fill(PastyDesign.Color.accent)
+                    .frame(width: 5, height: 5)
+                    .padding(.top, 7)
                 Text(attributed(block.text))
-                    .font(.system(size: 13))
+                    .font(PastyDesign.TypeRamp.body)
+                    .foregroundStyle(PastyDesign.Color.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         case .paragraph:
             Text(attributed(block.text))
-                .font(.system(size: 13))
+                .font(PastyDesign.TypeRamp.body)
+                .foregroundStyle(PastyDesign.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         case .hr:
-            Divider().padding(.vertical, 6)
+            Rectangle()
+                .fill(PastyDesign.Color.border)
+                .frame(height: 0.5)
+                .padding(.vertical, PastyDesign.Spacing.sm - 2)
         }
     }
 

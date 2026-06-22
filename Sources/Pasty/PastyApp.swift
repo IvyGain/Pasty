@@ -166,6 +166,23 @@ struct PastyApp: App {
                 } catch {
                     pastyAppLogger.error("BlobGC sweep failed: \(String(describing: error), privacy: .public)")
                 }
+
+                // v0.9.8-beta Wave 1A: startup auto-trim. After BlobGC has had
+                // a chance to reclaim orphan blobs, enforce the clip-count
+                // ceiling. Pinned clips are protected by trimToMaxClips itself
+                // (NOT IN pinboard_items). Silent on the zero case, logged when
+                // we actually shed clips.
+                let settings = SettingsStore.shared
+                if settings.autoTrimEnabled {
+                    do {
+                        let trimmed = try store2.trimToMaxClips(settings.autoTrimMaxClips)
+                        if trimmed > 0 {
+                            print("[AutoTrim] startup: trimmed \(trimmed) clips")
+                        }
+                    } catch {
+                        print("[AutoTrim] startup error: \(error)")
+                    }
+                }
             }
         }
     }

@@ -677,6 +677,56 @@ final class ClipStore: ObservableObject {
         }
     }
 
+    /// v0.9.8-beta Wave 1A: クリップ件数上限に基づく soft delete。
+    ///
+    /// アクティブ (`deleted_at IS NULL`) かつピン留めされていない (`id NOT IN
+    /// (SELECT clipId FROM pinboard_items)`) クリップが `maxCount` を超えていれば、
+    /// 超過分だけ古い順 (`createdAt ASC`) に soft delete し、影響件数を返す。
+    /// ピン留め済みクリップはカウントにも削除対象にも含まれない (= 保護)。
+    ///
+    /// - `maxCount <= 0`: no-op として 0 を返す (= 無制限扱い)。
+    /// - 戻り値: soft delete された件数 (テスト & ログ用途)。
+    ///
+    /// 非 async・スレッド非依存。`PasteboardObserver` の `Task.detached` 経路
+    /// (background priority) と `PastyApp` の起動時 MainActor 経路の両方から
+    /// 同じ署名で呼べる。`dbWriter.write` (GRDB の同期 API) は内部で SQLite の
+    /// 直列化 queue に乗せるので並行呼び出しでも安全。
+    @discardableResult
+    nonisolated func trimToMaxClips(_ maxCount: Int) throws -> Int {
+        guard maxCount > 0 else { return 0 }
+        let nowTS = Date().timeIntervalSince1970
+        return try dbWriter.write { db in
+            // 1. ピン留めされていない、生存中のクリップを数える。
+            //    pinboard_items.clipId に乗っている id は count にも delete 集合にも含めない。
+            let liveUnpinned = try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*) FROM clips
+                    WHERE deleted_at IS NULL
+                      AND id NOT IN (SELECT clipId FROM pinboard_items)
+                    """
+            ) ?? 0
+            if liveUnpinned <= maxCount { return 0 }
+            let excess = liveUnpinned - maxCount
+
+            // 2. 古いものから excess 件を soft delete。
+            //    SQLite には UPDATE ... ORDER BY ... LIMIT が無いので
+            //    サブクエリで id を絞り込む。
+            try db.execute(sql: """
+                UPDATE clips
+                SET deleted_at = ?, updated_at = ?
+                WHERE id IN (
+                    SELECT id FROM clips
+                    WHERE deleted_at IS NULL
+                      AND id NOT IN (SELECT clipId FROM pinboard_items)
+                    ORDER BY createdAt ASC
+                    LIMIT ?
+                )
+                """, arguments: [nowTS, nowTS, excess])
+            return db.changesCount
+        }
+    }
+
     /// v0.9.5-beta (B3): アプリ別 + グローバル保持期間に基づく soft delete。
     ///
     /// - `globalDays`: ルール対象外の `sourceBundleId` を持つクリップに適用する

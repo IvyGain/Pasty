@@ -1292,10 +1292,14 @@ struct StripView: View {
     private func reload() {
         var q = SearchQuery.parse(query)
         if let f = filterKind { q.kind = f }
-        // v0.9.6-beta P1 #5: cap any reload() query at 1000 rows. Loading
-        // 10k+ matches into the SwiftUI list pegged the main thread; 1000
-        // is plenty for any human-driven browse, and we surface a toast
-        // when we hit the cap so the user knows to narrow their search.
+        // v0.9.6-beta P1 #5 → v0.9.8-beta Wave 1A: cap any reload() query at
+        // 1000 rows for render performance. Loading 10k+ matches into the
+        // SwiftUI list pegged the main thread; 1000 is plenty for any
+        // human-driven browse. The user-facing "邪魔" toast that announced
+        // when this cap was hit has been retired — auto-trim (see
+        // SettingsStore.autoTrim*) now manages the underlying clip count
+        // proactively, so the UI cap rarely matters in practice and the
+        // intrusive toast is no longer worth the friction.
         q.limit = min(q.limit, 1000)
         let cap = q.limit
 
@@ -1307,12 +1311,6 @@ struct StripView: View {
                 let clipped = Array(filtered.prefix(cap))
                 self.items = clipped
                 if selection.cursorIndex >= self.items.count { selection.cursorIndex = 0 }
-                if clipped.count == cap && filtered.count >= cap {
-                    PasteToast.shared.show(
-                        targetApp: nil,
-                        customMessage: "結果が1000件を超えています。検索条件を絞り込んでください"
-                    )
-                }
             }
             return
         }
@@ -1322,12 +1320,6 @@ struct StripView: View {
             let results = (try? await SearchEngine.run(q, store: store)) ?? []
             self.items = results
             if selection.cursorIndex >= results.count { selection.cursorIndex = 0 }
-            if results.count == cap {
-                PasteToast.shared.show(
-                    targetApp: nil,
-                    customMessage: "結果が1000件を超えています。検索条件を絞り込んでください"
-                )
-            }
         }
     }
 
@@ -1810,9 +1802,9 @@ private struct StripCard: View {
     }
 
     private var borderColor: Color {
-        if isCursor   { return Color.accentColor.opacity(0.9) }
-        if isSelected { return Color.accentColor.opacity(0.55) }
-        return Color.primary.opacity(0.06)
+        if isCursor   { return PastyDesign.Color.accent.opacity(0.9) }
+        if isSelected { return PastyDesign.Color.accent.opacity(0.55) }
+        return PastyDesign.Color.border
     }
 }
 

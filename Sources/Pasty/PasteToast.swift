@@ -162,26 +162,26 @@ private struct ToastContent: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: PastyDesign.Spacing.sm + 2) {
             Image(systemName: "doc.on.clipboard.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.85))
+                .foregroundStyle(PastyDesign.Color.accent)
             Text(text)
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.primary)
+                .font(PastyDesign.TypeRamp.bodyMedium)
+                .foregroundStyle(PastyDesign.Color.textPrimary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, PastyDesign.Spacing.md + 2)
+        .padding(.vertical, PastyDesign.Spacing.sm + 2)
         .background(
             VisualEffectBackground()
-                .clipShape(RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: PastyDesign.Radius.md, style: .continuous))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: PastyTheme.cornerRadius, style: .continuous)
-                .strokeBorder(.white.opacity(PastyTheme.strokeOpacity), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: PastyDesign.Radius.md, style: .continuous)
+                .strokeBorder(PastyDesign.Color.border, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
+        .pastyShadow(PastyDesign.Shadow.soft)
     }
 }
