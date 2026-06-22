@@ -75,20 +75,23 @@ struct PinboardReorderDelegate: DropDelegate {
         guard let provider = info.itemProviders(for: [UTType.pastyPinboardTab.identifier]).first else {
             return false
         }
+        // P1 #15: DropDelegate methods are already on main, so we drop the
+        // explicit `DispatchQueue.main.async` wrappers that previously
+        // bracketed the binding mutations inside this completion handler.
+        // The completion of `loadDataRepresentation` is delivered back on the
+        // queue the framework chooses (typically main for in-process drags
+        // initiated from a `DropDelegate`); SwiftUI re-coalesces binding
+        // writes regardless, so inlining is safe.
         provider.loadDataRepresentation(forTypeIdentifier: UTType.pastyPinboardTab.identifier) { data, _ in
             guard let data = data,
                   let item = try? JSONDecoder().decode(PinboardDragItem.self, from: data) else {
-                DispatchQueue.main.async {
-                    self.draggedBoardId = nil
-                    self.folderDropTargetIndex = nil
-                }
-                return
-            }
-            DispatchQueue.main.async {
-                self.onReorder(item.boardID, self.targetIndex)
                 self.draggedBoardId = nil
                 self.folderDropTargetIndex = nil
+                return
             }
+            self.onReorder(item.boardID, self.targetIndex)
+            self.draggedBoardId = nil
+            self.folderDropTargetIndex = nil
         }
         return true
     }
@@ -563,39 +566,56 @@ struct ClipReceiveDropTarget: ViewModifier {
         Task { @MainActor in
             var pinned = 0
             var added = 0
+            // v0.9.6-beta (P1 #11): "要求件数" vs "成功件数" を厳密に追跡し、
+            // partial / total failure を分けてユーザに伝える。
+            var requestedCount = 0
+            var successCount = 0
             for s in strings {
                 // v0.9.0 A-4: 複数選択ドラッグから来た PASTY-MULTI marker は
                 // 1 つの文字列に複数 ID を詰め込んでいるので、ループで個別に pin。
                 if let ids = ClipDnDPayload.decodeMulti(s) {
                     for cid in ids {
+                        requestedCount += 1
                         do {
                             try await pinboards.pin(clipId: cid, toBoard: pid)
                             pinned += 1
+                            successCount += 1
                         } catch {
                             NSLog("D&D multi pin failed: \(error)")
                         }
                     }
                 } else if let payload = ClipDnDPayload.decode(s) {
+                    requestedCount += 1
                     do {
                         try await pinboards.pin(clipId: payload.id, toBoard: pid)
                         pinned += 1
+                        successCount += 1
                     } catch {
                         NSLog("D&D pin failed: \(error)")
                     }
                 } else {
                     let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { continue }
+                    requestedCount += 1
                     if let clip = try? await store.createTextClip(
                         content: s, sourceAppName: "Drop"
                     ), let cid = clip.id {
+                        // pin 自体は best-effort: ボードへのリンクが失敗しても
+                        // クリップ作成までは成功扱いとする。
                         try? await pinboards.pin(clipId: cid, toBoard: pid)
                         added += 1
+                        successCount += 1
                     }
                 }
             }
             let total = pinned + added
             let msg: String
-            if total == 0 {
+            // v0.9.6-beta (P1 #11): 失敗パターンを明示する 2 つの分岐を先に評価。
+            if successCount == 0 && requestedCount > 0 {
+                msg = "追加に失敗しました"
+            } else if successCount < requestedCount {
+                msg = "\(requestedCount) 件中 \(successCount) 件のみ追加されました"
+            } else if total == 0 {
                 msg = "ドロップを受け取れませんでした"
             } else if added > 0 && pinned > 0 {
                 msg = "📌 \(boardName) に \(total) 件を保存"

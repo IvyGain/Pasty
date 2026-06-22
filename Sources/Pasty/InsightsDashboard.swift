@@ -269,12 +269,14 @@ struct InsightsDashboard: View {
             let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? startOfToday
 
             // 今日 / 今週
+            // v0.9.6-beta (follow-up #3): exclude soft-deleted rows from every
+            // clips aggregation so Insights doesn't keep counting tombstones.
             snap.todayCount = try Int.fetchOne(db,
-                sql: "SELECT COUNT(*) FROM clips WHERE createdAt >= ?",
+                sql: "SELECT COUNT(*) FROM clips WHERE createdAt >= ? AND deleted_at IS NULL",
                 arguments: [startOfToday]
             ) ?? 0
             snap.weekCount = try Int.fetchOne(db,
-                sql: "SELECT COUNT(*) FROM clips WHERE createdAt >= ?",
+                sql: "SELECT COUNT(*) FROM clips WHERE createdAt >= ? AND deleted_at IS NULL",
                 arguments: [startOfWeek]
             ) ?? 0
 
@@ -288,7 +290,7 @@ struct InsightsDashboard: View {
             let dailyRows = try Row.fetchAll(db, sql: """
                 SELECT date(createdAt) AS d, COUNT(*) AS c
                 FROM clips
-                WHERE createdAt >= ?
+                WHERE createdAt >= ? AND deleted_at IS NULL
                 GROUP BY d
                 ORDER BY d ASC
                 """, arguments: [from])
@@ -315,7 +317,9 @@ struct InsightsDashboard: View {
 
             // 種類別分布: ClipKind の raw を表示用ラベルにまとめる。
             let kindRows = try Row.fetchAll(db, sql: """
-                SELECT kind, COUNT(*) AS c FROM clips GROUP BY kind
+                SELECT kind, COUNT(*) AS c FROM clips
+                WHERE deleted_at IS NULL
+                GROUP BY kind
                 """)
             var bucket: [String: Int] = [:]
             for row in kindRows {
@@ -332,6 +336,7 @@ struct InsightsDashboard: View {
             let appRows = try Row.fetchAll(db, sql: """
                 SELECT sourceBundleId, sourceAppName, COUNT(*) AS c
                 FROM clips
+                WHERE deleted_at IS NULL
                 GROUP BY COALESCE(sourceAppName, sourceBundleId, 'Unknown')
                 ORDER BY c DESC
                 LIMIT 10
@@ -351,6 +356,7 @@ struct InsightsDashboard: View {
                 SELECT c.id, c.preview, COUNT(pe.id) AS cnt
                 FROM clips c
                 JOIN paste_events pe ON pe.clipId = c.id
+                WHERE c.deleted_at IS NULL
                 GROUP BY c.id
                 ORDER BY cnt DESC
                 LIMIT 10

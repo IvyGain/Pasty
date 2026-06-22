@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 
 // MARK: - Template Field Runtime
@@ -203,13 +204,28 @@ final class AIActionCoordinator {
                     s.play()
                 }
             } catch {
-                PasteToast.shared.show(targetApp: nil,
-                                       customMessage: "AI 失敗: \(error.localizedDescription)")
+                // v0.9.6-beta (P1 #10): typed AIError で原因別の文言を出す。
+                let msg = aiErrorToastMessage(error)
+                PasteToast.shared.show(targetApp: nil, customMessage: msg)
                 if useGlow { ScreenGlowController.shared.showFailure() }
                 if useSound, let s = NSSound(named: NSSound.Name("Funk")) {
                     s.play()
                 }
             }
+        }
+    }
+
+    /// v0.9.6-beta (P1 #10): typed AIError → UI 文言マップ。
+    private func aiErrorToastMessage(_ error: Error) -> String {
+        switch AIError.from(error) {
+        case .modelNotAvailable:
+            return "Apple Intelligence のモデルが利用できません。設定から有効化してください。"
+        case .osUnsupported:
+            return "この機能は macOS の対応バージョンが必要です"
+        case .aiDisabledBySettings:
+            return "AI 機能は設定で無効になっています"
+        case .other:
+            return "AI 処理でエラーが発生しました"
         }
     }
 
@@ -257,8 +273,9 @@ final class AIActionCoordinator {
                     s.play()
                 }
             } catch {
-                PasteToast.shared.show(targetApp: nil,
-                                       customMessage: "マクロ失敗: \(error.localizedDescription)")
+                // v0.9.6-beta (P1 #10): typed AIError → 文言。
+                let msg = "マクロ失敗: " + aiErrorToastMessage(error)
+                PasteToast.shared.show(targetApp: nil, customMessage: msg)
                 if useGlow { ScreenGlowController.shared.showFailure() }
                 if useSound, let s = NSSound(named: NSSound.Name("Funk")) {
                     s.play()
@@ -329,6 +346,22 @@ final class PasteHistory {
     func undoLast() {
         Task { @MainActor in
             await PreviousAppTracker.shared.restoreFocus()
+            // v0.9.6-beta (audit follow-up #4): synthesized ⌘Z は HID event tap を
+            // 通るので Accessibility 権限が無いと黙って失敗する。明示的にガードして
+            // 失敗理由を broadcast し、トースト UI 側で「権限が無い」と分かるようにする。
+            guard AXIsProcessTrusted() else {
+                NotificationCenter.default.post(
+                    name: .pastyPasteFailed,
+                    object: nil,
+                    userInfo: ["reason": "no_accessibility"]
+                )
+                PasteToast.shared.show(
+                    targetApp: nil,
+                    customMessage: "アクセシビリティ権限が無効です。設定で再付与してください"
+                )
+                PasteAutomator.showAccessibilityRevokedAlert()
+                return
+            }
             let src = CGEventSource(stateID: .combinedSessionState)
             let down = CGEvent(keyboardEventSource: src, virtualKey: 0x06, keyDown: true) // kVK_ANSI_Z
             down?.flags = .maskCommand

@@ -67,15 +67,22 @@ struct PastyApp: App {
             installable.prewarmStrip()
             _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
 
-            // Subscribe to settings notifications.
-            NotificationCenter.default.addObserver(forName: .pastyWipeAll,
-                                                   object: nil, queue: .main) { _ in
+            // Subscribe to settings notifications. Capture the observer tokens
+            // so `applicationWillTerminate(_:)` can tear them down on quit and
+            // we don't leak the closure references across an app relaunch
+            // (sandbox / fast-restart scenarios).
+            let wipeToken = NotificationCenter.default.addObserver(
+                forName: .pastyWipeAll, object: nil, queue: .main
+            ) { _ in
                 Task { try? await store2.deleteAll() }
             }
-            NotificationCenter.default.addObserver(forName: .pastyOpenSettings,
-                                                   object: nil, queue: .main) { _ in
+            let openToken = NotificationCenter.default.addObserver(
+                forName: .pastyOpenSettings, object: nil, queue: .main
+            ) { _ in
                 openSettingsWindowRobustly()
             }
+            AppDelegate.stage1Observers.append(wipeToken)
+            AppDelegate.stage1Observers.append(openToken)
         }
 
         // Stage 2 — 0.5s 遅延 (非クリティカル / 起動後タスク)
@@ -83,6 +90,41 @@ struct PastyApp: App {
             // Sparkle: SPUStandardUpdaterController(startingUpdater: true) を呼んだ時点で
             // 自動チェッカーが起動するので、shared にアクセスするだけで初期化される。
             _ = SparkleUpdater.shared
+
+            // v0.9.6-beta (P1 #7): Sparkle のフェイル/インストール完了をトーストで表面化する。
+            // failed reason: "network" | "edsa" | "sandbox" | "other"
+            let sparkleFailedToken = NotificationCenter.default.addObserver(
+                forName: .pastySparkleUpdateFailed,
+                object: nil, queue: .main
+            ) { note in
+                let reason = (note.userInfo?["reason"] as? String) ?? "other"
+                let message: String
+                switch reason {
+                case "network": message = "アップデートのダウンロードに失敗しました（ネットワークエラー）"
+                case "edsa":    message = "アップデートの署名検証に失敗しました"
+                case "sandbox": message = "アップデートのインストール権限がありません"
+                default:        message = "アップデートに失敗しました"
+                }
+                Task { @MainActor in
+                    PasteToast.shared.show(targetApp: nil,
+                                           customMessage: message,
+                                           durationSeconds: 2.4)
+                }
+            }
+            let sparkleInstalledToken = NotificationCenter.default.addObserver(
+                forName: .pastySparkleUpdateInstalled,
+                object: nil, queue: .main
+            ) { note in
+                let version = (note.userInfo?["version"] as? String) ?? ""
+                let message = "Pasty を更新しました（バージョン \(version)）"
+                Task { @MainActor in
+                    PasteToast.shared.show(targetApp: nil,
+                                           customMessage: message,
+                                           durationSeconds: 2.4)
+                }
+            }
+            AppDelegate.stage1Observers.append(sparkleFailedToken)
+            AppDelegate.stage1Observers.append(sparkleInstalledToken)
 
             // 初回起動時のオンボーディング
             OnboardingPresenter.shared.presentIfNeeded {
@@ -218,8 +260,21 @@ private struct MenuBarLabel: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Stage-1 NotificationCenter observer tokens captured during
+    /// `PastyApp.init`'s immediate `DispatchQueue.main.async` block. We tear
+    /// them down in `applicationWillTerminate(_:)` to avoid the observers
+    /// outliving their owning state — see `PastyApp.init` for the call site.
+    static var stage1Observers: [NSObjectProtocol] = []
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        for token in AppDelegate.stage1Observers {
+            NotificationCenter.default.removeObserver(token)
+        }
+        AppDelegate.stage1Observers.removeAll()
     }
 }
 

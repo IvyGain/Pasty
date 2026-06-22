@@ -28,57 +28,67 @@ enum SyntaxHighlighter {
         return base
     }
 
+    // v0.9.6-beta P1 #3: precompile the regex set per language at type-load
+    // time. Hot-path callers (preview rendering on every keystroke / scroll)
+    // now reuse the same `NSRegularExpression` instances instead of paying
+    // `try!` on each invocation.
+    private static let swiftRules: [Rule] = [
+        Rule(pattern: #"\b(let|var|func|class|struct|enum|extension|protocol|import|return|if|else|guard|for|in|while|switch|case|break|continue|defer|do|try|catch|throw|throws|public|private|internal|static|final|some|any|where|init|deinit|self|super|true|false|nil)\b"#, color: .systemPink),
+        Rule(pattern: #""([^"\\]|\\.)*""#, color: .systemRed),
+        Rule(pattern: #"//[^\n]*"#, color: .systemGray),
+        Rule(pattern: #"\b[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
+    ]
+
+    private static let pythonRules: [Rule] = [
+        Rule(pattern: #"\b(def|class|return|if|elif|else|for|while|in|import|from|as|with|try|except|raise|pass|None|True|False|lambda|yield|await|async)\b"#, color: .systemPink),
+        Rule(pattern: #"#[^\n]*"#, color: .systemGray),
+        Rule(pattern: #"'([^'\\]|\\.)*'|"([^"\\]|\\.)*""#, color: .systemRed),
+        Rule(pattern: #"\b[0-9]+\b"#, color: .systemOrange),
+    ]
+
+    private static let jsonRules: [Rule] = [
+        Rule(pattern: #""([^"\\]|\\.)*"\s*:"#, color: .systemBlue),
+        Rule(pattern: #":\s*"([^"\\]|\\.)*""#, color: .systemRed),
+        Rule(pattern: #"\b(true|false|null)\b"#, color: .systemPink),
+        Rule(pattern: #"\b-?[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
+    ]
+
+    private static let markdownRules: [Rule] = [
+        Rule(pattern: #"^#{1,6}\s.*$"#, color: .systemPurple, options: [.anchorsMatchLines]),
+        Rule(pattern: #"\*\*[^*]+\*\*"#, color: .systemPink),
+        Rule(pattern: #"`[^`]+`"#, color: .systemRed),
+        Rule(pattern: #"\[[^\]]+\]\([^)]+\)"#, color: .systemBlue),
+    ]
+
+    private static let htmlRules: [Rule] = [
+        Rule(pattern: #"</?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?>"#, color: .systemPink),
+        Rule(pattern: #"\b[a-zA-Z-]+="([^"]*)""#, color: .systemBlue),
+        Rule(pattern: #"<!--[\s\S]*?-->"#, color: .systemGray),
+    ]
+
+    private static let javascriptRules: [Rule] = [
+        Rule(pattern: #"\b(const|let|var|function|return|if|else|for|while|switch|case|break|continue|class|extends|new|this|super|true|false|null|undefined|async|await|import|from|export|default)\b"#, color: .systemPink),
+        Rule(pattern: #"//[^\n]*"#, color: .systemGray),
+        Rule(pattern: #""([^"\\]|\\.)*"|'([^'\\]|\\.)*'|`([^`\\]|\\.)*`"#, color: .systemRed),
+        Rule(pattern: #"\b[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
+    ]
+
+    private static let shellRules: [Rule] = [
+        Rule(pattern: #"^\s*#[^\n]*"#, color: .systemGray, options: [.anchorsMatchLines]),
+        Rule(pattern: #"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?"#, color: .systemBlue),
+        Rule(pattern: #""([^"\\]|\\.)*"|'[^']*'"#, color: .systemRed),
+    ]
+
     private static func rules(for lang: Language) -> [Rule] {
         switch lang {
-        case .plain:
-            return []
-        case .swift:
-            return [
-                Rule(pattern: #"\b(let|var|func|class|struct|enum|extension|protocol|import|return|if|else|guard|for|in|while|switch|case|break|continue|defer|do|try|catch|throw|throws|public|private|internal|static|final|some|any|where|init|deinit|self|super|true|false|nil)\b"#, color: .systemPink),
-                Rule(pattern: #""([^"\\]|\\.)*""#, color: .systemRed),
-                Rule(pattern: #"//[^\n]*"#, color: .systemGray),
-                Rule(pattern: #"\b[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
-            ]
-        case .python:
-            return [
-                Rule(pattern: #"\b(def|class|return|if|elif|else|for|while|in|import|from|as|with|try|except|raise|pass|None|True|False|lambda|yield|await|async)\b"#, color: .systemPink),
-                Rule(pattern: #"#[^\n]*"#, color: .systemGray),
-                Rule(pattern: #"'([^'\\]|\\.)*'|"([^"\\]|\\.)*""#, color: .systemRed),
-                Rule(pattern: #"\b[0-9]+\b"#, color: .systemOrange),
-            ]
-        case .json:
-            return [
-                Rule(pattern: #""([^"\\]|\\.)*"\s*:"#, color: .systemBlue),
-                Rule(pattern: #":\s*"([^"\\]|\\.)*""#, color: .systemRed),
-                Rule(pattern: #"\b(true|false|null)\b"#, color: .systemPink),
-                Rule(pattern: #"\b-?[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
-            ]
-        case .markdown:
-            return [
-                Rule(pattern: #"^#{1,6}\s.*$"#, color: .systemPurple, options: [.anchorsMatchLines]),
-                Rule(pattern: #"\*\*[^*]+\*\*"#, color: .systemPink),
-                Rule(pattern: #"`[^`]+`"#, color: .systemRed),
-                Rule(pattern: #"\[[^\]]+\]\([^)]+\)"#, color: .systemBlue),
-            ]
-        case .html:
-            return [
-                Rule(pattern: #"</?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?>"#, color: .systemPink),
-                Rule(pattern: #"\b[a-zA-Z-]+="([^"]*)""#, color: .systemBlue),
-                Rule(pattern: #"<!--[\s\S]*?-->"#, color: .systemGray),
-            ]
-        case .javascript:
-            return [
-                Rule(pattern: #"\b(const|let|var|function|return|if|else|for|while|switch|case|break|continue|class|extends|new|this|super|true|false|null|undefined|async|await|import|from|export|default)\b"#, color: .systemPink),
-                Rule(pattern: #"//[^\n]*"#, color: .systemGray),
-                Rule(pattern: #""([^"\\]|\\.)*"|'([^'\\]|\\.)*'|`([^`\\]|\\.)*`"#, color: .systemRed),
-                Rule(pattern: #"\b[0-9]+(?:\.[0-9]+)?\b"#, color: .systemOrange),
-            ]
-        case .shell:
-            return [
-                Rule(pattern: #"^\s*#[^\n]*"#, color: .systemGray, options: [.anchorsMatchLines]),
-                Rule(pattern: #"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?"#, color: .systemBlue),
-                Rule(pattern: #""([^"\\]|\\.)*"|'[^']*'"#, color: .systemRed),
-            ]
+        case .plain:      return []
+        case .swift:      return swiftRules
+        case .python:     return pythonRules
+        case .json:       return jsonRules
+        case .markdown:   return markdownRules
+        case .html:       return htmlRules
+        case .javascript: return javascriptRules
+        case .shell:      return shellRules
         }
     }
 

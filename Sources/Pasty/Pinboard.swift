@@ -98,10 +98,15 @@ final class PinboardStore: ObservableObject {
         try await dbWriter.read { db in
             // pinboard_items.title が non-NULL なら、それを `pinDisplayTitle` として
             // メモリ上だけセット。本文 (preview / content) は触らない。
+            // v0.9.6-beta (follow-up #2): hide soft-deleted clips from
+            // pinboard contents. pinboard_items rows survive the soft delete
+            // (so re-pinning on restore stays cheap), but the clip itself must
+            // not surface in the UI until deleted_at is cleared.
             let rows = try Row.fetchAll(db, sql: """
                 SELECT c.*, pi.title AS pi_title FROM clips c
                 JOIN pinboard_items pi ON pi.clipId = c.id
                 WHERE pi.pinboardId = ?
+                  AND c.deleted_at IS NULL
                 ORDER BY pi.sortOrder
                 """, arguments: [pinboardId])
             return rows.compactMap { row -> ClipItem? in

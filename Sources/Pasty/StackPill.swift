@@ -59,7 +59,7 @@ final class StackPillController {
     private var stack: PasteStack?
     private weak var coordinator: PanelCoordinator?
     private var cancellables = Set<AnyCancellable>()
-    private var screenObserver: NSObjectProtocol?
+    private var screenObserverToken: NSObjectProtocol?
     /// Coalesces rapid-fire clicks into a single paste at the controller level.
     /// SwiftUI Button taps can fire twice in quick succession on first activate;
     /// without this guard we observed the Pill repeatedly pasting into the host
@@ -75,6 +75,12 @@ final class StackPillController {
     private let edgeMargin: CGFloat = 24
 
     private init() {}
+
+    deinit {
+        if let token = screenObserverToken {
+            NotificationCenter.default.removeObserver(token)
+        }
+    }
 
     // MARK: API
 
@@ -99,8 +105,8 @@ final class StackPillController {
             .store(in: &cancellables)
 
         // 画面構成が変わったら追従。マルチモニタやノッチ表示で位置がずれるのを防ぐ。
-        if screenObserver == nil {
-            screenObserver = NotificationCenter.default.addObserver(
+        if screenObserverToken == nil {
+            screenObserverToken = NotificationCenter.default.addObserver(
                 forName: NSApplication.didChangeScreenParametersNotification,
                 object: nil,
                 queue: .main

@@ -90,6 +90,74 @@ public enum AIEngineError: LocalizedError {
     }
 }
 
+/// v0.9.6-beta (P1 #10): UI 層から `switch` で分岐できる typed error。
+/// `AIEngineError` を吸収して 4 つの代表ケースに集約する。
+public enum AIError: Error {
+    case modelNotAvailable
+    case osUnsupported
+    case aiDisabledBySettings
+    case other(Error)
+
+    /// 既存の `AIEngineError` / 任意の `Error` を `AIError` にマップする。
+    /// 呼び出し側は `catch let e as AIError` か、`AIError.from(error)` を使う。
+    public static func from(_ error: Error) -> AIError {
+        if let aiErr = error as? AIError { return aiErr }
+        if let engineErr = error as? AIEngineError {
+            switch engineErr {
+            case .modelUnavailable:
+                // macOS 26 未満なら OS 不一致、それ以外なら model unavailable。
+                if #available(macOS 26.0, *) {
+                    return .modelNotAvailable
+                } else {
+                    return .osUnsupported
+                }
+            case .requestFailed(let underlying):
+                return .other(underlying)
+            case .invalidInput:
+                return .other(engineErr)
+            }
+        }
+        return .other(error)
+    }
+}
+
+// MARK: - OCR concurrency gate
+
+/// v0.9.6-beta P1 #2: Vision `VNRecognizeTextRequest` is heavy enough that
+/// firing it concurrently for every image clip can pin all P-cores. Throttle
+/// to at most 2 concurrent OCR jobs via this actor-guarded semaphore.
+actor OCRQueue {
+    static let shared = OCRQueue(max: 2)
+
+    private let max: Int
+    private var inFlight: Int = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(max: Int) {
+        self.max = max
+    }
+
+    func acquire() async {
+        if inFlight < max {
+            inFlight += 1
+            return
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            waiters.append(cont)
+        }
+    }
+
+    func release() {
+        if let next = waiters.first {
+            waiters.removeFirst()
+            // Slot stays occupied; ownership transfers to the woken waiter.
+            next.resume()
+        } else {
+            inFlight = Swift.max(0, inFlight - 1)
+        }
+    }
+}
+
 // MARK: - AIEngine
 
 /// On-device intelligence layer. Everything here runs locally and is free.
@@ -110,6 +178,9 @@ enum AIEngine {
         guard let image = NSImage(data: data),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         else { return nil }
+        // v0.9.6-beta P1 #2: cap concurrent Vision OCR requests at 2.
+        await OCRQueue.shared.acquire()
+        defer { Task { await OCRQueue.shared.release() } }
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true

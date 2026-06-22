@@ -1292,13 +1292,27 @@ struct StripView: View {
     private func reload() {
         var q = SearchQuery.parse(query)
         if let f = filterKind { q.kind = f }
+        // v0.9.6-beta P1 #5: cap any reload() query at 1000 rows. Loading
+        // 10k+ matches into the SwiftUI list pegged the main thread; 1000
+        // is plenty for any human-driven browse, and we surface a toast
+        // when we hit the cap so the user knows to narrow their search.
+        q.limit = min(q.limit, 1000)
+        let cap = q.limit
 
         if let fid = folderID,
            let board = pinboards.boards.first(where: { $0.id == fid }) {
             Task { @MainActor in
                 let pinned = (try? await pinboards.items(in: board.id ?? -1)) ?? []
-                self.items = applyFilters(pinned, q: q)
+                let filtered = applyFilters(pinned, q: q)
+                let clipped = Array(filtered.prefix(cap))
+                self.items = clipped
                 if selection.cursorIndex >= self.items.count { selection.cursorIndex = 0 }
+                if clipped.count == cap && filtered.count >= cap {
+                    PasteToast.shared.show(
+                        targetApp: nil,
+                        customMessage: "結果が1000件を超えています。検索条件を絞り込んでください"
+                    )
+                }
             }
             return
         }
@@ -1308,6 +1322,12 @@ struct StripView: View {
             let results = (try? await SearchEngine.run(q, store: store)) ?? []
             self.items = results
             if selection.cursorIndex >= results.count { selection.cursorIndex = 0 }
+            if results.count == cap {
+                PasteToast.shared.show(
+                    targetApp: nil,
+                    customMessage: "結果が1000件を超えています。検索条件を絞り込んでください"
+                )
+            }
         }
     }
 

@@ -28,6 +28,10 @@ final class PanelCoordinator: ObservableObject {
     /// テキストキャレットを移してから ⌘V を撃つために使う。
     private(set) var summonPoint: NSPoint?
 
+    /// P1 #18: NSApplication.didChangeScreenParametersNotification の観測トークン。
+    /// ディスプレイ構成変更時に notch hot zone と strip frame を再計算する。
+    private var screenParamsObserver: NSObjectProtocol?
+
     init(store: ClipStore,
          pinboards: PinboardStore,
          stack: PasteStack,
@@ -199,6 +203,33 @@ final class PanelCoordinator: ObservableObject {
             // 払っておき、実際のホバー時は瞬時に表示できるようにする。
             notch.prewarm()
         }
+        installScreenParamsObserver()
+    }
+
+    /// P1 #18: ディスプレイ構成変更を観測。NotchHoverController.install 内にも
+    /// 同名通知の購読があるが、こちらは coordinator 視点で notch を強制再 install し、
+    /// かつ strip が visible なら frame をカーソルのあるスクリーンへ打ち直す二重防壁。
+    private func installScreenParamsObserver() {
+        if let token = screenParamsObserver {
+            NotificationCenter.default.removeObserver(token)
+            screenParamsObserver = nil
+        }
+        screenParamsObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if SettingsStore.shared.notchHoverEnabled {
+                    self.notch.install()
+                }
+                if let strip = self.strip, strip.isVisible,
+                   let screen = NSScreen.cursorScreen() {
+                    strip.position(onScreen: screen)
+                }
+            }
+        }
     }
 
     /// ⇧⌘V を押した瞬間の体感を「ほぼゼロ」にするため、Strip パネルと
@@ -297,8 +328,20 @@ final class PanelCoordinator: ObservableObject {
                 // monitor なので、ここでも multiMode を尊重しないと「選択中に Esc 1 回で
                 // 消える」状態が再発する。
                 if let sel = selection, sel.multiMode {
+                    // P1 #17: Esc 時に primary mouse button が押されたままなら
+                    // (= D&D 中)、宙ぶらりんになった drag セッションを leftMouseUp
+                    // 合成で終わらせる。NSEvent.pressedMouseButtons bit 0 = primary。
+                    // これがないと SwiftUI .onDrag 経路の残骸が裏に残って次の
+                    // クリックで「掴んだまま」になる。
+                    if (NSEvent.pressedMouseButtons & 0x1) != 0 {
+                        self.synthesizeLeftMouseUpForStaleDrag()
+                    }
                     Task { @MainActor in sel.clearAll() }
                     return nil
+                }
+                // P1 #17: 非 multiMode の Esc dismiss でも同じクリーンアップ。
+                if (NSEvent.pressedMouseButtons & 0x1) != 0 {
+                    self.synthesizeLeftMouseUpForStaleDrag()
                 }
                 Task { @MainActor in self.dismissStrip() }
                 return nil
@@ -321,6 +364,27 @@ final class PanelCoordinator: ObservableObject {
             stripEscMonitor = nil
         }
         strip?.orderOut(nil)
+    }
+
+    /// P1 #17: Esc 押下時 primary mouse button が押下中の場合、宙ぶらりんになった
+    /// drag セッションを終わらせるため leftMouseUp を現在のカーソル位置に合成投下する。
+    /// NSEvent.mouseLocation は AppKit (左下原点)、CGEvent は Quartz (左上原点) なので
+    /// main screen の高さで y を反転する。main screen が取れないフォールバックは
+    /// 反転無しでそのまま渡す (実害最小化)。
+    fileprivate func synthesizeLeftMouseUpForStaleDrag() {
+        let appKitPoint = NSEvent.mouseLocation
+        let cgPoint: CGPoint
+        if let mainHeight = NSScreen.main?.frame.height {
+            cgPoint = CGPoint(x: appKitPoint.x, y: mainHeight - appKitPoint.y)
+        } else {
+            cgPoint = CGPoint(x: appKitPoint.x, y: appKitPoint.y)
+        }
+        if let event = CGEvent(mouseEventSource: nil,
+                               mouseType: .leftMouseUp,
+                               mouseCursorPosition: cgPoint,
+                               mouseButton: .left) {
+            event.post(tap: .cghidEventTap)
+        }
     }
 
     private func makeStrip() -> StripPanel {

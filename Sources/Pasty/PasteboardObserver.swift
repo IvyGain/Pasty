@@ -17,6 +17,13 @@ final class PasteboardObserver: ObservableObject {
     private var timer: Timer?
     private let pollInterval: TimeInterval = 0.25
 
+    // v0.9.6-beta P1 #1: SHA256 over identical strings is wasteful when the
+    // pasteboard ticks for unrelated reasons. Cache the last text string and
+    // its hex digest so subsequent identical-text changeCount ticks skip the
+    // SHA256 round entirely. Invalidated whenever a non-text payload arrives.
+    private var lastTextString: String?
+    private var lastTextHash: String?
+
     init(store: ClipStore, pasteboard: NSPasteboard = .general) {
         self.store = store
         self.pasteboard = pasteboard
@@ -140,6 +147,10 @@ final class PasteboardObserver: ObservableObject {
         // 1) File URLs take priority over text representations of the same content.
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
            let url = urls.first {
+            // v0.9.6-beta P1 #1: incoming payload is non-text — drop the text
+            // SHA256 cache so a stale string can't mask the next real text.
+            lastTextString = nil
+            lastTextHash = nil
             let isFile = url.isFileURL
             let preview = isFile ? url.lastPathComponent : url.absoluteString
             let size = Int64(url.absoluteString.utf8.count)
@@ -174,6 +185,19 @@ final class PasteboardObserver: ObservableObject {
                trimmed.range(of: #"^https?://\S+$"#, options: .regularExpression) != nil {
                 kind = .link
             }
+            // v0.9.6-beta P1 #1: SHA256 cache. Identical strings reuse the
+            // previously computed digest; new strings recompute and refresh
+            // both fields.
+            let hash: String
+            if let cachedString = lastTextString,
+               let cachedHash = lastTextHash,
+               cachedString == string {
+                hash = cachedHash
+            } else {
+                hash = Self.sha256(string)
+                lastTextString = string
+                lastTextHash = hash
+            }
             return ClipItem(
                 id: nil,
                 createdAt: now,
@@ -184,7 +208,7 @@ final class PasteboardObserver: ObservableObject {
                 byteSize: Int64(string.utf8.count),
                 sourceBundleId: bundleId,
                 sourceAppName: appName,
-                contentHash: Self.sha256(string)
+                contentHash: hash
             )
         }
 
@@ -192,6 +216,9 @@ final class PasteboardObserver: ObservableObject {
         //    変換してから保存する。Finder / スクリーンショット / Slack の
         //    どれから来ても 1 つのコードパスで吸収できる。
         if let raw = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
+            // v0.9.6-beta P1 #1: non-text payload — drop SHA256 text cache.
+            lastTextString = nil
+            lastTextHash = nil
             let pngData = Self.pngData(from: raw) ?? raw
             let hash = Self.sha256Data(pngData)
             let rel = ClipBlobs.writeImage(pngData, hash: hash, suggestedExt: "png")

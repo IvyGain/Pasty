@@ -37,6 +37,12 @@ final class HoverPreviewController {
     /// The clip that is currently scheduled or showing. Used to avoid no-op
     /// reschedules for the same item.
     private var currentClipID: ClipItem.ID?
+    /// P1 #16: Per-animation token used to guard NSAnimationContext completion
+    /// handlers against stale callbacks. Each `present` / `fadeOutAndClose`
+    /// stamps a fresh UUID here; the completion captures the token it started
+    /// with and bails if it no longer matches (= a newer animation superseded
+    /// it). Prevents stale `orderOut` from killing a freshly shown panel.
+    private var animatingPanelID: UUID?
 
     private init() {}
 
@@ -111,11 +117,26 @@ final class HoverPreviewController {
         panel.alphaValue = 0
         panel.orderFrontRegardless()
 
-        NSAnimationContext.runAnimationGroup { ctx in
+        // P1 #16: stamp a fresh animation token. Any in-flight fade-out
+        // completion captured an older token and will now bail rather than
+        // call `orderOut` on this freshly-presented panel.
+        let expectedID = UUID()
+        animatingPanelID = expectedID
+        NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = fadeDuration
             ctx.allowsImplicitAnimation = true
             panel.animator().alphaValue = 1
-        }
+        }, completionHandler: { [weak self] in
+            // NSAnimationContext completion は Sendable closure として
+            // 扱われるため、main-actor 隔離プロパティ animatingPanelID への
+            // アクセスは Task { @MainActor in ... } 越しで行う。
+            Task { @MainActor in
+                guard let self else { return }
+                // If a newer animation superseded us, leave state alone.
+                guard self.animatingPanelID == expectedID else { return }
+                self.animatingPanelID = nil
+            }
+        })
 
         scheduleAutoDismiss()
     }
@@ -132,12 +153,27 @@ final class HoverPreviewController {
     }
 
     private func fadeOutAndClose(panel: HoverPreviewPanel) {
+        // P1 #16: capture a per-animation token. If a newer animation
+        // (e.g. a fresh `present`) bumps `animatingPanelID` before our
+        // completion fires, we MUST NOT call `orderOut` — that would hide
+        // the just-presented panel and leave the UI looking stuck.
+        let expectedID = UUID()
+        animatingPanelID = expectedID
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = fadeDuration
             ctx.allowsImplicitAnimation = true
             panel.animator().alphaValue = 0
-        }, completionHandler: { [weak panel] in
-            panel?.orderOut(nil)
+        }, completionHandler: { [weak self, weak panel] in
+            // NSAnimationContext completion は Sendable closure。
+            // main-actor 隔離プロパティに触るので MainActor へホップする。
+            Task { @MainActor in
+                guard let self else { return }
+                // Stale completion: a newer animation took over. Return without
+                // mutating panel state.
+                guard self.animatingPanelID == expectedID else { return }
+                self.animatingPanelID = nil
+                panel?.orderOut(nil)
+            }
         })
     }
 

@@ -16,6 +16,10 @@ private let pasteAutomatorLogger = Logger(subsystem: "io.pasty.app", category: "
 ///   - "clipId": Int64 (blob_read only)
 extension Notification.Name {
     static let pastyPasteFailed = Notification.Name("io.pasty.pasteFailed")
+    /// v0.9.6-beta (P1 #8): セッション初回のペースト成功で 1 度だけ post される。
+    /// Sparkle の初回バックグラウンドチェックを「ユーザーがちゃんと使い始めた」
+    /// タイミングまで遅延させるためのトリガ。
+    static let pastyFirstPasteCompleted = Notification.Name("pasty.firstPasteCompleted")
 }
 
 // TODO(v0.9.6-beta P0 #10): wire a toast listener that observes
@@ -31,6 +35,42 @@ extension Notification.Name {
 final class PasteAutomator {
     static let shared = PasteAutomator()
     private init() {}
+
+    /// v0.9.6-beta (P1 #8): セッション内で `pastyFirstPasteCompleted` を 1 度だけ post する
+    /// ためのガード。アプリプロセスが生きている間 true のまま据え置く。
+    private static var hasPostedFirstPaste = false
+
+    /// 初回ペースト成功時に内部から呼ぶ。post 後はフラグが固定されるため、
+    /// 2 回目以降の呼び出しは no-op。
+    static func notifyFirstPasteIfNeeded() {
+        guard !hasPostedFirstPaste else { return }
+        hasPostedFirstPaste = true
+        NotificationCenter.default.post(name: .pastyFirstPasteCompleted, object: nil)
+    }
+
+    /// v0.9.6-beta (P1 #9): アクセシビリティ権限が失効していた時に
+    /// 1 度だけ目立つ NSAlert を出す。連続発火しないよう 5 分のクールダウンを噛ます。
+    private static var lastAccessibilityAlertAt: Date?
+
+    static func showAccessibilityRevokedAlert() {
+        if let last = lastAccessibilityAlertAt,
+           Date().timeIntervalSince(last) < 300 {
+            return
+        }
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "アクセシビリティ権限が必要です"
+            alert.informativeText = "Pasty がペーストを実行するには、システム設定でアクセシビリティ権限を許可してください。"
+            alert.addButton(withTitle: "システム設定を開く")
+            alert.addButton(withTitle: "後で")
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn,
+               let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+            lastAccessibilityAlertAt = Date()
+        }
+    }
 
     /// PanelCoordinator が「パネルを召喚した瞬間のマウス位置」を保存する場所。
     /// 貼付時にここへ合成クリックを送ることで「マウスがあった場所」にキャレットを
@@ -65,6 +105,24 @@ final class PasteAutomator {
         summonMouseLocation = nil
 
         Task { @MainActor in
+            // v0.9.6-beta (P1 #21): if autoPaste is requested but accessibility
+            // is revoked, the synthetic ⌘V will silently fail AFTER we've
+            // already clobbered NSPasteboard.general — destroying whatever the
+            // user had on their clipboard. Check up front and abort before any
+            // pasteboard write so the user's existing clipboard contents stay
+            // intact. Manual-place mode (autoPaste == false) still proceeds
+            // because the user explicitly asked us to load the pasteboard.
+            if autoPaste && !AXIsProcessTrusted() {
+                NotificationCenter.default.post(
+                    name: .pastyPasteFailed,
+                    object: nil,
+                    userInfo: ["reason": "no_accessibility"]
+                )
+                pasteAutomatorLogger.error("_doPaste: AXIsProcessTrusted false; aborting before pasteboard write")
+                PasteAutomator.showAccessibilityRevokedAlert()
+                return
+            }
+
             place(item, asPlainText: asPlainText)
             guard autoPaste else {
                 if SettingsStore.shared.toastEnabled {
@@ -105,6 +163,8 @@ final class PasteAutomator {
                 let anchor = savedSummon ?? NSEvent.mouseLocation
                 PasteToast.shared.show(targetApp: app, near: anchor)
             }
+            // v0.9.6-beta (P1 #8): セッション初回ペースト後に Sparkle 初回 BG チェックを起動。
+            PasteAutomator.notifyFirstPasteIfNeeded()
         }
     }
 
@@ -125,6 +185,9 @@ final class PasteAutomator {
                 userInfo: ["reason": "accessibility"]
             )
             pasteAutomatorLogger.error("clickAtScreenPoint: AXIsProcessTrusted false; aborting click")
+            // v0.9.6-beta (P1 #9): surface a persistent NSAlert (cooldown 5 min)
+            // so the user can jump straight to System Settings.
+            PasteAutomator.showAccessibilityRevokedAlert()
             return
         }
         let primaryHeight = NSScreen.screens.first?.frame.height
@@ -345,6 +408,9 @@ final class PasteAutomator {
                     durationSeconds: 4
                 )
             }
+            // v0.9.6-beta (P1 #9): also pop a modal NSAlert (cooldown 5 min) so
+            // a returning user immediately understands why ⌘V silently failed.
+            PasteAutomator.showAccessibilityRevokedAlert()
             return
         }
         let src = CGEventSource(stateID: .combinedSessionState)
@@ -377,6 +443,12 @@ enum ClipBlobs {
             .appendingPathComponent("Pasty", isDirectory: true)
             .appendingPathComponent("blobs", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // v0.9.6-beta (P1 #19): tighten perms to 0o700 unconditionally so
+        // existing installs migrate from looser modes on first access.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: dir.path
+        )
         return dir
     }
 
@@ -391,6 +463,12 @@ enum ClipBlobs {
         let subdir = "images"
         let dir = directory.appendingPathComponent(subdir, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // v0.9.6-beta (P1 #19): tighten image subdir perms to 0o700 so
+        // pasteboard image payloads aren't world-readable.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: dir.path
+        )
         let rel = "\(subdir)/\(hash).\(suggestedExt)"
         let url = directory.appendingPathComponent(rel)
         if !FileManager.default.fileExists(atPath: url.path) {

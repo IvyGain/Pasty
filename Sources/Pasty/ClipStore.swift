@@ -45,6 +45,13 @@ final class ClipStore: ObservableObject {
 
             let blobs = appSupport.appendingPathComponent("blobs", isDirectory: true)
             try FileManager.default.createDirectory(at: blobs, withIntermediateDirectories: true)
+            // v0.9.6-beta (P1 #19): tighten blob dir permissions to 0o700 so
+            // image/file payloads aren't world-readable. Call unconditionally
+            // so upgrades from looser perms get retightened on next launch.
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: blobs.path
+            )
 
             let store = try ClipStore(dbWriter: dbQueue, blobDirectory: blobs)
             return store
@@ -257,6 +264,78 @@ final class ClipStore: ObservableObject {
                 """)
         }
 
+        // v0.9.6-beta (P1 #12): keep `clips_fts` in lockstep with soft-delete
+        // transitions. The v8.fts5_with_ocr AFTER UPDATE trigger (`clips_au`)
+        // re-inserts the row into the FTS index on EVERY column change, which
+        // would resurrect a tombstoned row immediately after a soft delete
+        // (UPDATE clips SET deleted_at = ?). We rebuild `clips_au` to honor
+        // `deleted_at`:
+        //   • new.deleted_at IS NULL ⇒ normal edit: delete-then-insert (as before).
+        //   • new.deleted_at IS NOT NULL ⇒ tombstoned: only delete from FTS, no
+        //     re-insert.
+        // Two separate triggers because SQLite triggers can't carry CASE
+        // branches in their action — splitting on WHEN keeps things atomic and
+        // makes the intent obvious to future readers.
+        // The column list mirrors the v8.fts5_with_ocr triggers
+        // (preview, content, sourceAppName, extractedOCRText) so the contentless
+        // FTS5 stays consistent with what backfill writes.
+        //
+        // We also add a dedicated `clips_softdelete_au_restore` trigger keyed
+        // on `OF deleted_at` so that flipping deleted_at back to NULL (restore)
+        // forces a re-insert even if no other column changed in the same
+        // UPDATE statement.
+        migrator.registerMigration("v10.fts5_softdelete_trigger") { db in
+            // GRDB's `db.create(virtualTable: "clips_fts", using: FTS5())` in
+            // migration v1 auto-created sync triggers named `__clips_fts_ai/au/ad`
+            // (via `t.synchronize(withTable: "clips")`). The v8 migration
+            // dropped the FTS5 table and recreated it in external-content mode
+            // with its own manual `clips_ai/au/ad` triggers, but SQLite does
+            // NOT cascade-drop trigger objects when the underlying table is
+            // dropped — so the v1 sync triggers kept firing on every
+            // INSERT/UPDATE/DELETE of `clips`, double-writing to the new FTS5
+            // table and (crucially) re-inserting rows into `clips_fts` on
+            // UPDATE even after a soft-delete tried to evict them.
+            //
+            // We only drop the AFTER UPDATE one (`__clips_fts_au`) here — the
+            // INSERT/DELETE counterparts are functionally redundant with v8's
+            // manual triggers but they don't interfere with the soft-delete
+            // semantics we're adding, and removing them changes how the FTS
+            // index responds to direct `DELETE FROM clips_fts` rebuild calls
+            // (regression risk we'd rather not take in this migration).
+            // Targeting `__clips_fts_au` is enough to make the soft-delete
+            // pipeline below win.
+            try db.execute(sql: "DROP TRIGGER IF EXISTS __clips_fts_au")
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_au")
+            try db.execute(sql: """
+                CREATE TRIGGER clips_au AFTER UPDATE ON clips
+                WHEN NEW.deleted_at IS NULL
+                BEGIN
+                  INSERT INTO clips_fts(clips_fts, rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES ('delete', old.id, old.preview, old.content, old.sourceAppName, old.extractedOCRText);
+                  INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES (new.id, new.preview, new.content, new.sourceAppName, new.extractedOCRText);
+                END
+                """)
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_softdelete_au")
+            try db.execute(sql: """
+                CREATE TRIGGER clips_softdelete_au AFTER UPDATE OF deleted_at ON clips
+                WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL
+                BEGIN
+                  INSERT INTO clips_fts(clips_fts, rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES ('delete', old.id, old.preview, old.content, old.sourceAppName, old.extractedOCRText);
+                END
+                """)
+            try db.execute(sql: "DROP TRIGGER IF EXISTS clips_softdelete_au_restore")
+            try db.execute(sql: """
+                CREATE TRIGGER clips_softdelete_au_restore AFTER UPDATE OF deleted_at ON clips
+                WHEN NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL
+                BEGIN
+                  INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                  VALUES (new.id, new.preview, new.content, new.sourceAppName, new.extractedOCRText);
+                END
+                """)
+        }
+
         try migrator.migrate(dbWriter)
     }
 
@@ -301,7 +380,38 @@ final class ClipStore: ObservableObject {
     /// `WHERE entity_uuid IS NULL` ガードがある限り並行 INSERT と衝突しない。
     func backfillEntityUUIDsIfNeeded() async {
         let flagKey = "pasty.entityUuidBackfillCompleted"
-        if UserDefaults.standard.bool(forKey: flagKey) { return }
+
+        // v0.9.6-beta (P1 #20): the UserDefaults flag alone was insufficient —
+        // if a previous run set the flag after a partial/interrupted backfill,
+        // or if rows were inserted afterwards via a buggy upgrade path without
+        // entity_uuid, those rows stayed permanently NULL and broke iCloud
+        // sync identity. We now ALWAYS issue a cheap COUNT(*) query first
+        // (across all three tables) and only short-circuit if both the flag is
+        // set AND the count is zero. Any non-zero count forces a backfill pass
+        // and re-stamps the flag at the end.
+        let nullCount: Int
+        do {
+            nullCount = try await dbWriter.read { db in
+                var total = 0
+                for table in ["clips", "pinboards", "pinboard_items"] {
+                    let n = try Int.fetchOne(
+                        db,
+                        sql: "SELECT COUNT(*) FROM \(table) WHERE entity_uuid IS NULL OR entity_uuid = ''"
+                    ) ?? 0
+                    total += n
+                }
+                return total
+            }
+        } catch {
+            NSLog("[ClipStore] entity_uuid backfill count failed: \(error)")
+            return
+        }
+
+        if nullCount == 0 {
+            // Stamp the flag so future launches skip even the COUNT path.
+            UserDefaults.standard.set(true, forKey: flagKey)
+            return
+        }
 
         await Task.detached(priority: .background) { [weak self] in
             guard let self else { return }

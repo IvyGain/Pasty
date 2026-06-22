@@ -238,12 +238,7 @@ struct ClipPreviewView: View {
     @ViewBuilder
     private func markdownView(raw: String) -> some View {
         ScrollView {
-            if let attr = try? AttributedString(
-                markdown: raw,
-                options: AttributedString.MarkdownParsingOptions(
-                    interpretedSyntax: .inlineOnlyPreservingWhitespace
-                )
-            ) {
+            if let attr = Self.cachedMarkdownAttributedString(raw: raw, clip: clip) {
                 Text(attr)
                     .font(isCompact ? .caption : .body)
                     .textSelection(.enabled)
@@ -255,6 +250,37 @@ struct ClipPreviewView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    // v0.9.6-beta P1 #4: memoize markdown -> AttributedString conversion.
+    // `AttributedString(markdown:)` is allocation-heavy; reparsing the same
+    // clip on every body re-evaluation made scrolling jittery. Cache by
+    // `clipID|contentHash` via an `NSCache` (so the system can evict on
+    // memory pressure) and store `NSAttributedString` for AppKit interop.
+    private static let markdownCache: NSCache<NSString, NSAttributedString> = {
+        let cache = NSCache<NSString, NSAttributedString>()
+        cache.countLimit = 256
+        return cache
+    }()
+
+    private static func cachedMarkdownAttributedString(raw: String,
+                                                       clip: ClipItem) -> AttributedString? {
+        let idPart = clip.id.map(String.init) ?? "nil"
+        let key = "\(idPart)|\(clip.contentHash)" as NSString
+        if let cached = markdownCache.object(forKey: key) {
+            return try? AttributedString(cached, including: \.foundation)
+        }
+        guard let parsed = try? AttributedString(
+            markdown: raw,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        ) else {
+            return nil
+        }
+        let ns = NSAttributedString(parsed)
+        markdownCache.setObject(ns, forKey: key)
+        return parsed
     }
 
     // MARK: - RichText

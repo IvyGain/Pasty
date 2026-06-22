@@ -68,17 +68,27 @@ enum SearchEngine {
 
             var rows: [ClipItem]
             if q.freeText.isEmpty {
+                // v0.9.6-beta (follow-up #1): exclude soft-deleted rows from
+                // the empty-query / browse path so the search DSL never
+                // surfaces tombstoned clips even when no FTS5 MATCH is used.
                 rows = try ClipItem
+                    .filter(sql: "deleted_at IS NULL")
                     .order(ClipItem.Columns.createdAt.desc)
                     .limit(q.limit * 2)
                     .fetchAll(db)
             } else {
                 let pattern = FTS5Pattern(matchingAllPrefixesIn: q.freeText)
                     ?? FTS5Pattern(matchingAnyTokenIn: q.freeText)
+                // v0.9.6-beta (follow-up #1): clips_fts is in external-content
+                // mode; soft-deleted rows can linger in the FTS index until the
+                // clips_softdelete_au trigger (migration v10) fires or a
+                // backfill rebuilds it. AND clips.deleted_at IS NULL on the
+                // clips side so the DSL stays consistent with ClipStore.search.
                 rows = try ClipItem.fetchAll(db, sql: """
                     SELECT clips.* FROM clips
                     JOIN clips_fts ON clips_fts.rowid = clips.id
                     WHERE clips_fts MATCH ?
+                      AND clips.deleted_at IS NULL
                     ORDER BY clips.createdAt DESC
                     LIMIT ?
                     """, arguments: [pattern, q.limit * 2])
