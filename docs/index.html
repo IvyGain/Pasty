@@ -1197,10 +1197,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.5-beta · 新機能・修正 · MIT</span>
+      <span class="eyebrow">v0.9.6-beta · 信頼性向上 · ディスク掃除 · セキュリティ強化 · 操作の堅さ · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「クリップを賢く、フォルダを安定に。」
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「データを失わない、操作を取りこぼさない、機密を漏らさない。」v0.
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1830,7 +1830,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.5-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.6-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1879,7 +1879,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.5-beta+ 推奨</span>
+          <span>Pasty v0.9.6-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -2136,10 +2136,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.5-beta</div>
+        <div class="ver">v0.9.6-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.5-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.6-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -2152,9 +2152,59 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.5-beta</span>
+        <span class="v">v0.9.6-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty v0.9.6-beta — 14 件の P0 安定化パック</h1>
+<p>「データを失わない、操作を取りこぼさない、機密を漏らさない。」v0.9.5-beta の Stability Audit で洗い出された 14 件の P0 をまとめて落とします。</p>
+<h2>🛡 信頼性向上</h2>
+<h3>Soft-delete の徹底</h3>
+<p>クリップを削除した瞬間に DB から物理消去するのをやめ、<code>deleted_at</code> タイムスタンプで <strong>論理削除に統一</strong> しました。これまでは UI 上の削除と内部読み出しのタイミングで「削除したはずのクリップが一瞬戻る」「FTS5 の結果に残骸が混じる」といった不整合が稀に発生していました。UI / Recent / Search / byId / FTS5 JOIN の全 SELECT パスに <code>WHERE deleted_at IS NULL</code> を強制し、削除されたクリップは表示・検索の双方から確実に消えます。</p>
+<h3>FTS5 バックフィル冪等マーカー</h3>
+<p>全文検索インデックス (FTS5) の再構築は本来 v8 で完了しているはずですが、過去のアップグレード経路では稀に未完で終わるケースが報告されていました。v9 で <code>pasty_meta</code> テーブルを新設し、<code>v8.fts5_backfilled = true</code> マーカーが無い場合は起動時に冪等で再投入します。一度完了すれば二度走らないので起動が遅くなることもありません。</p>
+<h3>DB 破損からの自動復旧</h3>
+<p>これまで ClipStore の初期化に失敗するとアプリは fatalError でクラッシュし、ユーザーは手動でファイルを退避する必要がありました。これからは <code>clips.db</code> を <code>clips.db.corrupt-&lt;timestamp&gt;</code> に退避し、新規 DB で起動を続行、NSAlert で「DB を再構築しました。バックアップは clips.db.corrupt-... に保存されています。」と通知します。データロスはバックアップで救済可能、起動だけは止まりません。</p>
+<h2>🧹 ディスク掃除</h2>
+<h3>起動時 Blob GC</h3>
+<p>画像 / 動画 / PDF / ファイルクリップの実データは <code>~/Library/Application Support/io.pasty.app/blobs/</code> 配下に保存されます。これまでは tombstone 化したクリップの blob が永遠に残り続けていました。起動から ~1 秒後に <strong>BlobGC.sweep</strong> がバックグラウンドで走り、<code>deleted_at</code> から 30 日経過したクリップの blob と、どのクリップからも参照されない孤児 blob を削除します。30 日のグレース期間で、誤削除した直後でも元データは残っているので Undo 可能なまま掃除が進みます。</p>
+<h2>🔒 セキュリティ強化</h2>
+<h3>アクセシビリティ未許可時のサイレント失敗を解消</h3>
+<p>これまで Pasty のアクセシビリティ権限が無効化されている状態でクリップを貼ろうとすると、CGEvent.post が空打ちになって <strong>「貼ったつもりが貼れていない」</strong> という最悪のサイレント失敗を起こすことがありました。<code>AXIsProcessTrusted()</code> で全 CGEvent.post サイトをガードし、未許可ならば <code>pastyPasteFailed</code> 通知を発火、Toast でユーザーに「アクセシビリティ権限を許可」と促せるようにしました。Blob 読み込み失敗も同様に通知化、無音で失敗することは無くなります。</p>
+<h3>OCR テキストの機密データ自動マスク</h3>
+<p>画像クリップから抽出した OCR テキストには稀にクレジットカード番号 / SSN / マイナンバー / API トークン / IBAN / 電話番号が含まれます。デフォルト ON で <strong>正規表現 + Luhn 検証</strong> で検出し、<code>[CARD]</code> / <code>[SSN]</code> / <code>[MYNUMBER]</code> / <code>[TOKEN]</code> / <code>[IBAN]</code> / <code>[PHONE]</code> に置換してから DB / FTS5 / AI に渡します。設定 → OCR の「機密データ自動マスク (CC / 身分証 / API トークン)」で無効化も可能。メールアドレスは検索性のため保持します。</p>
+<h3>NotificationCenter observer リーク修正</h3>
+<p>StripPanel が NotificationCenter にぶら下げた observer が <code>.onDisappear</code> で外れず、長時間稼働で memory pressure が増えていた問題を修正。observer token を捕捉して disappear 時に確実に剥がします。</p>
+<h3>MultiMode ペースト中レース修正</h3>
+<p>複数選択で連続ペースト中に ClipStore の更新が走ると、選択中のクリップ ID 配列が縮んでペースト対象がブレるケースがありました。ペースト開始時に ID をスナップショットして ID キー解決で 1 件ずつ処理、tombstone 化したクリップはスキップして次に進みます。</p>
+<h2>📊 操作の堅さ</h2>
+<h3>NotchHover の表示中断レース修正</h3>
+<p>通知バー (NotchHover) の dismiss アニメーション中に再度トリガーすると、アルファ値が中途半端な状態で固まったり、Z オーダーが沈んだまま再表示される問題を修正。<code>isDismissing</code> フラグで状態遷移を捉えて、show 時に進行中アニメーションをキャンセルして見える状態を復元してから表示し直します。</p>
+<h3>サムネイル生成の TOCTOU 修正</h3>
+<p>動画 / PDF のサムネイル生成で、同じクリップに対する 2 つの concurrent リクエストが「片方が走っていればもう片方は待つ」をすり抜けて重複生成していた問題を NSLock で atomize。重複したファイル I/O が消えます。</p>
+<h2>📦 内部修正</h2>
+<ul>
+<li><code>FileManager.urls(...).first!</code> を guard 化 (URLLinkPreview / DragDropSupport)</li>
+<li><code>URL(string: "about:blank")!</code> を nil-coalescing でフォールバック (DragDropSupport)</li>
+<li>ペースト失敗時の <code>pastyPasteFailed</code> 通知導入 (将来の Toast UI の土台)</li>
+<li>BlobGC + soft-delete 整合性テスト 8 件追加 (ClipStoreSoftDeleteTests)</li>
+<li>SensitiveDataFilter のパターン網羅テスト 12 件追加 (SensitiveDataFilterTests)</li>
+</ul>
+<h2>🧪 テスト</h2>
+<p>全 <strong>36 テスト</strong> pass — 既存 16 + 新規 20 (ClipStore soft-delete × 8、SensitiveDataFilter × 12)。</p>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.6-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.9.6-beta</a></p>
+        <a class="permalink" href="whats-new/0.9.6-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.5-beta</span>
+        
+        <span class="date">2026-06-21</span>
       </summary>
       <div class="body">
 <h1>Pasty v0.9.5-beta — 7 件パッケージ</h1>
