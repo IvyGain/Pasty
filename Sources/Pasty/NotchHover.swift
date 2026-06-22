@@ -62,6 +62,11 @@ final class NotchHoverController: NSObject {
     private var isClipEditOpen: Bool = false
     /// `installContextMenuNotifications` を 1 回だけ呼ぶための idempotency フラグ。
     private var contextMenuObserverInstalled: Bool = false
+    /// v0.9.6 P0 #7: dismiss() のアニメーション中に show() が再入したケースを
+    /// 検知するためのフラグ。dismiss 開始時に true、completionHandler 内で false に戻す。
+    /// true の間に show() が呼ばれたら、アニメーションをキャンセル → alpha/z-order を
+    /// 復元 → 通常の show パスに合流して「閉じかけ→即再表示」の race を吸収する。
+    private var isDismissing: Bool = false
 
     init(store: ClipStore,
          pinboards: PinboardStore,
@@ -256,7 +261,45 @@ final class NotchHoverController: NSObject {
 
     func show(on screen: NSScreen) {
         PerfLog.timing("notch.show.total") {
-            if dropdownPanel != nil { return }
+            // v0.9.6 P0 #7: dismiss() のアニメーション中に再 hover した場合、
+            // dropdownPanel はまだ非 nil なので従来は早期 return していたが、
+            // それだと「閉じかけ」のまま閉じて再度開かなくなる。ここで
+            // isDismissing == true なら進行中アニメーションをキャンセル、
+            // 表示状態を元に戻して show 経路を続行する (idempotent)。
+            if dropdownPanel != nil {
+                if isDismissing, let panel = dropdownPanel {
+                    // 1) 進行中の frame アニメーションをキャンセル
+                    //    NSWindow/NSPanel 自体は layer-backed ではないので
+                    //    contentView 経由で CA アニメーションを止める。frame の
+                    //    補間は NSAnimationContext duration=0 で打ち切る。
+                    panel.contentView?.layer?.removeAllAnimations()
+                    NSAnimationContext.beginGrouping()
+                    NSAnimationContext.current.duration = 0
+                    panel.animator().setFrame(panel.frame, display: false)
+                    NSAnimationContext.endGrouping()
+                    // 2) alpha を完全表示に戻す
+                    panel.alphaValue = 1
+                    // 3) Z-order を前面に戻す
+                    panel.orderFrontRegardless()
+                    // 4) 展開位置に setFrame しなおして show 経路に合流させる
+                    let visible = screen.visibleFrame
+                    let targetWidth: CGFloat = min(visible.width - 32, 1320)
+                    let panelHeight: CGFloat = 280
+                    let expanded = NSRect(x: visible.midX - targetWidth / 2,
+                                          y: visible.maxY - panelHeight,
+                                          width: targetWidth, height: panelHeight)
+                    panel.setFrame(expanded, display: true)
+                    // 5) モニタを再活性化 (dismiss で deactivate されている)
+                    activateMonitors(activeFrame: expanded)
+                    // 6) trigger panel は dismiss 完了時に戻されるが、ここで
+                    //    completionHandler が走らず終わるので明示的に退避する。
+                    for tp in self.triggerPanels { tp.orderOut(nil) }
+                    isDismissing = false
+                    return
+                }
+                // 既に表示済み (dismiss 中でもない) → 二重 present 防止
+                return
+            }
             // メニューバー直下に張り付ける。
             let visible = screen.visibleFrame
             let targetWidth: CGFloat = min(visible.width - 32, 1320)
@@ -322,33 +365,48 @@ final class NotchHoverController: NSObject {
 
     func dismiss() {
         guard let panel = dropdownPanel else { return }
+        // v0.9.6 P0 #7: 既に dismiss 進行中なら二重発火を回避 (アニメーションが
+        // 重複起動して completionHandler が誤った順序で走るのを防ぐ)。
+        if isDismissing { return }
         deactivateMonitors()
         let animMs = SettingsStore.shared.notchAnimMs
         if animMs <= 0 {
             // v0.8.5 N-2: 閉じる方向も即時化。setFrame を経由せず orderOut のみ。
+            isDismissing = true
             panel.orderOut(nil)
             self.dropdownPanel = nil
             for tp in self.triggerPanels { tp.orderFrontRegardless() }
+            isDismissing = false
             return
         }
         let frame = panel.frame
         let collapsed = NSRect(x: frame.origin.x,
                                y: frame.origin.y + frame.size.height,
                                width: frame.size.width, height: 0)
+        // v0.9.6 P0 #7: アニメーション開始直前にフラグを立て、completionHandler
+        // 内で false に戻す。完了前に show() が呼ばれた場合は、show() 側で
+        // フラグを見てアニメーションキャンセル + alpha/z-order 復元 + 再展開を行う。
+        isDismissing = true
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = TimeInterval(animMs) / 1000.0
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(collapsed, display: true)
         }, completionHandler: { [weak self] in
-            panel.orderOut(nil)
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                // v0.9.6 P0 #7: 途中で show() に「奪われた」場合は isDismissing が
+                // false に戻されており dropdownPanel もそのまま残っている。その
+                // ケースでは completionHandler は何もせずに抜ける (二重 orderOut /
+                // dropdownPanel=nil 防止)。
+                guard self.isDismissing else { return }
+                panel.orderOut(nil)
                 // パネルは `cachedPanel` に保持したまま、`dropdownPanel` だけ
                 // クリアする。次回 show() で同じ panel が即時再表示される。
                 self.dropdownPanel = nil
                 // ドロップダウン終了後に trigger panel を復活させて
                 // 次のホバー検出を再開できるようにする。
                 for tp in self.triggerPanels { tp.orderFrontRegardless() }
+                self.isDismissing = false
             }
         })
     }

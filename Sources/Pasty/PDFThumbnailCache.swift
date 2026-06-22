@@ -19,6 +19,10 @@ final class PDFThumbnailCache {
     private var inFlight: Set<String> = []
     /// 過去に「生成を試みて失敗 / PDF として読めなかった」URL。再試行を抑制する。
     private var failed: Set<String> = []
+    /// `inFlight` Set の check+insert を原子的にするためのロック。
+    /// MainActor 隔離だけに頼らず NSLock で明示的に直列化し、二重 Task 起動を防ぐ。
+    /// ロックを保持したまま await することは絶対に避ける (短い critical section のみ)。
+    private let inFlightLock = NSLock()
 
     /// `clip.content` から file URL を解釈してサムネを取得。`.pdf` 以外でも、
     /// 呼び出し側が拡張子で振り分けた後に呼ぶ前提なので拡張子チェックは緩め。
@@ -30,13 +34,22 @@ final class PDFThumbnailCache {
             return cached
         }
         if failed.contains(key) { return nil }
-        if !inFlight.contains(key) {
+        // check+insert を 1 critical section で原子的に行い、二重 Task 起動を防ぐ。
+        let shouldSchedule: Bool = inFlightLock.withLock {
+            if inFlight.contains(key) {
+                return false
+            }
             inFlight.insert(key)
+            return true
+        }
+        if shouldSchedule {
             Task.detached { [weak self] in
                 let img = Self.generateThumbnail(at: url)
                 await MainActor.run {
                     guard let self else { return }
-                    self.inFlight.remove(key)
+                    defer {
+                        self.inFlightLock.withLock { _ = self.inFlight.remove(key) }
+                    }
                     if let img {
                         self.store(key: key, image: img)
                         NotificationCenter.default.post(

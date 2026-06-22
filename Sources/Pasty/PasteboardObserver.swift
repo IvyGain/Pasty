@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import Combine
 import CryptoKit
+import os.log
 
 /// Polls `NSPasteboard.general.changeCount` every 250 ms and persists new clips.
 /// This is the proven-by-Maccy approach: macOS provides no notification API
@@ -82,13 +83,29 @@ final class PasteboardObserver: ObservableObject {
         guard clip.kind == .image, let id = clip.id, let dataPath = clip.dataPath else { return }
         let languages = SettingsStore.shared.ocrLanguages
         let storeRef = store
+        let redactEnabled = SettingsStore.shared.redactOCRSensitiveData
         Task.detached(priority: .background) {
             let url = ClipBlobs.blobURL(for: dataPath)
             guard let data = try? Data(contentsOf: url) else { return }
-            guard let text = await AIEngine.ocr(image: data, languages: languages),
-                  !text.isEmpty else { return }
+            guard let raw = await AIEngine.ocr(image: data, languages: languages),
+                  !raw.isEmpty else { return }
+            // v0.9.6-beta P0 #9: 永続化前に機密データを `[CARD]` / `[SSN]` /
+            // `[MYNUMBER]` / `[PHONE]` / `[TOKEN]` / `[IBAN]` に置換する。
+            // FTS にも置換後のテキストだけが乗るので、生のカード番号などが
+            // SQLite に残らない。
+            let final: String
+            if redactEnabled {
+                let result = SensitiveDataFilter.redact(raw)
+                if result.redactedCount > 0 {
+                    let logger = Logger(subsystem: "io.pasty.ocr", category: "redact")
+                    logger.info("Redacted \(result.redactedCount, privacy: .public) sensitive token(s) from OCR text for clip #\(id, privacy: .public)")
+                }
+                final = result.output
+            } else {
+                final = raw
+            }
             do {
-                try await storeRef.updateOCRText(clipId: id, text: text)
+                try await storeRef.updateOCRText(clipId: id, text: final)
             } catch {
                 NSLog("Pasty OCR update failed for clip #\(id): \(error)")
             }

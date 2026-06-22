@@ -35,7 +35,17 @@ final class URLLinkPreviewCache {
     private let diskDir: URL
 
     private init() {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        // v0.9.6-beta P0 #6: Caches directory lookup is technically optional.
+        // Sandbox / unusual environments could in theory return an empty array.
+        // Degrade gracefully to a tmp-backed path so memory cache still works
+        // and disk persistence becomes best-effort rather than crashing the app.
+        let base: URL
+        if let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            base = cachesDir
+        } else {
+            NSLog("URLLinkPreviewCache: cachesDirectory unavailable, falling back to NSTemporaryDirectory()")
+            base = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        }
         self.diskDir = base.appendingPathComponent("io.pasty.app/url-previews", isDirectory: true)
         try? FileManager.default.createDirectory(at: diskDir, withIntermediateDirectories: true)
         memCache.countLimit = 200

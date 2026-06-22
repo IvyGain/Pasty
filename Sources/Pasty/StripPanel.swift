@@ -105,6 +105,21 @@ struct StripView: View {
     // クリップドラッグ (`ClipDragItem`) はこの state を触らないので影響なし。
     // `Any?` で受けるのは `addLocalMonitorForEvents` の戻り値型に合わせるため。
     @State private var folderDragMouseUpMonitor: AnyObject? = nil
+    // v0.9.6 P0 #13: NotificationCenter observer のトークンを保持し、
+    // `.onDisappear` で removeObserver する。これを怠ると、パネルが閉じても
+    // クロージャ (`Task { @MainActor in cycleFolder(...) }`) は強参照を保持し
+    //続け、`pastyNotchCycleFolderForward/Backward` 通知が来る度に「もう存在
+    // しないはずの StripView インスタンス」上で cycleFolder が走る。
+    // 結果として状態を持たない @State がデフォルト値にリセットされたり、
+    // 過去セッションのキャプチャが意図せず復活したりする。
+    @State private var observerTokens: [NSObjectProtocol] = []
+    // v0.9.6 P0 #12: マルチセレクション貼付中フラグ。
+    // `ClipStore.recent` の再ロードや `pinboards.boards` の変化で
+    // `reload()` → `items` 再構築が走ると、`selection.orderedSelectedIDs` の
+    // 一部 ID に対応する clip がフィルタアウトされ、`selectedItems(from:)` の
+    // 戻り値が縮む可能性がある。貼付ループ内で snapshot を取って ID 起点で
+    // 解決することで、最終的に「選択した順に全件貼付」を保証する。
+    @State private var pasteInProgress: Bool = false
     let onDismiss: () -> Void
     let onOpenSettings: () -> Void
 
@@ -138,18 +153,23 @@ struct StripView: View {
             filterKind = SettingsStore.shared.restoredStripFilterKind()
             reload()
             // ノッチパネル経由の Tab/Shift+Tab 通知を購読。
-            NotificationCenter.default.addObserver(
+            // v0.9.6 P0 #13: 戻り値のトークンを `observerTokens` に積み、
+            // `.onDisappear` で必ず removeObserver する。block-based observer は
+            // クロージャを強参照したまま生き残るので、回収しないとリークする。
+            let fwdToken = NotificationCenter.default.addObserver(
                 forName: .pastyNotchCycleFolderForward,
                 object: nil, queue: .main
             ) { _ in
                 Task { @MainActor in cycleFolder(by: 1) }
             }
-            NotificationCenter.default.addObserver(
+            observerTokens.append(fwdToken)
+            let bwdToken = NotificationCenter.default.addObserver(
                 forName: .pastyNotchCycleFolderBackward,
                 object: nil, queue: .main
             ) { _ in
                 Task { @MainActor in cycleFolder(by: -1) }
             }
+            observerTokens.append(bwdToken)
             // v0.9.5 P2: フォルダタブ drag を gap 外 (空白 / パネル外) で
             // キャンセルした時に `draggedBoardId` が nil に戻らず source タブが
             // opacity 0.2 のまま残るリーク対策。`.leftMouseUp` を全イベント横断で
@@ -225,6 +245,13 @@ struct StripView: View {
                 NSEvent.removeMonitor(monitor)
                 folderDragMouseUpMonitor = nil
             }
+            // v0.9.6 P0 #13: NotificationCenter observer をまとめて解除。
+            // パネル開閉のたびに残置すると、次回 onAppear で新たな token が
+            // 追加され、観測者が累積的に増えていく (= multi-fire & retain leak)。
+            for token in observerTokens {
+                NotificationCenter.default.removeObserver(token)
+            }
+            observerTokens.removeAll()
             // パネル閉鎖時はドラッグ状態も合わせてクリア (Esc + ⌘⇧V 再オープン時
             // に opacity が残らないように)。
             draggedBoardId = nil
@@ -1059,8 +1086,19 @@ struct StripView: View {
     /// 既存の `pasteSelected` は `onDismiss()` を内部で呼ぶため、ダブルクリック経路
     /// では二重 dismiss を避けるためにこちらを使う。
     private func pasteSelectedAfterDismiss(join: Bool, plain: Bool) {
-        let selected = selection.selectedItems(from: items)
+        // v0.9.6 P0 #12: pasteSelected と同じ snapshot-then-resolve パターン。
+        // こちらは dismiss が呼び出し元 (handleDoubleTap) 側で既に発火済みの
+        // 経路で使われるので onDismiss() は呼ばないが、ID 起点での解決と
+        // pasteInProgress ガードは同じく必要。
+        guard !pasteInProgress else { return }
+        let snapshotIDs = selection.orderedSelectedIDs
+        let itemsSnapshot = items
+        let selected: [ClipItem] = snapshotIDs.compactMap { id in
+            itemsSnapshot.first(where: { $0.id == id })
+        }
         guard !selected.isEmpty else { return }
+        pasteInProgress = true
+        defer { pasteInProgress = false }
         if join {
             PasteAutomator.shared.pasteSequence(
                 selected, asPlainText: plain,
@@ -1137,8 +1175,20 @@ struct StripView: View {
     }
 
     private func pasteSelected(join: Bool, plain: Bool = false) {
-        let selected = selection.selectedItems(from: items)
+        // v0.9.6 P0 #12: マルチ貼付の "選択 ID スナップショット → ID 起点で
+        // 解決" パターン。ここで FIRST に snapshotIDs を確定させてから、
+        // 同じく value-type copy された itemsSnapshot 上で順に lookup する。
+        // SwiftUI が body 再評価で `items` を組み替えても、ローカルコピーは
+        // 影響を受けないので、貼付件数が縮む race を完全に潰せる。
+        guard !pasteInProgress else { return }
+        let snapshotIDs = selection.orderedSelectedIDs
+        let itemsSnapshot = items
+        let selected: [ClipItem] = snapshotIDs.compactMap { id in
+            itemsSnapshot.first(where: { $0.id == id })
+        }
         guard !selected.isEmpty else { return }
+        pasteInProgress = true
+        defer { pasteInProgress = false }
         onDismiss()
         if join {
             PasteAutomator.shared.pasteSequence(

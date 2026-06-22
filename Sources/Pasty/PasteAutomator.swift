@@ -1,6 +1,28 @@
 import AppKit
 import Carbon.HIToolbox
 import ApplicationServices
+import os
+
+private let pasteAutomatorLogger = Logger(subsystem: "io.pasty.app", category: "PasteAutomator")
+
+/// v0.9.6-beta (P0 #10 / #11): broadcast when a paste attempt aborts so a
+/// future toast UI listener can offer to open System Settings (for
+/// `reason == "accessibility"`) or surface a blob-read failure
+/// (`reason == "blob_read"`). The toast UI itself is intentionally not built
+/// in this codegen — see the TODO inside `place(_:)` / `emitCommandV()`.
+///
+/// userInfo keys:
+///   - "reason": String — "accessibility" | "blob_read"
+///   - "clipId": Int64 (blob_read only)
+extension Notification.Name {
+    static let pastyPasteFailed = Notification.Name("io.pasty.pasteFailed")
+}
+
+// TODO(v0.9.6-beta P0 #10): wire a toast listener that observes
+// `.pastyPasteFailed`. For reason == "accessibility", offer a button that
+// opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
+// For reason == "blob_read", show "貼り付け元のファイルが見つかりませんでした" and
+// the related clip id for support.
 
 /// `ClipItem` をシステムのペーストボードに書き戻し、直前のフロントアプリに
 /// 戻してから ⌘V を送出する。`paste(_:)` は単発、`pasteSequence(_:)` は
@@ -91,6 +113,20 @@ final class PasteAutomator {
     /// y 下向き) を使うので、ここで反転する。複数スクリーン環境でも
     /// プライマリの高さを使えば、全画面で正しく解釈される。
     private func clickAtScreenPoint(_ point: NSPoint) {
+        // v0.9.6-beta (P0 #10): synthesized clicks also go through the HID
+        // event tap, so they require Accessibility permission. If the
+        // permission was revoked (e.g. after a re-sign of the ad-hoc bundle),
+        // bail out and broadcast so the future toast listener can guide the
+        // user to System Settings.
+        guard AXIsProcessTrusted() else {
+            NotificationCenter.default.post(
+                name: .pastyPasteFailed,
+                object: nil,
+                userInfo: ["reason": "accessibility"]
+            )
+            pasteAutomatorLogger.error("clickAtScreenPoint: AXIsProcessTrusted false; aborting click")
+            return
+        }
         let primaryHeight = NSScreen.screens.first?.frame.height
             ?? NSScreen.main?.frame.height ?? 0
         let cgPoint = CGPoint(x: point.x, y: primaryHeight - point.y)
@@ -234,6 +270,17 @@ final class PasteAutomator {
             // テキスト系 type は一切書かない (受信側が文字列フォールバックして
             // "PASTY|..." や preview を貼ってしまう問題を避ける)。
             guard let p = item.dataPath else {
+                // v0.9.6-beta (P0 #11): data path missing on an image clip is
+                // a structural failure (BlobGC may have reaped it, or the
+                // row was inserted incorrectly). Broadcast so the toast UI
+                // can surface "貼り付け元が見つかりません" and keep telemetry.
+                let clipId = item.id ?? -1
+                NotificationCenter.default.post(
+                    name: .pastyPasteFailed,
+                    object: nil,
+                    userInfo: ["reason": "blob_read", "clipId": clipId]
+                )
+                pasteAutomatorLogger.error("blob read failed for clip \(clipId, privacy: .public): missing dataPath")
                 // データパスが無い image kind は壊れている。preview を text として fallback
                 let raw = item.content ?? item.preview
                 if !raw.isEmpty {
@@ -243,6 +290,17 @@ final class PasteAutomator {
             }
             let url = ClipBlobs.blobURL(for: p)
             guard let nsImage = NSImage(contentsOf: url) else {
+                // v0.9.6-beta (P0 #11): the row points at a relative path that
+                // no longer exists on disk (deleted out from under us, or the
+                // blob dir was relocated). Broadcast and continue with text
+                // fallback so the user gets *something*.
+                let clipId = item.id ?? -1
+                NotificationCenter.default.post(
+                    name: .pastyPasteFailed,
+                    object: nil,
+                    userInfo: ["reason": "blob_read", "clipId": clipId]
+                )
+                pasteAutomatorLogger.error("blob read failed for clip \(clipId, privacy: .public): \(url.path, privacy: .public)")
                 // ファイル読込失敗時も同様にテキスト fallback
                 pb.setString(item.preview, forType: .string)
                 return
@@ -271,7 +329,15 @@ final class PasteAutomator {
         // ad-hoc 署名のまま Pasty.app を再ビルドすると Accessibility 権限が
         // 失効しがち。emit 前に確認して、無ければトーストだけ出す。
         // (ダイアログ反復防止のため prompt: true は呼ばない。設定ボタンから手動で。)
+        // v0.9.6-beta (P0 #10): also broadcast `.pastyPasteFailed` so a future
+        // toast UI can offer to open System Settings → Privacy → Accessibility.
         if !AXIsProcessTrusted() {
+            NotificationCenter.default.post(
+                name: .pastyPasteFailed,
+                object: nil,
+                userInfo: ["reason": "accessibility"]
+            )
+            pasteAutomatorLogger.error("emitCommandV: AXIsProcessTrusted false; aborting ⌘V")
             Task { @MainActor in
                 PasteToast.shared.show(
                     targetApp: nil,

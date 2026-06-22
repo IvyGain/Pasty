@@ -174,6 +174,14 @@ final class SettingsStore: ObservableObject {
         didSet { persistOCRLanguages() }
     }
 
+    /// v0.9.6-beta P0 #9: OCR で抽出したテキストに含まれる機密データ
+    /// (クレジットカード / SSN / マイナンバー / 電話番号 / API トークン /
+    /// IBAN) を `[CARD]` などのプレースホルダで自動マスクする。デフォルト ON。
+    /// OFF にすると生テキストがそのまま SQLite / FTS に保存される。
+    @Published var redactOCRSensitiveData: Bool {
+        didSet { defaults.set(redactOCRSensitiveData, forKey: Keys.redactOCRSensitiveData) }
+    }
+
     /// B5: ファイル kind が PDF のとき、hover プレビューで 1 ページ目を描画する。
     @Published var hoverPreviewPDFEnabled: Bool {
         didSet { defaults.set(hoverPreviewPDFEnabled, forKey: Keys.hoverPreviewPDFEnabled) }
@@ -227,6 +235,7 @@ final class SettingsStore: ObservableObject {
         static let urlPreviewFaviconEnabled = "pasty.urlPreviewFaviconEnabled"
         static let autoTagOCRImages       = "pasty.autoTagOCRImages"
         static let ocrLanguages           = "pasty.ocrLanguages.v1"
+        static let redactOCRSensitiveData = "pasty.redactOCRSensitiveData"
         static let hoverPreviewPDFEnabled = "pasty.hoverPreviewPDFEnabled"
         static let hoverPreviewVideoEnabled = "pasty.hoverPreviewVideoEnabled"
         static let snippetCounters        = "pasty.snippetCounters.v1"
@@ -271,6 +280,7 @@ final class SettingsStore: ObservableObject {
             // v0.9.5-beta foundation defaults
             Keys.urlPreviewFaviconEnabled: true,
             Keys.autoTagOCRImages: true,
+            Keys.redactOCRSensitiveData: true,
             Keys.hoverPreviewPDFEnabled: true,
             Keys.hoverPreviewVideoEnabled: true,
         ])
@@ -346,6 +356,7 @@ final class SettingsStore: ObservableObject {
         } else {
             self.ocrLanguages = ["ja-JP", "en-US"]
         }
+        self.redactOCRSensitiveData = defaults.bool(forKey: Keys.redactOCRSensitiveData)
         self.hoverPreviewPDFEnabled = defaults.bool(forKey: Keys.hoverPreviewPDFEnabled)
         self.hoverPreviewVideoEnabled = defaults.bool(forKey: Keys.hoverPreviewVideoEnabled)
         if let data = defaults.data(forKey: Keys.snippetCounters),

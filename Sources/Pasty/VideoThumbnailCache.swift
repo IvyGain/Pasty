@@ -11,6 +11,11 @@ final class VideoThumbnailCache {
     private var lru: [String] = []
     private let maxItems = 128
     private var inFlight: Set<String> = []
+    /// `inFlight` Set の check+insert を原子的にするためのロック。
+    /// `Task.detached` 内のクロージャからも触られる可能性があるため、
+    /// MainActor 隔離だけに頼らず NSLock で明示的に直列化する。
+    /// ロックを保持したまま await することは絶対に避ける (短い critical section のみ)。
+    private let inFlightLock = NSLock()
 
     /// 同期で取得を試みる (cache hit 時のみ即座に NSImage、miss は非同期生成して
     /// nil を返す。生成完了後は NotificationCenter で `pastyVideoThumbReady`
@@ -22,13 +27,22 @@ final class VideoThumbnailCache {
             touch(key)
             return cached
         }
-        if !inFlight.contains(key) {
+        // check+insert を 1 critical section で原子的に行い、二重 Task 起動を防ぐ。
+        let shouldSchedule: Bool = inFlightLock.withLock {
+            if inFlight.contains(key) {
+                return false
+            }
             inFlight.insert(key)
+            return true
+        }
+        if shouldSchedule {
             Task.detached { [weak self] in
                 let img = Self.generateThumbnail(at: url)
                 await MainActor.run {
                     guard let self else { return }
-                    self.inFlight.remove(key)
+                    defer {
+                        self.inFlightLock.withLock { _ = self.inFlight.remove(key) }
+                    }
                     if let img {
                         self.store(key: key, image: img)
                         NotificationCenter.default.post(

@@ -1,5 +1,8 @@
 import SwiftUI
 import AppKit
+import os
+
+private let pastyAppLogger = Logger(subsystem: "io.pasty.app", category: "PastyApp")
 
 @main
 struct PastyApp: App {
@@ -15,8 +18,17 @@ struct PastyApp: App {
 
     init() {
         let store: ClipStore
-        do { store = try ClipStore.shared() }
-        catch { fatalError("Failed to open ClipStore: \(error)") }
+        do {
+            store = try ClipStore.shared()
+        } catch {
+            // v0.9.6-beta (P0 #5): instead of fatalError, try once to recover
+            // by side-lining the apparently-corrupt DB and rebuilding from
+            // scratch. If that also fails, *then* we fatalError because the
+            // file system itself is hostile and there's nothing further the
+            // app can do.
+            pastyAppLogger.error("ClipStore.shared() failed: \(String(describing: error), privacy: .public)")
+            store = PastyApp.recoverFromDBOpenFailure(originalError: error)
+        }
 
         // PasteHistory など ClipStore を持たないシングルトンから
         // 貼付イベントを永続化できるよう、共有コンテナにも差し込んでおく。
@@ -98,6 +110,81 @@ struct PastyApp: App {
 
             // 起動後にバックグラウンドで entity_uuid backfill を進める (M-2)
             Task { await store2.backfillEntityUUIDsIfNeeded() }
+
+            // v0.9.6-beta (P0 #3): kick off BlobGC sweep on startup. Sweeps
+            // orphan blobs (deleted soft-deleted rows that aged past the
+            // 30-day grace window) and hard-deletes the corresponding rows.
+            // Hand-off to BlobGC is MainActor-bound; the heavy disk walk is
+            // off-actor inside BlobGC.sweep itself.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                do {
+                    let result = try await BlobGC.sweep(store: store2)
+                    pastyAppLogger.info("BlobGC sweep: deleted=\(result.deleted, privacy: .public) kept=\(result.kept, privacy: .public)")
+                } catch {
+                    pastyAppLogger.error("BlobGC sweep failed: \(String(describing: error), privacy: .public)")
+                }
+            }
+        }
+    }
+
+    /// v0.9.6-beta (P0 #5): Side-line a corrupt `pasty.sqlite` and rebuild
+    /// from an empty DB. We rename the old file to
+    /// `clips.db.corrupt-<unixTimestamp>` so the user (or support) can
+    /// recover data offline, then attempt `ClipStore.shared()` once more.
+    /// An `NSAlert` lets the user know their history is preserved on disk.
+    ///
+    /// If the second open also fails, we fatalError as a last resort —
+    /// that path means the user-facing recovery attempt was already made.
+    private static func recoverFromDBOpenFailure(originalError: Error) -> ClipStore {
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let fm = FileManager.default
+        var backupName: String? = nil
+
+        do {
+            let appSupport = try fm
+                .url(for: .applicationSupportDirectory, in: .userDomainMask,
+                     appropriateFor: nil, create: true)
+                .appendingPathComponent("Pasty", isDirectory: true)
+            let dbURL = appSupport.appendingPathComponent("pasty.sqlite")
+            if fm.fileExists(atPath: dbURL.path) {
+                let backup = "clips.db.corrupt-\(timestamp)"
+                let backupURL = appSupport.appendingPathComponent(backup)
+                try fm.moveItem(at: dbURL, to: backupURL)
+                backupName = backup
+                pastyAppLogger.error("Renamed corrupt DB to \(backup, privacy: .public)")
+
+                // SQLite sidecar files (-wal, -shm) would tie the rebuilt DB
+                // back to the corrupt state, so move them out of the way too.
+                for sidecarSuffix in ["-wal", "-shm"] {
+                    let sidecar = appSupport
+                        .appendingPathComponent("pasty.sqlite\(sidecarSuffix)")
+                    if fm.fileExists(atPath: sidecar.path) {
+                        let sidecarBackup = appSupport
+                            .appendingPathComponent("\(backup)\(sidecarSuffix)")
+                        try? fm.moveItem(at: sidecar, to: sidecarBackup)
+                    }
+                }
+            }
+
+            let store = try ClipStore.shared()
+
+            // Surface the recovery to the user. We're inside `init`, so
+            // dispatch the alert async to next main-loop tick.
+            let backupLabel = backupName ?? "clips.db.corrupt-\(timestamp)"
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = "Pasty"
+                alert.informativeText = "DB を再構築しました。バックアップは \(backupLabel) に保存されています。"
+                alert.addButton(withTitle: "OK")
+                NSApp.activate(ignoringOtherApps: true)
+                _ = alert.runModal()
+            }
+            return store
+        } catch {
+            pastyAppLogger.fault("DB recovery failed: \(String(describing: error), privacy: .public). Original: \(String(describing: originalError), privacy: .public)")
+            fatalError("Failed to open ClipStore (original: \(originalError), recovery: \(error))")
         }
     }
 

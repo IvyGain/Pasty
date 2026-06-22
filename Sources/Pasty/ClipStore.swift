@@ -2,6 +2,20 @@ import Foundation
 import GRDB
 import Combine
 import CryptoKit
+import os
+
+/// v0.9.6-beta (P0 #5): typed errors so PastyApp can distinguish DB failure
+/// modes and decide whether to recover by renaming/replacing the file vs.
+/// hard-failing. We surface the underlying GRDB / SQLite error verbatim for
+/// crash reports and logs.
+enum ClipStoreError: Error {
+    case openFailed(underlying: Error)
+    case migrationFailed(underlying: Error)
+    case initialLoadFailed(underlying: Error)
+    case backfillFailed(underlying: Error)
+}
+
+private let clipStoreLogger = Logger(subsystem: "io.pasty.app", category: "ClipStore")
 
 /// SQLite-backed persistence for clipboard items. Local-first by design:
 /// the database lives under `~/Library/Application Support/Pasty/`.
@@ -22,7 +36,12 @@ final class ClipStore: ObservableObject {
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
             let dbURL = appSupport.appendingPathComponent("pasty.sqlite")
-            let dbQueue = try DatabaseQueue(path: dbURL.path)
+            let dbQueue: DatabaseQueue
+            do {
+                dbQueue = try DatabaseQueue(path: dbURL.path)
+            } catch {
+                throw ClipStoreError.openFailed(underlying: error)
+            }
 
             let blobs = appSupport.appendingPathComponent("blobs", isDirectory: true)
             try FileManager.default.createDirectory(at: blobs, withIntermediateDirectories: true)
@@ -35,8 +54,28 @@ final class ClipStore: ObservableObject {
     init(dbWriter: any DatabaseWriter, blobDirectory: URL) throws {
         self.dbWriter = dbWriter
         self.blobDirectory = blobDirectory
-        try migrate()
-        try reloadInitial()
+        do {
+            try migrate()
+        } catch let error as ClipStoreError {
+            throw error
+        } catch {
+            throw ClipStoreError.migrationFailed(underlying: error)
+        }
+        // v0.9.6-beta (P0 #4): FTS5 backfill idempotency marker. If migration v9
+        // is fresh or the marker is missing/false, re-run the backfill so that
+        // soft-deleted-aware FTS index stays consistent with `clips`.
+        do {
+            try runFTS5BackfillIfNeeded()
+        } catch {
+            // Don't fail init for a marker glitch — but log loudly. Search may
+            // be partially stale until the next launch.
+            clipStoreLogger.error("FTS5 backfill failed: \(String(describing: error), privacy: .public)")
+        }
+        do {
+            try reloadInitial()
+        } catch {
+            throw ClipStoreError.initialLoadFailed(underlying: error)
+        }
     }
 
     private func migrate() throws {
@@ -206,7 +245,52 @@ final class ClipStore: ObservableObject {
                 """)
         }
 
+        // v0.9.6-beta (P0 #4): generic meta key/value table so we can record
+        // idempotency markers (e.g. FTS5 backfill state) without bloating
+        // UserDefaults or coupling them to migration version numbers.
+        migrator.registerMigration("v9.pasty_meta") { db in
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS pasty_meta(
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """)
+        }
+
         try migrator.migrate(dbWriter)
+    }
+
+    // MARK: - FTS5 backfill idempotency (P0 #4)
+
+    /// v0.9.6-beta (P0 #4): if the `pasty_meta` marker `v8.fts5_backfilled`
+    /// isn't `"true"`, wipe `clips_fts` and re-insert every live row (rows
+    /// where `deleted_at IS NULL`). Soft-deleted rows stay out of the FTS
+    /// index so search doesn't accidentally surface them.
+    ///
+    /// Called once per init; cheap when the marker is already set (just a
+    /// SELECT). Wrapped in a single transaction so a partial backfill can't
+    /// leave the FTS table inconsistent.
+    private func runFTS5BackfillIfNeeded() throws {
+        try dbWriter.write { db in
+            let marker = try String.fetchOne(
+                db,
+                sql: "SELECT value FROM pasty_meta WHERE key = ?",
+                arguments: ["v8.fts5_backfilled"]
+            )
+            if marker == "true" { return }
+
+            try db.execute(sql: "DELETE FROM clips_fts")
+            try db.execute(sql: """
+                INSERT INTO clips_fts(rowid, preview, content, sourceAppName, extractedOCRText)
+                SELECT id, preview, content, sourceAppName, extractedOCRText
+                FROM clips
+                WHERE deleted_at IS NULL
+                """)
+            try db.execute(sql: """
+                INSERT OR REPLACE INTO pasty_meta(key, value)
+                VALUES ('v8.fts5_backfilled', 'true')
+                """)
+        }
     }
 
     // MARK: - Deferred entity_uuid backfill (M-2)
@@ -271,16 +355,35 @@ final class ClipStore: ObservableObject {
     }
 
     private func reloadInitial() throws {
+        // v0.9.6-beta (P0 #1): exclude soft-deleted rows from the in-memory
+        // recent feed and the total counter so the menu bar / strip never
+        // surface tombstones.
         let snapshot: (items: [ClipItem], total: Int) = try dbWriter.read { db in
             let items = try ClipItem
+                .filter(sql: "deleted_at IS NULL")
                 .order(ClipItem.Columns.createdAt.desc)
                 .limit(20)
                 .fetchAll(db)
-            let total = try ClipItem.fetchCount(db)
+            let total = try ClipItem
+                .filter(sql: "deleted_at IS NULL")
+                .fetchCount(db)
             return (items, total)
         }
         self.recent = snapshot.items
         self.totalCount = snapshot.total
+    }
+
+    /// v0.9.6-beta (P0 #1): typed lookup by primary key, soft-delete aware.
+    /// Returns `nil` for unknown ids *and* for ids whose row has been
+    /// tombstoned, so UI / paste-stack call sites can't accidentally
+    /// resurrect a deleted clip.
+    func byId(_ id: Int64) async throws -> ClipItem? {
+        try await dbWriter.read { db in
+            try ClipItem
+                .filter(sql: "deleted_at IS NULL")
+                .filter(ClipItem.Columns.id == id)
+                .fetchOne(db)
+        }
     }
 
     @discardableResult
@@ -288,7 +391,11 @@ final class ClipStore: ObservableObject {
         let deviceId = Self.currentDeviceId
         let inserted: ClipItem? = try await dbWriter.write { db in
             // Dedupe against the most recent matching hash.
+            // v0.9.6-beta (P0 #1): skip soft-deleted rows so re-pasting after
+            // a delete re-creates the clip (the user just brought it back —
+            // honour that signal).
             if let last = try ClipItem
+                .filter(sql: "deleted_at IS NULL")
                 .order(ClipItem.Columns.createdAt.desc)
                 .limit(1)
                 .fetchOne(db),
@@ -319,8 +426,11 @@ final class ClipStore: ObservableObject {
     func search(query: String, limit: Int = 50) async throws -> [ClipItem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
+            // v0.9.6-beta (P0 #1): empty-query path returns the recent feed —
+            // mirror the soft-delete filter applied in reloadInitial.
             return try await dbWriter.read { db in
                 try ClipItem
+                    .filter(sql: "deleted_at IS NULL")
                     .order(ClipItem.Columns.createdAt.desc)
                     .limit(limit)
                     .fetchAll(db)
@@ -328,10 +438,17 @@ final class ClipStore: ObservableObject {
         }
         let pattern = FTS5Pattern(matchingAllPrefixesIn: trimmed) ?? FTS5Pattern(matchingAnyTokenIn: trimmed)
         return try await dbWriter.read { db in
+            // v0.9.6-beta (P0 #1): the FTS5 join doesn't know about
+            // `deleted_at`, so AND it on the clips side. The FTS5 backfill
+            // (runFTS5BackfillIfNeeded) skips tombstoned rows on a fresh
+            // backfill, but live deletes only land in clips_fts via the
+            // clips_ad trigger after a hard DELETE — so for the soft-delete
+            // window this WHERE is the only guard.
             let sql = """
                 SELECT clips.* FROM clips
                 JOIN clips_fts ON clips_fts.rowid = clips.id
                 WHERE clips_fts MATCH ?
+                  AND clips.deleted_at IS NULL
                 ORDER BY clips.createdAt DESC
                 LIMIT ?
                 """
@@ -407,11 +524,47 @@ final class ClipStore: ObservableObject {
         }
     }
 
+    /// v0.9.6-beta (P0 #2): UI delete is now a **soft delete**. The row stays
+    /// in `clips` with `deleted_at` set so iCloud sync (C1 phase 2) can ship
+    /// a tombstone. Any blob on disk is reclaimed later by `BlobGC` via
+    /// `hardDelete(_:)` during the startup sweep.
+    ///
+    /// Call sites (StripPanel, AIActionMenu, etc.) remain identical; the
+    /// signature is unchanged.
     func delete(clipId: Int64) async throws {
+        let nowTS = Date().timeIntervalSince1970
         _ = try await dbWriter.write { db in
-            try db.execute(sql: "DELETE FROM clips WHERE id = ?", arguments: [clipId])
+            try db.execute(
+                sql: "UPDATE clips SET deleted_at = ?, updated_at = ? WHERE id = ?",
+                arguments: [nowTS, nowTS, clipId]
+            )
         }
         try reloadInitial()
+    }
+
+    /// v0.9.6-beta (P0 #2): physically remove a row from `clips` (and the
+    /// matching `clips_fts` row) and return its `dataPath` so the caller
+    /// (BlobGC) can unlink the on-disk blob. Reserved for the startup GC
+    /// sweep — UI code should keep calling `delete(clipId:)`.
+    ///
+    /// Returns `nil` when the row no longer exists.
+    @discardableResult
+    func hardDelete(_ id: Int64) async throws -> String? {
+        try await dbWriter.write { db in
+            // Snapshot the dataPath before the row goes away.
+            let dataPath = try String.fetchOne(
+                db,
+                sql: "SELECT dataPath FROM clips WHERE id = ?",
+                arguments: [id]
+            )
+            // clips_fts is in external-content mode (content='clips',
+            // content_rowid='id'), so the proper sync is the clips_ad
+            // trigger which fires on DELETE FROM clips. We don't issue a
+            // direct DELETE on clips_fts because external-content tables
+            // reject row-level deletes outside the 'delete' command.
+            try db.execute(sql: "DELETE FROM clips WHERE id = ?", arguments: [id])
+            return dataPath
+        }
     }
 
     /// v0.9.5-beta (B3): アプリ別 + グローバル保持期間に基づく soft delete。

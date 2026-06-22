@@ -228,11 +228,13 @@ struct ClipDragItem: Transferable {
 
     /// link kind なら URL、それ以外は about:blank をダミーで返す
     /// (Transferable の挙動上、受け手が URL を期待しなければ他の representation が選ばれる)。
+    /// v0.9.6-beta P0 #14: `URL(string: "about:blank")` は常に成功するはずだが、
+    /// 念のため `URL(fileURLWithPath:)` (compile-time non-optional) を最終フォールバックに使う。
     var linkURL: URL {
         if clip.kind == .link, let raw = clip.content, let u = URL(string: raw) {
             return u
         }
-        return URL(string: "about:blank")!
+        return URL(string: "about:blank") ?? URL(fileURLWithPath: "/")
     }
 
     // MARK: - v0.9.5-beta X1: image / file binary representation helpers

@@ -329,6 +329,14 @@ struct SettingsView: View {
             Toggle("画像 OCR を有効化", isOn: $settings.autoTagOCRImages)
             if settings.autoTagOCRImages {
                 OCRLanguageEditor(settings: settings)
+                // v0.9.6-beta P0 #9: OCR テキスト内の機密データ (CC / SSN /
+                // マイナンバー / 電話 / API トークン / IBAN) を保存前にマスク。
+                Toggle("機密データ自動マスク (CC / 身分証 / API トークン)", isOn: $settings.redactOCRSensitiveData)
+                    .padding(.leading, 18)
+                Text("クレジットカード番号や身分証番号などをプレースホルダに置換してから DB に保存します")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 18)
             }
         }
     }
