@@ -1197,10 +1197,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.7-beta · パフォーマンス強化 · アップデート通知強化 · セキュリティ + TCC · 削除済みクリップが完全に非表示に · MIT</span>
+      <span class="eyebrow">v0.9.8-beta · 静かに · 自動 trim 設定 · ラグジュアリー UI/UX · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「ノイズを消し、上限を自動で守り、見た目を一段引き上げる。」v0.
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1830,7 +1830,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.7-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.8-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1879,7 +1879,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.7-beta+ 推奨</span>
+          <span>Pasty v0.9.8-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -2136,10 +2136,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.7-beta</div>
+        <div class="ver">v0.9.8-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.7-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.8-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -2152,9 +2152,48 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.7-beta</span>
+        <span class="v">v0.9.8-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty v0.9.8-beta — 静かに、自動で、ラグジュアリーに</h1>
+<p>「ノイズを消し、上限を自動で守り、見た目を一段引き上げる。」v0.9.7-beta の P1 一掃に続き、Wave 1–2 で UX とビジュアルを総ざらいします。</p>
+<h2>🔇 静かに</h2>
+<ul>
+<li>1000 件超過時のトースト通知を撤廃しました</li>
+<li>検索結果上限の警告も非表示化しました</li>
+<li>バックグラウンドのパフォーマンス最適化 (LIMIT 1000) はそのまま継続します</li>
+</ul>
+<h2>🧹 自動 trim 設定</h2>
+<ul>
+<li>クリップ数が上限を超えた際に自動で古いクリップを soft-delete する機能を追加</li>
+<li><strong>ピン留めしたクリップは保護されます</strong></li>
+<li>設定 → 一般 → クリップ上限 で有効/無効と上限値を選択可能 (500 / 1000 / 5000 / 10000 / 無制限)</li>
+<li>起動時と新規クリップ追加時 (60 秒スロットル) に自動実行</li>
+</ul>
+<h2>💎 ラグジュアリー UI/UX</h2>
+<ul>
+<li>統一デザイントークン (<code>PastyDesign</code>) を全画面に適用</li>
+<li>カード/パネルに多層シャドウ + マテリアル backdrop</li>
+<li>フォルダタブを Apple Wallet 風グラデーション + soft shadow に</li>
+<li>HoverPreview にアクセントストリップ + prominent shadow</li>
+<li>設定画面の typography とタブバーを刷新 (ultraThinMaterial + accent underline)</li>
+<li>WhatsNew + Onboarding に hero gradient + ステップインジケータ追加</li>
+<li>ライト/ダーク両モード対応 (NSAppearance dynamicProvider)</li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.8-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.9.8-beta</a></p>
+        <a class="permalink" href="whats-new/0.9.8-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.7-beta</span>
+        
+        <span class="date">2026-06-22</span>
       </summary>
       <div class="body">
 <h1>Pasty v0.9.7-beta — 30 件の P1 + 4 件の Audit Follow-up</h1>
