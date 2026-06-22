@@ -1197,15 +1197,15 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.6-beta · 信頼性向上 · ディスク掃除 · セキュリティ強化 · 操作の堅さ · MIT</span>
+      <span class="eyebrow">v0.9.7-beta · パフォーマンス強化 · アップデート通知強化 · セキュリティ + TCC · 削除済みクリップが完全に非表示に · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。「データを失わない、操作を取りこぼさない、機密を漏らさない。」v0.
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.9.
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
           Pasty.dmg をダウンロード
-          <small>· 5.9 MB · macOS 14 以降</small>
+          <small>· 6.0 MB · macOS 14 以降</small>
         </a>
         <a class="btn ghost" href="#download">
           Raycast 拡張をインストール
@@ -1830,14 +1830,14 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.6-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.7-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
         <div class="ctas">
           <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
             Pasty.dmg をダウンロード
-            <small>· 5.9 MB</small>
+            <small>· 6.0 MB</small>
           </a>
         </div>
 <!-- DOWNLOAD_CARD:END -->
@@ -1879,7 +1879,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.6-beta+ 推奨</span>
+          <span>Pasty v0.9.7-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -2136,10 +2136,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.6-beta</div>
+        <div class="ver">v0.9.7-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.6-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.7-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -2152,9 +2152,90 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.6-beta</span>
+        <span class="v">v0.9.7-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty v0.9.7-beta — 30 件の P1 + 4 件の Audit Follow-up</h1>
+<p>v0.9.6-beta の P0 安定化に続き、v0.9.5-beta Stability Audit で洗い出された <strong>30 件の P1</strong> と、Wave-2 audit で追加検出された <strong>4 件の follow-up</strong> をまとめて落とします。「ホットパスを軽く、失敗を黙らせず、削除済みは本当に消す。」</p>
+<h2>⚡ パフォーマンス強化</h2>
+<h3>同一テキスト連続コピー時の SHA256 を省略</h3>
+<p>クリップボード変化検出のたびに SHA256 を計算していましたが、<code>lastTextString</code> キャッシュを追加し、直前と同一文字列なら既存ハッシュをそのまま再利用します。長文を立て続けにコピーする場面で <strong>CPU 使用率が目に見えて下がります</strong>。</p>
+<h3>OCR 同時実行を 2 並列に制限</h3>
+<p>複数の画像を同時にコピーすると Vision OCR が無制限に並走して <code>AIEngine</code> が CPU/メモリを吸い上げる挙動がありました。<code>actor OCRQueue</code> (max=2) で <strong>同時 2 件まで</strong> に抑え、3 件目以降はキュー待ちにします。</p>
+<h3>正規表現の type-load コンパイル</h3>
+<p><code>SyntaxHighlighter</code> がプレビュー描画ごとに <code>try! NSRegularExpression(...)</code> を実行していたものを、言語ごとの <strong>静的プロパティに巻き上げ</strong> て型ロード時に一度だけコンパイルする方式に変更。コードプレビューが滑らかになります。</p>
+<h3>Markdown プレビューのメモ化</h3>
+<p><code>AttributedString(markdown:)</code> のパース結果を <code>clipID + contentHash</code> をキーに <code>NSCache</code> (容量 256) で記憶します。同じクリップを繰り返し開いてもパースが走らず、長文 Markdown のプレビュー再表示が即座に。</p>
+<h3>Strip 検索結果の上限明示化</h3>
+<p>検索結果が大量ヒットした場合に StripPanel が無制限にロードしていた箇所に <strong><code>LIMIT 1000</code></strong> を明示適用し、上限到達時は「結果が1000件を超えています。検索条件を絞り込んでください」とトーストでガイドします。</p>
+<h2>🔔 アップデート通知強化</h2>
+<h3>Sparkle 失敗/成功デリゲートの完全実装</h3>
+<p>これまで Sparkle のダウンロード/インストール失敗はサイレントでした。<code>failedToDownloadUpdate</code> / <code>didFinishUpdateCycleFor</code> / <code>didAbortWithError</code> の 3 デリゲートを実装し、エラーを <strong>network / edsa / sandbox / other</strong> に分類してそれぞれ専用トーストを出します。インストール成功時も「Pasty を更新しました（バージョン X）」と通知。</p>
+<h3>起動直後の自動チェックを抑制</h3>
+<p>launchPad で初回ペーストする前に Sparkle がバックグラウンドチェックに走り、ペースト操作と HTTP リクエストが競合する微細なラグがあった問題を解消。<strong>初回ペースト完了</strong> か <strong>起動から 30 秒経過</strong> のいずれか早いほうまで初回チェックを遅延します。</p>
+<h2>🔐 セキュリティ + TCC</h2>
+<h3>Accessibility 権限の永続アラート</h3>
+<p>セッション中にユーザーがアクセシビリティ権限を OFF にすると、これまではトーストのみで埋もれがちでした。<code>NSAlert</code>（5 分クールダウン付き）で <strong>「システム設定を開く」</strong> ボタン付きの永続アラートを出し、<code>x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility</code> に 1 クリックで遷移できるようにしました。</p>
+<h3>ペースト前の権限チェック順序を修正</h3>
+<p><code>PasteAutomator.emitCommandV</code> がこれまで「先にクリップボードへ書き込んでから AX チェック」していたため、権限が剥がれた状態で <strong>ユーザーのクリップボードを意図せず上書き</strong> していました。チェックを <strong>書き込み前</strong> に移動し、未許可なら一切クリップボードを汚さず処理を中断します。</p>
+<h3>Blob ディレクトリの権限を 0o700 に固定</h3>
+<p><code>~/Library/Application Support/io.pasty.app/blobs/</code> と画像ステージング dir を毎起動 <strong>POSIX 0700</strong> に再適用。他ユーザー / 他プロセスからの覗き見を防ぎます。</p>
+<h3>IntegrationHubs.undoLast() の AX ガード</h3>
+<p>Integration Hubs (Linear / Notion / GitHub 等の連携) の <strong>取り消し操作</strong> が <code>CGEvent.post</code> を AX チェック無しで叩いていた点を修正。<code>AXIsProcessTrusted()</code> で事前ガードし、未許可なら <code>pastyPasteFailed</code> 通知を出して失敗を可視化します。</p>
+<h2>🔎 削除済みクリップが完全に非表示に</h2>
+<p>v0.9.6-beta で読み出しパスに <code>WHERE deleted_at IS NULL</code> を入れましたが、Wave-2 audit で <strong>3 つの抜け穴</strong> が見つかりました。</p>
+<h3>SearchEngine の両パス</h3>
+<p>空クエリ (recent) と FTS5 MATCH の <strong>両方</strong> に <code>deleted_at IS NULL</code> を適用。検索で deleted clip が一瞬出るケースを根絶。</p>
+<h3>Pinboard.items(in:)</h3>
+<p>ピンボードに登録済みのクリップが ClipStore で soft-delete された場合、Pinboard 側では残骸として表示され続けていた問題を、JOIN に <code>AND clips.deleted_at IS NULL</code> を追加して解消。</p>
+<h3>InsightsDashboard の全集計</h3>
+<p>今日 / 週次 / 日次 / カインド別 / アプリ別 / 長期保存などの <strong>全集計クエリ</strong> に <code>deleted_at IS NULL</code> を入れました。削除済みクリップが統計のグラフを歪めることはなくなります。</p>
+<h3>FTS5 ソフトデリート同期 (migration v10)</h3>
+<p>最大の漏れは、<code>deleted_at</code> が NULL→値 に変わっても <strong>FTS5 インデックスからは削除されない</strong> ことでした。v10 マイグレーションで <code>AFTER UPDATE OF deleted_at</code> トリガーを追加し、soft-delete 時に FTS から除去 / 復元時に再投入する <strong>完全同期</strong> を実現。これで「アプリ再起動するまで MATCH に残骸が出る」が消えます。</p>
+<h2>🧩 エッジケース</h2>
+<h3>HoverPreview のアニメーション競合</h3>
+<p>複数のホバープレビューを高速に行き来すると、古いアニメーション完了ハンドラが新しいパネル状態を破壊するレースがありました。<code>animatingPanelID: UUID</code> のトークン照合で <strong>古い完了ハンドラを無視</strong> するようにし、状態の整合性を確保。</p>
+<h3>Esc キーでドラッグ中断時のクリーンアップ</h3>
+<p>ドラッグ中に Esc を押すと panel は閉じるのに <strong>macOS 側のドラッグ状態が残ったまま</strong> で、次のクリックが drop と誤認される問題を解消。Esc 受信時にドラッグが進行中なら <code>leftMouseUp</code> CGEvent を合成してから clearAll() するようにしました。</p>
+<h3>NSScreen 構成変更への追従</h3>
+<p>ディスプレイの抜き差し / 解像度変更時に notch hot-zone と strip panel の座標がずれる問題を、<code>NSApplication.didChangeScreenParametersNotification</code> 購読で <strong>再登録 + 再配置</strong> することで解消。</p>
+<h2>📦 メモリ整理</h2>
+<h3>StackPill の observer 解放</h3>
+<p>StackPill が NotificationCenter にぶら下げた screenObserver token を deinit で確実に解除。長時間稼働でも漏れません。</p>
+<h3>PastyApp の Stage-1 observer 解放</h3>
+<p>起動時に登録される Stage-1 observer 群を <code>stage1Observers: [NSObjectProtocol]</code> に保管し、<code>applicationWillTerminate</code> で一括解除。</p>
+<h3>DropDelegate の余計な main dispatch を削除</h3>
+<p><code>DropDelegate</code> は AppKit / SwiftUI 仕様で main thread 呼び出しが保証されているのに、<code>DispatchQueue.main.async</code> で再ラップしていた箇所を解消。微小ですがレスポンスが軽くなります。</p>
+<h2>🛠 追加修正</h2>
+<h3>AI エラーのケース別メッセージ化</h3>
+<p><code>AIError</code> を <code>.modelNotAvailable / .osUnsupported / .aiDisabledBySettings / .other</code> に分類し、<strong>4 種のローカライズ済みトースト</strong> を出すように。Apple Intelligence 未登録 / OS バージョン不足 / 設定 OFF / その他の区別がユーザー側で明確に。</p>
+<h3>DragDrop 部分失敗の可視化</h3>
+<p>複数アイテムのドロップで一部が失敗していた場合に、これまでは成功したものだけ静かに登録されていました。<strong><code>「N 件中 M 件のみ追加されました」</code></strong> トーストで具体的な数を伝えます。</p>
+<h3>v5 entity\_uuid バックフィルの冪等化</h3>
+<p>過去の中断起動などで <code>entity_uuid</code> が NULL のまま残っていた行を救うため、<strong>UserDefaults フラグに依存せず毎起動 <code>SELECT COUNT</code> で残存を検査</strong>してバックフィルする方式に変更。</p>
+<h2>🧪 テスト</h2>
+<p>全 <strong>41 テスト</strong> pass — v0.9.6-beta の 36 件に加え、<strong>SoftDeleteFilterTests を 5 件追加</strong>:</p>
+<ul>
+<li><code>testSearchEngineExcludesDeleted_emptyQuery</code></li>
+<li><code>testSearchEngineExcludesDeleted_FTSMatch</code></li>
+<li><code>testPinboardItemsExcludesDeleted</code></li>
+<li><code>testInsightsExcludesDeleted</code></li>
+<li><code>testV10TriggerRemovesFTSRow</code></li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.7-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.9.7-beta</a></p>
+        <a class="permalink" href="whats-new/0.9.7-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.6-beta</span>
+        
+        <span class="date">2026-06-22</span>
       </summary>
       <div class="body">
 <h1>Pasty v0.9.6-beta — 14 件の P0 安定化パック</h1>
