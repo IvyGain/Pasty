@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Pasty v0.9.9-beta — リリースノート</title>
+<meta name="description" content="Pasty v0.9.9-beta のリリースノート — 新機能・改善・修正の詳細。" />
+<link rel="icon" type="image/png" sizes="64x64" href="../assets/icon-64.png" />
+<style>
+:root {
+  --bg: #fbfbfd;
+  --bg-soft: #f5f5f7;
+  --bg-card: rgba(255,255,255,0.7);
+  --text: #1d1d1f;
+  --text-soft: #6e6e73;
+  --line: rgba(0,0,0,0.08);
+  --line-strong: rgba(0,0,0,0.18);
+  --accent: #6366f1;
+  --accent-2: #a855f7;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+          "Helvetica Neue", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000;
+    --bg-soft: #0a0a0a;
+    --bg-card: rgba(28,28,30,0.65);
+    --text: #f5f5f7;
+    --text-soft: #c7c7cc;
+    --line: rgba(255,255,255,0.10);
+    --line-strong: rgba(255,255,255,0.22);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  letter-spacing: -0.011em;
+  padding: 48px 24px 80px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vw 50vh at 80% -20%, rgba(99,102,241,0.15), transparent 60%),
+    radial-gradient(50vw 50vh at -10% 30%, rgba(168,85,247,0.12), transparent 60%);
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-soft); font-size: 14px; text-decoration: none;
+  margin-bottom: 28px;
+}
+.back:hover { color: var(--text); }
+.eyebrow {
+  display: inline-block;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 5px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 36px 36px 44px;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,0.18);
+}
+@media (max-width: 600px) { .card { padding: 28px 22px 36px; } }
+.card h1 {
+  font-size: clamp(28px, 5vw, 40px);
+  letter-spacing: -0.02em; line-height: 1.15;
+  margin-bottom: 8px;
+}
+.card .meta {
+  color: var(--text-soft); font-size: 13px; margin-bottom: 28px;
+}
+.card h2 {
+  font-size: 22px; letter-spacing: -0.015em;
+  margin: 32px 0 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.card h3 { font-size: 17px; margin: 22px 0 8px; }
+.card h4 { font-size: 15px; margin: 18px 0 6px; }
+.card p { margin: 10px 0; color: var(--text); }
+.card ul { margin: 10px 0 10px 22px; }
+.card li { margin: 4px 0; }
+.card a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.card a:hover { border-bottom-style: solid; }
+.card code {
+  font-family: var(--mono); font-size: 0.9em;
+  background: var(--bg-soft);
+  padding: 1px 6px; border-radius: 5px;
+}
+.card pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 18px; overflow-x: auto;
+  margin: 14px 0;
+}
+.card pre code { background: transparent; padding: 0; font-size: 13px; }
+.card hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+.dl {
+  display: inline-flex; gap: 8px; align-items: center;
+  margin-top: 28px;
+  padding: 12px 22px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white; font-weight: 600; text-decoration: none;
+  box-shadow: 0 12px 30px -8px rgba(99,102,241,0.5);
+}
+.dl:hover { transform: translateY(-1px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../index.html">← Pasty トップへ</a>
+  <article class="card">
+    <span class="eyebrow">v0.9.9-beta</span>
+    <h1>Pasty v0.9.9-beta</h1>
+    
+    <h1>Pasty v0.9.9-beta — 軽量化と構造最適化、業界 No.1 設計思想</h1>
+<p>7 軸の全方位監査 (critical path / hot path / re-render / leak / DB / concurrency / industry benchmark) を経て、表面ではなく構造レベルで仕立て直したリリースです。Raycast / Linear / Apple Store の "売れる仕組み" を Pasty に翻訳しました。</p>
+<h2>⚡ 軽量化</h2>
+<ul>
+<li><strong>SQLite 同時性チューニング</strong>: WAL ジャーナル + <code>synchronous = NORMAL</code> + 16MB cache + 32MB mmap を全 DB 起動に適用。検索とインサートの両方が体感で速くなります。</li>
+<li><strong>無駄な再描画を排除</strong>: <code>ClipStore.recent</code> を実差分があるときだけ publish するよう変更。アイドル状態での SwiftUI 再評価を抑制しました。</li>
+<li><strong>メニューバービューのメモ化</strong>: 上位 10 件スライスをキャッシュ。クリップボード polling のたびに新しい配列を生成していたのを停止。</li>
+<li><strong>FTS5 ランキング</strong>: 検索結果は BM25 で関連度順にソート (タイブレーカーが <code>createdAt DESC</code>)。"今コピーしたあの URL" が最上位に来ます。</li>
+</ul>
+<h2>🎯 ストレスゼロ UX</h2>
+<ul>
+<li><strong>キーボードでフォルダ並び替え</strong>: ⌥↑ / ⌥↓ で 1 つずつ、⌥⇧↑ / ⌥⇧↓ で先頭 / 末尾へ。マウス不要。<code>⌘?</code> ヘルプ表にも追記。</li>
+<li><strong>トースト消滅タイマーの統一</strong>: <code>DispatchWorkItem</code> 由来の旧式タイマーを構造化並行 (<code>Task</code> + <code>Task.sleep</code>) に置き換え。キャンセル挙動が予測可能に。</li>
+<li><strong><code>searchPage(query:afterID:limit:)</code></strong>: 履歴ビュー / アーカイブ拡張に向けたカーソルベースのページネーション API を追加。ユーザー向けの直接効果は次リリース以降。</li>
+</ul>
+<h2>🔩 リファクタ</h2>
+<ul>
+<li><strong>並行モデルの統一</strong>: <code>DispatchQueue.main.asyncAfter</code> を 4 箇所削除し、<code>Task { @MainActor in try? await Task.sleep(...) }</code> に置換 (<code>PastyApp</code> Stage 2、<code>PasteToast</code> auto-dismiss、<code>TemplateFieldDialog</code> focus latch ほか)。</li>
+<li><strong><code>PerfLog.log(_:)</code> 追加</strong>: 自由文の perf 計測ポイントを少ないコストで埋められるよう拡張。</li>
+<li><strong>DB メンテナンス自動化</strong>: 週 1 回 <code>ANALYZE</code>、月 1 回 <code>PRAGMA incremental_vacuum(5000)</code> をバックグラウンドで実行。</li>
+<li><strong>Soft-delete 密度ログ</strong>: <code>PerfLog.enabled</code> のときだけ tombstone 比率を出力。GC 遅延の早期検知に使えます。</li>
+</ul>
+<h2>🏆 業界 No.1 設計思想</h2>
+<ul>
+<li><strong>Raycast / Linear</strong>: "every action keyboard-reachable" を満たすため、これまでマウス専用だったフォルダ並び替えを ⌥+方向キーで到達可能にしました。</li>
+<li><strong>Linear (motion design tokens)</strong>: 既存 <code>DesignTokens.swift</code> の <code>snappy</code> (response 0.35 / damping 0.85) を引き続き活用。次リリースでキャプチャ瞬間の "祝祭" アニメーションへ拡張予定です。</li>
+<li><strong>McDonald's (operational reproducibility)</strong>: 7 軸監査と PRAGMA チューニングで、コピー → ストリップ → ペーストのレイテンシを構造的に予測可能にしました。</li>
+<li><strong>Stripe (fail-loud-but-recoverable)</strong>: DB メンテナンス失敗時はサイレントに記録し、次起動でリトライ。ユーザー操作を阻害しません。</li>
+</ul>
+<hr />
+<p>リリース詳細: <a href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.9-beta" target="_blank" rel="noopener">https://github.com/IvyGain/Pasty/releases/tag/v0.9.9-beta</a></p>
+    <a class="dl"
+       href="https://github.com/IvyGain/Pasty/releases/tag/v0.9.9-beta"
+       target="_blank" rel="noopener">
+      GitHub Releases で詳細を見る ↗
+    </a>
+  </article>
+</div>
+</body>
+</html>
