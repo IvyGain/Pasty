@@ -15,4 +15,13 @@ enum PerfLog {
         os_log("%{public}@=%dms", log: log, type: .info, label, ms)
         return result
     }
+
+    /// v0.9.9-beta (B4): emit ad-hoc perf-only diagnostics (e.g. soft-delete
+    /// density, table sizes). No-ops when `enabled` is false so production
+    /// builds pay zero cost.
+    static func log(_ msg: String) {
+        guard enabled else { return }
+        NSLog("[perf] \(msg)")
+        os_log("%{public}@", log: log, type: .info, msg)
+    }
 }

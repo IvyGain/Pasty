@@ -86,7 +86,8 @@ struct PastyApp: App {
         }
 
         // Stage 2 — 0.5s 遅延 (非クリティカル / 起動後タスク)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [stack] in
+        Task { @MainActor [stack] in
+            try? await Task.sleep(nanoseconds: UInt64(0.5 * 1_000_000_000))
             // Sparkle: SPUStandardUpdaterController(startingUpdater: true) を呼んだ時点で
             // 自動チェッカーが起動するので、shared にアクセスするだけで初期化される。
             _ = SparkleUpdater.shared
@@ -139,7 +140,8 @@ struct PastyApp: App {
                 WhatsNewPresenter.shared.presentIfNeeded()
                 // アップデート直後にだけ、`##` 見出しから組み立てたミニオンボーディングをキューイング
                 if prevSeen != current {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: UInt64(0.4 * 1_000_000_000))
                         OnboardingPresenter.shared.presentMiniWhatsNew(version: current)
                     }
                 }

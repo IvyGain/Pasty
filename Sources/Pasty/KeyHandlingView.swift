@@ -21,6 +21,10 @@ struct KeyHandlingView: NSViewRepresentable {
     var onShiftDown: () -> Void = {}
     var onShiftLeft: () -> Void = {}
     var onShiftRight: () -> Void = {}
+    var onOptionUp: () -> Void = {}
+    var onOptionDown: () -> Void = {}
+    var onOptionShiftUp: () -> Void = {}
+    var onOptionShiftDown: () -> Void = {}
     var onCmdA: () -> Void = {}
     var onCmdE: () -> Void = {}
     var onCmdR: () -> Void = {}
@@ -67,8 +71,12 @@ struct KeyHandlingView: NSViewRepresentable {
             let opt = event.modifierFlags.contains(.option)
             let ctrl = event.modifierFlags.contains(.control)
             switch event.keyCode {
-            case 126: shift ? v.onShiftUp()   : v.onUp(); return
-            case 125: shift ? v.onShiftDown() : v.onDown(); return
+            case 126:
+                if opt { shift ? v.onOptionShiftUp() : v.onOptionUp(); return }
+                shift ? v.onShiftUp()   : v.onUp(); return
+            case 125:
+                if opt { shift ? v.onOptionShiftDown() : v.onOptionDown(); return }
+                shift ? v.onShiftDown() : v.onDown(); return
             case 123: shift ? v.onShiftLeft()  : v.onLeft(); return
             case 124: shift ? v.onShiftRight() : v.onRight(); return
             case 36, 76:

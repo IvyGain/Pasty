@@ -84,12 +84,16 @@ enum SearchEngine {
                 // clips_softdelete_au trigger (migration v10) fires or a
                 // backfill rebuilds it. AND clips.deleted_at IS NULL on the
                 // clips side so the DSL stays consistent with ClipStore.search.
+                // v0.9.9-beta (Cluster D D1): rank FTS hits by BM25 first so the
+                // most relevant snippet floats up, then fall back to createdAt DESC
+                // as a deterministic tiebreaker (and to preserve the recent-first
+                // feel for ties / equal-score matches).
                 rows = try ClipItem.fetchAll(db, sql: """
                     SELECT clips.* FROM clips
                     JOIN clips_fts ON clips_fts.rowid = clips.id
                     WHERE clips_fts MATCH ?
                       AND clips.deleted_at IS NULL
-                    ORDER BY clips.createdAt DESC
+                    ORDER BY bm25(clips_fts) ASC, clips.createdAt DESC
                     LIMIT ?
                     """, arguments: [pattern, q.limit * 2])
             }

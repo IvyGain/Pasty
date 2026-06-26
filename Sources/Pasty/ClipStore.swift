@@ -36,9 +36,24 @@ final class ClipStore: ObservableObject {
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
             let dbURL = appSupport.appendingPathComponent("pasty.sqlite")
+            // v0.9.9-beta (Cluster B): tune SQLite for Pasty's read-heavy /
+            // burst-write workload. WAL keeps writers from blocking the menu-bar
+            // read path; cache_size / mmap_size cut cold-start I/O for the
+            // recent feed; temp_store = MEMORY keeps sort / FTS scratch off
+            // disk; foreign_keys re-enables cascade semantics that GRDB depends
+            // on for `references(... onDelete: .cascade)`.
+            var config = Configuration()
+            config.prepareDatabase { db in
+                try db.execute(sql: "PRAGMA journal_mode = WAL")
+                try db.execute(sql: "PRAGMA synchronous = NORMAL")
+                try db.execute(sql: "PRAGMA cache_size = -16000")           // 16 MB
+                try db.execute(sql: "PRAGMA mmap_size = 33554432")          // 32 MB
+                try db.execute(sql: "PRAGMA temp_store = MEMORY")
+                try db.execute(sql: "PRAGMA foreign_keys = ON")
+            }
             let dbQueue: DatabaseQueue
             do {
-                dbQueue = try DatabaseQueue(path: dbURL.path)
+                dbQueue = try DatabaseQueue(path: dbURL.path, configuration: config)
             } catch {
                 throw ClipStoreError.openFailed(underlying: error)
             }
@@ -78,10 +93,89 @@ final class ClipStore: ObservableObject {
             // be partially stale until the next launch.
             clipStoreLogger.error("FTS5 backfill failed: \(String(describing: error), privacy: .public)")
         }
+        // v0.9.9-beta (Cluster B): post-migration maintenance. All three are
+        // best-effort — failures stay out of the user-visible init path.
+        maybeRunAnalyze()
+        maybeRunIncrementalVacuum()
+        logSoftDeleteDensityIfEnabled()
         do {
             try reloadInitial()
         } catch {
             throw ClipStoreError.initialLoadFailed(underlying: error)
+        }
+    }
+
+    // MARK: - Cluster B: periodic maintenance (B2/B3/B4)
+
+    /// v0.9.9-beta (B2): run `ANALYZE` once per week to keep SQLite's query
+    /// planner statistics fresh for the FTS5-aware search path and the
+    /// soft-delete-filtered recent feed. Detached so it never blocks the menu
+    /// bar / strip cold start; failures are logged and the timestamp is only
+    /// stamped on success so the next launch retries.
+    private func maybeRunAnalyze() {
+        let key = "pasty.lastAnalyzeAt"
+        let last = UserDefaults.standard.double(forKey: key)
+        let now = Date().timeIntervalSince1970
+        let weekSeconds: Double = 7 * 86400
+        if last > 0 && (now - last) < weekSeconds { return }
+
+        let writer = dbWriter
+        Task.detached(priority: .background) {
+            do {
+                try await writer.write { db in
+                    try db.execute(sql: "ANALYZE")
+                }
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: key)
+            } catch {
+                NSLog("[ClipStore] ANALYZE failed: \(error)")
+            }
+        }
+    }
+
+    /// v0.9.9-beta (B3): once a month, hand back unused pages to the FS via
+    /// `PRAGMA incremental_vacuum(N)`. Only meaningful when the DB was created
+    /// with `auto_vacuum = INCREMENTAL`; on legacy DBs this is a no-op that
+    /// still costs a single PRAGMA round-trip — cheap, and the cadence cap
+    /// keeps the worst case bounded.
+    private func maybeRunIncrementalVacuum() {
+        let key = "pasty.lastIncrementalVacuumAt"
+        let last = UserDefaults.standard.double(forKey: key)
+        let now = Date().timeIntervalSince1970
+        let monthSeconds: Double = 30 * 86400
+        if last > 0 && (now - last) < monthSeconds { return }
+
+        let writer = dbWriter
+        Task.detached(priority: .background) {
+            do {
+                try await writer.write { db in
+                    try db.execute(sql: "PRAGMA incremental_vacuum(5000)")
+                }
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: key)
+            } catch {
+                NSLog("[ClipStore] incremental_vacuum failed: \(error)")
+            }
+        }
+    }
+
+    /// v0.9.9-beta (B4): emit soft-delete density (tombstone ratio) into
+    /// PerfLog so we can tell, post-release, when the GC sweep is falling
+    /// behind. Gated by `PerfLog.enabled` so production builds skip the
+    /// COUNT(*) entirely.
+    private func logSoftDeleteDensityIfEnabled() {
+        guard PerfLog.enabled else { return }
+        do {
+            let (total, tombstoned) = try dbWriter.read { db -> (Int, Int) in
+                let t = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
+                let d = try Int.fetchOne(
+                    db,
+                    sql: "SELECT COUNT(*) FROM clips WHERE deleted_at IS NOT NULL"
+                ) ?? 0
+                return (t, d)
+            }
+            let pct = total > 0 ? Int(Double(tombstoned) / Double(total) * 100) : 0
+            PerfLog.log("clips.softDelete total=\(total) tombstoned=\(tombstoned) pct=\(pct)")
+        } catch {
+            NSLog("[ClipStore] softDelete density log failed: \(error)")
         }
     }
 
@@ -479,8 +573,31 @@ final class ClipStore: ObservableObject {
                 .fetchCount(db)
             return (items, total)
         }
-        self.recent = snapshot.items
-        self.totalCount = snapshot.total
+        // v0.9.9-beta Cluster C: gate the @Published `recent` reassignment by
+        // an actual content diff. Idle reloads (no real change since last
+        // tick) shouldn't re-emit identical arrays into SwiftUI's diffing
+        // pipeline. Compare ids first (cheap), then a (id, createdAt)
+        // signature as a tiebreaker for in-place mutations. ClipItem has no
+        // `updatedAt` column today, so createdAt is the only timestamp we can
+        // hash against without an extra round trip.
+        let newIDs = snapshot.items.map { $0.id }
+        let oldIDs = self.recent.map { $0.id }
+        if newIDs != oldIDs {
+            self.recent = snapshot.items
+        } else {
+            let oldSig = self.recent
+                .map { "\($0.id ?? -1):\($0.createdAt.timeIntervalSince1970)" }
+                .joined(separator: ",")
+            let newSig = snapshot.items
+                .map { "\($0.id ?? -1):\($0.createdAt.timeIntervalSince1970)" }
+                .joined(separator: ",")
+            if oldSig != newSig {
+                self.recent = snapshot.items
+            }
+        }
+        if self.totalCount != snapshot.total {
+            self.totalCount = snapshot.total
+        }
     }
 
     /// v0.9.6-beta (P0 #1): typed lookup by primary key, soft-delete aware.
@@ -554,15 +671,70 @@ final class ClipStore: ObservableObject {
             // backfill, but live deletes only land in clips_fts via the
             // clips_ad trigger after a hard DELETE — so for the soft-delete
             // window this WHERE is the only guard.
+            //
+            // v0.9.9-beta (Cluster D D1): order FTS results by BM25 ascending
+            // so the most relevant rows surface first, with createdAt DESC as
+            // tiebreaker. The recent-feed path above (empty query) intentionally
+            // stays createdAt DESC only — there's no MATCH there to score.
             let sql = """
                 SELECT clips.* FROM clips
                 JOIN clips_fts ON clips_fts.rowid = clips.id
                 WHERE clips_fts MATCH ?
                   AND clips.deleted_at IS NULL
-                ORDER BY clips.createdAt DESC
+                ORDER BY bm25(clips_fts) ASC, clips.createdAt DESC
                 LIMIT ?
                 """
             return try ClipItem.fetchAll(db, sql: sql, arguments: [pattern, limit])
+        }
+    }
+
+    /// v0.9.9-beta (Cluster D D2): cursor-based pagination primitive for search.
+    ///
+    /// Returns at most `limit` clips matching `query`. When `afterID` is supplied,
+    /// only clips with `id < afterID` are returned — used by the UI to fetch the
+    /// next page after the last visible row's id.
+    ///
+    /// - Empty query: walks the recent feed (`createdAt DESC`, soft-delete aware).
+    /// - Non-empty query: takes the FTS5 path and orders by `bm25 ASC, createdAt DESC`
+    ///   so the most relevant matches surface first, mirroring `search(query:limit:)`.
+    ///
+    /// This is additive and does not change `search(query:limit:)`'s signature.
+    public func searchPage(query: String, afterID: Int64?, limit: Int) async throws -> [ClipItem] {
+        return try await dbWriter.read { db in
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                if let after = afterID {
+                    return try ClipItem
+                        .filter(sql: "deleted_at IS NULL AND id < ?", arguments: [after])
+                        .order(ClipItem.Columns.createdAt.desc)
+                        .limit(limit)
+                        .fetchAll(db)
+                } else {
+                    return try ClipItem
+                        .filter(sql: "deleted_at IS NULL")
+                        .order(ClipItem.Columns.createdAt.desc)
+                        .limit(limit)
+                        .fetchAll(db)
+                }
+            }
+            guard let pattern = FTS5Pattern(matchingAllPrefixesIn: trimmed) ?? FTS5Pattern(matchingAnyTokenIn: trimmed) else { return [] }
+            if let after = afterID {
+                return try ClipItem.fetchAll(db, sql: """
+                    SELECT clips.* FROM clips
+                    JOIN clips_fts ON clips_fts.rowid = clips.id
+                    WHERE clips_fts MATCH ? AND clips.deleted_at IS NULL AND clips.id < ?
+                    ORDER BY bm25(clips_fts) ASC, clips.createdAt DESC
+                    LIMIT ?
+                    """, arguments: [pattern, after, limit])
+            } else {
+                return try ClipItem.fetchAll(db, sql: """
+                    SELECT clips.* FROM clips
+                    JOIN clips_fts ON clips_fts.rowid = clips.id
+                    WHERE clips_fts MATCH ? AND clips.deleted_at IS NULL
+                    ORDER BY bm25(clips_fts) ASC, clips.createdAt DESC
+                    LIMIT ?
+                    """, arguments: [pattern, limit])
+            }
         }
     }
 

@@ -245,6 +245,9 @@ struct HelpOverlayView: View {
                 entries: [
                     ShortcutEntry(keys: ["⌘", "F"], detail: "検索フィールドにフォーカス"),
                     ShortcutEntry(keys: ["⌘", "M"], detail: "フォルダへ移動"),
+                    // v0.9.9-beta (Cluster G): キーボードでフォルダ並び替え
+                    ShortcutEntry(keys: ["⌥", "↑/↓"], detail: "フォルダを並び替え"),
+                    ShortcutEntry(keys: ["⌥", "⇧", "↑/↓"], detail: "フォルダを先頭/末尾へ"),
                     ShortcutEntry(keys: ["⌘", ","], detail: "設定を開く"),
                     ShortcutEntry(keys: ["⌘", "?"], detail: "このヘルプ"),
                     ShortcutEntry(keys: ["⌫"], detail: "削除"),

@@ -137,6 +137,28 @@ final class PinboardStore: ObservableObject {
         }
     }
 
+    /// v0.9.9-beta: キーボードでの相対並び替え。`delta` が +1 / -1 のように
+    /// 現在位置からのオフセットで指定される (⌥↑ / ⌥↓)。端で操作しても
+    /// クランプせず単に no-op にする (ドラッグ並び替えと同じセマンティクス)。
+    func reorder(boardId: Int64, delta: Int) async throws {
+        guard let idx = boards.firstIndex(where: { $0.id == boardId }) else { return }
+        let newIdx = idx + delta
+        guard newIdx >= 0, newIdx < boards.count else { return }
+        try await reorder(boardId: boardId, to: newIdx)
+    }
+
+    /// v0.9.9-beta: ⌥⇧↑ で先頭にジャンプ。
+    func moveToStart(boardId: Int64) async throws {
+        guard let idx = boards.firstIndex(where: { $0.id == boardId }), idx > 0 else { return }
+        try await reorder(boardId: boardId, to: 0)
+    }
+
+    /// v0.9.9-beta: ⌥⇧↓ で末尾にジャンプ。
+    func moveToEnd(boardId: Int64) async throws {
+        guard let idx = boards.firstIndex(where: { $0.id == boardId }), idx < boards.count - 1 else { return }
+        try await reorder(boardId: boardId, to: boards.count - 1)
+    }
+
     /// v0.8.6: フォルダタブのドラッグ並び替え。`boardId` を `newIndex` の位置に
     /// 移動し、`sortOrder` を 0..n-1 で振り直す。`reload()` 同期版を呼んで
     /// 並びを SwiftUI に反映する。

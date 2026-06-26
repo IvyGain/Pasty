@@ -981,6 +981,13 @@ struct StripView: View {
             onShiftDown:    { selection.extend(by:  1, in: items) },
             onShiftLeft:    { selection.extend(by: -1, in: items) },
             onShiftRight:   { selection.extend(by:  1, in: items) },
+            // v0.9.9-beta (Cluster G): Linear-grade "every action keyboard reachable".
+            // ⌥↑ / ⌥↓ で現在フォーカス中のフォルダを 1 つ前 / 後ろへ。
+            // ⌥⇧↑ / ⌥⇧↓ で先頭 / 末尾へジャンプ。履歴タブ (folderID == nil) では no-op。
+            onOptionUp:        { reorderFocusedFolder(delta: -1) },
+            onOptionDown:      { reorderFocusedFolder(delta:  1) },
+            onOptionShiftUp:   { jumpFocusedFolder(to: .start) },
+            onOptionShiftDown: { jumpFocusedFolder(to: .end) },
             onCmdA:         { selection.selectAll(in: items) },
             onCmdE:         {
                 guard items.indices.contains(selection.cursorIndex) else { return }
@@ -1017,6 +1024,27 @@ struct StripView: View {
         let currentIdx = ids.firstIndex(of: folderID) ?? 0
         let nextIdx = ((currentIdx + direction) % ids.count + ids.count) % ids.count
         folderID = ids[nextIdx]
+    }
+
+    /// v0.9.9-beta (Cluster G): ⌥↑ / ⌥↓ で現在フォーカス中フォルダを 1 つずらす。
+    /// 履歴タブ (folderID == nil) や、端での over-shoot は no-op。
+    private func reorderFocusedFolder(delta: Int) {
+        guard let bid = folderID else { return }
+        Task { @MainActor in
+            try? await pinboards.reorder(boardId: bid, delta: delta)
+        }
+    }
+
+    /// v0.9.9-beta (Cluster G): ⌥⇧↑ / ⌥⇧↓ で先頭 / 末尾へジャンプ。
+    private enum FolderEdge { case start, end }
+    private func jumpFocusedFolder(to edge: FolderEdge) {
+        guard let bid = folderID else { return }
+        Task { @MainActor in
+            switch edge {
+            case .start: try? await pinboards.moveToStart(boardId: bid)
+            case .end:   try? await pinboards.moveToEnd(boardId: bid)
+            }
+        }
     }
 
     private func runAI(_ action: AIAction) {

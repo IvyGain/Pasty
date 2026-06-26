@@ -9,7 +9,7 @@ final class PasteToast {
 
     private var panel: NSPanel?
     private var hostingView: NSHostingView<ToastContent>?
-    private var hideWorkItem: DispatchWorkItem?
+    private var hideTask: Task<Void, Never>?
 
     private init() {}
 
@@ -67,8 +67,8 @@ final class PasteToast {
                        display: false)
 
         // 連続呼び出し時は古いタイマーを破棄し、フェードを最新化。
-        hideWorkItem?.cancel()
-        hideWorkItem = nil
+        hideTask?.cancel()
+        hideTask = nil
 
         if !panel.isVisible {
             panel.alphaValue = 0
@@ -81,16 +81,16 @@ final class PasteToast {
             panel.animator().alphaValue = 1
         }
 
-        let work = DispatchWorkItem { [weak self] in
+        hideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(durationSeconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
             self?.hide()
         }
-        hideWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + durationSeconds, execute: work)
     }
 
     func hide() {
-        hideWorkItem?.cancel()
-        hideWorkItem = nil
+        hideTask?.cancel()
+        hideTask = nil
         guard let panel, panel.isVisible else { return }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.22

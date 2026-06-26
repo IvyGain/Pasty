@@ -280,7 +280,8 @@ struct TemplateFieldDialog: View {
 
     private func focusFirstEmpty() {
         // Slight delay so the focus binding latches after the window settles.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(0.05 * 1_000_000_000))
             focusedField = firstEmptyFieldID ?? editing.first?.id
         }
     }

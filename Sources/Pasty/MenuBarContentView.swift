@@ -16,7 +16,28 @@ struct MenuBarContentView: View {
         return f
     }()
 
-    private var visibleClips: [ClipItem] { Array(store.recent.prefix(10)) }
+    // v0.9.9-beta Cluster C: memoize the top-10 slice instead of recomputing
+    // it on every body re-evaluation. `store.recent` may publish unchanged
+    // arrays during idle reloads (ClipStore now gates that, but defense in
+    // depth is cheap); even when it does change, the cap-10 slice rarely
+    // diffs, so we update only when the array of ids actually moves.
+    @State private var visibleClips: [ClipItem] = []
+
+    private func recomputeVisibleClips(from recent: [ClipItem]) {
+        let next = Array(recent.prefix(10))
+        let nextIDs = next.map { $0.id }
+        let curIDs = visibleClips.map { $0.id }
+        if nextIDs != curIDs {
+            visibleClips = next
+            return
+        }
+        // Identity-stable; check createdAt to catch in-place updates.
+        let nextSig = next.map { $0.createdAt.timeIntervalSince1970 }
+        let curSig = visibleClips.map { $0.createdAt.timeIntervalSince1970 }
+        if nextSig != curSig {
+            visibleClips = next
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -38,7 +59,13 @@ struct MenuBarContentView: View {
         }
         .frame(width: 380)
         .padding(.vertical, 6)
-        .onAppear { selection.clearAll() }
+        .onAppear {
+            selection.clearAll()
+            recomputeVisibleClips(from: store.recent)
+        }
+        .onChange(of: store.recent.map { $0.id }) { _ in
+            recomputeVisibleClips(from: store.recent)
+        }
         .onDrop(of: [.plainText, .url, .fileURL, .image], isTargeted: nil) { providers in
             handleExternalDrop(providers)
             return true
