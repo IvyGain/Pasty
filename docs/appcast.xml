@@ -3,6 +3,15 @@
     <channel>
         <title>Pasty</title>
         <item>
+            <title>0.10.0-beta</title>
+            <pubDate>Mon, 29 Jun 2026 18:44:06 +0900</pubDate>
+            <sparkle:version>47</sparkle:version>
+            <sparkle:shortVersionString>0.10.0-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.10.0-beta/Pasty-0.10.0-beta.dmg" length="6340318" type="application/octet-stream" sparkle:edSignature="KgvSWCe0fEqbyzngEpHPvYvW26WUkIfxCRmuAq5MzONWeRpuH4Z5+AzHldJniakwm0Bo3kh/T1yDa6rt/6YlAw=="/>
+        </item>
+        <item>
             <title>0.9.9-beta</title>
             <pubDate>Fri, 26 Jun 2026 10:58:36 +0900</pubDate>
             <sparkle:version>46</sparkle:version>
@@ -37,15 +46,6 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.9.6-beta/Pasty-0.9.6-beta.dmg" length="6214352" type="application/octet-stream" sparkle:edSignature="D8v6qW1gQN4jo24s1HCCKpoFUmL9H+l1Jai09peopCT3TJjwKJ+fuERI2P+AZrAHMD+osCS3YoJIhxOvCW7tDA=="/>
-        </item>
-        <item>
-            <title>0.9.5-beta</title>
-            <pubDate>Sun, 21 Jun 2026 22:43:19 +0900</pubDate>
-            <sparkle:version>42</sparkle:version>
-            <sparkle:shortVersionString>0.9.5-beta</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/IvyGain/Pasty/releases/download/v0.9.5-beta/Pasty-0.9.5-beta.dmg" length="6178306" type="application/octet-stream" sparkle:edSignature="3fWb7hLiLO2jAElPbzi/4hUadKdlrpGe7aminTlnrJZutW07aHVppJbPind6/rnUVasF+c46gch2Fnvaq3oLCQ=="/>
         </item>
     </channel>
 </rss>

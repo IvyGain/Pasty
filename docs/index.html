@@ -1173,7 +1173,7 @@
     <ul>
       <li><a href="#surfaces">サーフェス</a></li>
 <!-- HERO_NAV:BEGIN -->
-      <li><a href="#releases">v0.9</a></li>
+      <li><a href="#releases">v0.10</a></li>
 <!-- HERO_NAV:END -->
       <li><a href="#folders">倉庫</a></li>
       <li><a href="#ai">AI</a></li>
@@ -1197,10 +1197,10 @@
   <div class="container">
 <!-- HERO:BEGIN -->
     <div class="reveal">
-      <span class="eyebrow">v0.9.9-beta · 軽量化 · ストレスゼロ UX · リファクタ · 業界 No.1 設計思想 · MIT</span>
+      <span class="eyebrow">v0.10.0-beta · ストレスゼロ UX 2 · 英語化 · アクセシビリティ · v1.0 準備 · MIT</span>
       <h1 class="headline">クリップボードを、<br/><span class="accent">倉庫に。</span></h1>
       <p class="subtitle">
-        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。7 軸の全方位監査 (critical path / hot path / re-render / leak / DB / concurrency / industry benchmark) を経て、表面ではなく構造レベルで仕立て直したリリースです。Raycast / Linear / Apple Store の &quot;売れる仕組み&quot; を Pasty に翻訳しました。
+        macOS のための、超軽量でローカルファーストなクリップボードマネージャ。下から出るカルーセルがメイン、ノッチが副メイン、Raycast 拡張がサード。v0.10.0-beta の最新アップデートはリリースノートをご覧ください。
       </p>
       <div class="ctas">
         <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty.dmg">
@@ -1830,7 +1830,7 @@
           <div>
 <!-- DOWNLOAD_CARD:BEGIN -->
             <h3>macOS アプリ</h3>
-            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.9.9-beta</div>
+            <div style="color:var(--text-dim);font-size:13px;font-family:var(--mono)">v0.10.0-beta</div>
           </div>
         </div>
         <p class="lede">dmg をダウンロード。<code style="font-family:var(--mono);font-size:0.9em">/Applications</code> にドラッグ。<code style="font-family:var(--mono);font-size:0.9em">⇧⌘V</code>。インストールは、それで全部です。</p>
@@ -1879,7 +1879,7 @@ $ open .build/release/Pasty.app</pre>
           <span>Raycast 1.60 以降</span>
           <span>Node.js 20+</span>
 <!-- RAYCAST_REC:BEGIN -->
-          <span>Pasty v0.9.9-beta+ 推奨</span>
+          <span>Pasty v0.10.0-beta+ 推奨</span>
 <!-- RAYCAST_REC:END -->
         </div>
         <details>
@@ -2136,10 +2136,10 @@ $ npx ray develop
     <div class="latest-card reveal">
       <div class="latest-meta">
         <span class="pill">最新版</span>
-        <div class="ver">v0.9.9-beta</div>
+        <div class="ver">v0.10.0-beta</div>
         <div class="sys">macOS 14+ · Apple Silicon &amp; Intel · MIT</div>
       </div>
-      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.9.9-beta.dmg"
+      <a class="btn primary" href="https://github.com/IvyGain/Pasty/releases/latest/download/Pasty-0.10.0-beta.dmg"
          style="padding: 14px 24px; border-radius: 999px; font-size: 16px; font-weight: 600;
                 background: linear-gradient(135deg, var(--accent), var(--accent-2));
                 color: white; box-shadow: 0 12px 30px -8px rgba(99,102,241,0.55);
@@ -2152,9 +2152,48 @@ $ npx ray develop
     <div class="release-list reveal">
     <details class="release" open>
       <summary>
-        <span class="v">v0.9.9-beta</span>
+        <span class="v">v0.10.0-beta</span>
         <span class="badge">最新</span>
         
+      </summary>
+      <div class="body">
+<h1>Pasty 0.10.0-beta — v1.0 準備リリース</h1>
+<h2>🎯 ストレスゼロ UX 2</h2>
+<ul>
+<li>検索フィールドに 300ms キーストロークデバウンスを導入。タイピング中の FTS5 クエリ発火を約 70% 削減。</li>
+<li>FTS5 パターン LRU キャッシュ (64 件) で繰り返しクエリの CPU 負荷を 5–15% 軽減。</li>
+<li>ホバープレビューのキャンセル動作と空クエリ時の最適化を再検証。</li>
+<li>Swift 6 strict concurrency 準拠化: 対象 7 ファイルで警告 108 件 → 0 件、<code>@MainActor</code>/<code>Sendable</code> を明示化。</li>
+</ul>
+<h2>🌐 英語化</h2>
+<ul>
+<li>Onboarding / Settings (一般タブ) / WhatsNew / Help を <code>Localizable.strings</code> (ja.lproj + en.lproj) に 70 キー追加 (en/ja パリティ済み)。</li>
+<li>新ヘルパー <code>L10n(key)</code> / <code>L10nText(key)</code> / <code>L10nFormat.string(key, args...)</code> を導入。</li>
+<li>AI / Insights / OCR ラベルは v0.10.1 で追従予定。</li>
+</ul>
+<h2>♿️ アクセシビリティ</h2>
+<ul>
+<li>6 つの主要 View (StripPanel / SettingsWindow / OnboardingView / WhatsNewPresenter / HelpOverlayView / ClipPreviewView) に VoiceOver ラベル 30 件 + UI test 用識別子 2 件を追加。</li>
+<li>HelpOverlayView のショートカット行が「キー + 説明」を 1 発話に統合 — 30+ 行すべてが VoiceOver でクリアに読み上げ可能。</li>
+<li>Dynamic Type は v0.9.9 luxury UI/UX に視覚的回帰を起こさないため次回ターゲット。</li>
+</ul>
+<h2>📦 v1.0 準備</h2>
+<ul>
+<li>DB GC: 90 日経過した soft-delete クリップを自動 hard-delete する <code>RetentionSweeper</code> を追加。起動時に BlobGC と並んで起動。</li>
+<li>マイグレーション統合テスト 3 件 + soft-delete ライフサイクルテスト 4 件 (計 7 件) で v1→v10 を網羅。</li>
+<li>Disk LRU: VideoThumbnailCache + PDFThumbnailCache に <code>~/Library/Caches/io.pasty.app/{video-thumbs,pdf-thumbs}/</code> 永続化 (40 MB + 20 MB / 90 日エビクション)。</li>
+<li>本リリースで統合テスト 7 件 (マイグレーション v1→v10 / soft-delete ライフサイクル) を新規追加。<code>swift test</code> 51/51 グリーン。</li>
+</ul>
+        <a class="permalink" href="whats-new/0.10.0-beta.html">
+          このリリースの専用ページを開く →
+        </a>
+      </div>
+    </details>
+    <details class="release">
+      <summary>
+        <span class="v">v0.9.9-beta</span>
+        
+        <span class="date">2026-06-26</span>
       </summary>
       <div class="body">
 <h1>Pasty v0.9.9-beta — 軽量化と構造最適化、業界 No.1 設計思想</h1>
