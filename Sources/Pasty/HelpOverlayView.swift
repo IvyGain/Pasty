@@ -82,19 +82,22 @@ struct HelpOverlayView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Pasty キーボードショートカット")
+                Text(L10n("help.title"))
                     .font(.system(size: 18, weight: .semibold))
-                Text("どこからでも素早く呼び出せる主要アクション一覧")
+                    .accessibilityAddTraits(.isHeader)
+                Text(L10n("help.subtitle"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             Spacer()
             HStack(spacing: 6) {
                 KeyCap(text: "⎋", size: .small)
-                Text("で閉じる")
+                Text(L10n("help.closeHint"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Esc キーで閉じる")
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 18)
@@ -119,11 +122,13 @@ struct HelpOverlayView: View {
                 Image(systemName: category.symbol)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text(category.title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .tracking(0.6)
+                    .accessibilityAddTraits(.isHeader)
             }
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(category.entries) { entry in
@@ -171,6 +176,7 @@ struct HelpOverlayView: View {
             Text("—")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
 
             Text(entry.detail)
                 .font(.system(size: 12))
@@ -178,6 +184,12 @@ struct HelpOverlayView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // VoiceOver: combine the keycap row + the description into a single
+        // utterance so screen readers don't enunciate each modifier character
+        // (e.g. "⇧, ⌘, V") followed by an em dash. The spoken label reads like
+        // "Shift Command V — Open Pasty" via the human-readable detail text.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(entry.keys.joined(separator: " ")) — \(entry.detail)")
     }
 
     // MARK: - Data
@@ -185,7 +197,7 @@ struct HelpOverlayView: View {
     private static func makeCategories() -> [ShortcutCategory] {
         [
             ShortcutCategory(
-                title: "呼び出し",
+                title: L10n("help.section.invoke"),
                 symbol: "sparkles",
                 entries: [
                     ShortcutEntry(keys: ["⇧", "⌘", "V"], detail: "プライマリサーフェスを開く / 閉じる"),
@@ -196,7 +208,7 @@ struct HelpOverlayView: View {
                 ]
             ),
             ShortcutCategory(
-                title: "ナビゲーション",
+                title: L10n("help.section.navigation"),
                 symbol: "arrow.up.and.down.and.arrow.left.and.right",
                 entries: [
                     ShortcutEntry(keys: ["↑", "↓", "←", "→"], detail: "カーソル移動"),
@@ -207,7 +219,7 @@ struct HelpOverlayView: View {
                 ]
             ),
             ShortcutCategory(
-                title: "選択 & 貼付",
+                title: L10n("help.section.selectPaste"),
                 symbol: "doc.on.clipboard",
                 entries: [
                     ShortcutEntry(keys: ["↩"], detail: "選択中を貼付（複数選択時は順次）"),
@@ -217,7 +229,7 @@ struct HelpOverlayView: View {
                 ]
             ),
             ShortcutCategory(
-                title: "プレビュー & 編集",
+                title: L10n("help.section.preview"),
                 symbol: "eye",
                 entries: [
                     ShortcutEntry(keys: ["Space"], detail: "Quick Look 全画面"),
@@ -228,7 +240,7 @@ struct HelpOverlayView: View {
                 ]
             ),
             ShortcutCategory(
-                title: "AI アクション",
+                title: L10n("help.section.ai"),
                 symbol: "wand.and.stars",
                 entries: [
                     ShortcutEntry(keys: ["⌘", "I"], detail: "AI アクションメニュー"),
@@ -240,7 +252,7 @@ struct HelpOverlayView: View {
                 ]
             ),
             ShortcutCategory(
-                title: "その他",
+                title: L10n("help.section.other"),
                 symbol: "ellipsis.circle",
                 entries: [
                     ShortcutEntry(keys: ["⌘", "F"], detail: "検索フィールドにフォーカス"),

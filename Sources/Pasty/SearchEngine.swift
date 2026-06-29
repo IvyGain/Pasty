@@ -77,8 +77,7 @@ enum SearchEngine {
                     .limit(q.limit * 2)
                     .fetchAll(db)
             } else {
-                let pattern = FTS5Pattern(matchingAllPrefixesIn: q.freeText)
-                    ?? FTS5Pattern(matchingAnyTokenIn: q.freeText)
+                let pattern = FTS5PatternCache.pattern(for: q.freeText)
                 // v0.9.6-beta (follow-up #1): clips_fts is in external-content
                 // mode; soft-deleted rows can linger in the FTS index until the
                 // clips_softdelete_au trigger (migration v10) fires or a

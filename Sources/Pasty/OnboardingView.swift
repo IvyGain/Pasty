@@ -64,106 +64,106 @@ struct OnboardingView: View {
         [
             // 01 — Welcome (basic)
             OnboardingStep(
-                badge: "01", title: "ようこそ、Pasty へ",
-                subtitle: "あなたのコピー履歴を、思考のスピードで取り出せるようにします。",
+                badge: "01", title: L10n("onboarding.01.title"),
+                subtitle: L10n("onboarding.01.subtitle"),
                 category: .basic,
                 body: AnyView(welcomeBody)
             ),
             // 02 — Hotkey (basic / shortcut)
             OnboardingStep(
-                badge: "02", title: "⇧⌘V でいつでも呼び出す",
-                subtitle: "どんなアプリでも、ストリップが下から立ち上がります。",
+                badge: "02", title: L10n("onboarding.02.title"),
+                subtitle: L10n("onboarding.02.subtitle"),
                 category: .basic,
                 body: AnyView(hotkeyBody)
             ),
             // 03 — Notch reveal
             OnboardingStep(
-                badge: "03", title: "ノッチに乗せれば、降りてくる",
-                subtitle: "M1/M2/M3 のノッチ (なくても画面上端) にカーソルを置くだけ。",
+                badge: "03", title: L10n("onboarding.03.title"),
+                subtitle: L10n("onboarding.03.subtitle"),
                 category: .notch,
                 body: AnyView(notchBody)
             ),
             // 03b — Notch wheel scroll (NEW)
             OnboardingStep(
-                badge: "03b", title: "ノッチ内をホイールで横スクロール",
-                subtitle: "ノッチ風枠の上でマウスホイールを回すと、クリップ履歴が左右に流れます。指1本でブラウズ。",
+                badge: "03b", title: L10n("onboarding.03b.title"),
+                subtitle: L10n("onboarding.03b.subtitle"),
                 category: .notch,
                 body: AnyView(notchScrollBody)
             ),
             // 04 — Accessibility (basic)
             OnboardingStep(
-                badge: "04", title: "アクセシビリティ権限を許可",
-                subtitle: "選択したクリップを自動で ⌘V するために必要です。Pasty は履歴を外部に送りません。",
+                badge: "04", title: L10n("onboarding.04.title"),
+                subtitle: L10n("onboarding.04.subtitle"),
                 category: .basic,
                 body: AnyView(accessibilityBody)
             ),
             // 05 — Folders (folder)
             OnboardingStep(
-                badge: "05", title: "フォルダで分類する",
-                subtitle: "ヘッダー右の「+」ボタンで新しいフォルダを作成。Tab / ⇧Tab でフォルダを順に切り替えられます。",
+                badge: "05", title: L10n("onboarding.05.title"),
+                subtitle: L10n("onboarding.05.subtitle"),
                 category: .folder,
                 body: AnyView(folderBody)
             ),
             // 06 — Clip → folder (folder)
             OnboardingStep(
-                badge: "06", title: "クリップをフォルダに入れる 3 つの方法",
-                subtitle: "履歴のクリップは、ドラッグ・右クリック・複数選択 → 一括移動 のいずれかでフォルダに振り分けられます。",
+                badge: "06", title: L10n("onboarding.06.title"),
+                subtitle: L10n("onboarding.06.subtitle"),
                 category: .folder,
                 body: AnyView(clipToFolderBody)
             ),
             // 06b — Folder drag-reorder (NEW, folder)
             OnboardingStep(
-                badge: "06b", title: "フォルダの順番をドラッグで入れ替え",
-                subtitle: "フォルダタブを掴んで左右にドラッグ。隙間に細い線が現れて、ドロップ位置を教えてくれます。",
+                badge: "06b", title: L10n("onboarding.06b.title"),
+                subtitle: L10n("onboarding.06b.subtitle"),
                 category: .folder,
                 body: AnyView(dragReorderBody)
             ),
             // 07 — Stack (basic)
             OnboardingStep(
-                badge: "07", title: "Stack — 下書きに積んでまとめて貼る",
-                subtitle: "気になるクリップを Stack に積んでおいて、画面右下の Pill から好きな順で貼り付けたり、まとめて結合貼付したり。長い文章を組み立てる時に便利。",
+                badge: "07", title: L10n("onboarding.07.title"),
+                subtitle: L10n("onboarding.07.subtitle"),
                 category: .basic,
                 body: AnyView(stackBody)
             ),
             // 08 — Multi-select (NEW v0.9.0 UX) (basic)
             OnboardingStep(
-                badge: "08", title: "複数選択 — Esc 2 段階・順番貼付",
-                subtitle: "Space で複数選択 → Enter で選んだ順に貼付。ドラッグでまとめて貼付・まとめてピン留めも。Esc は 1 回目で選択解除、2 回目で閉じる。",
+                badge: "08", title: L10n("onboarding.08.title"),
+                subtitle: L10n("onboarding.08.subtitle"),
                 category: .basic,
                 body: AnyView(multiSelectBody)
             ),
             // 08b — AI macro + sound + glow (NEW, ai)
             OnboardingStep(
-                badge: "08b", title: "AI マクロで一発整形",
-                subtitle: "右クリックから AI アクションを実行。完了するとサウンドと画面端の縁取りでさりげなく通知します。",
+                badge: "08b", title: L10n("onboarding.08b.title"),
+                subtitle: L10n("onboarding.08b.subtitle"),
                 category: .ai,
                 body: AnyView(aiMacroBody)
             ),
             // 09 — Keyboard mastery (shortcut)
             OnboardingStep(
-                badge: "09", title: "キーボードだけで完結する",
-                subtitle: "マウスを使わずに探す、選ぶ、貼る。生産性は手元から逃げない。",
+                badge: "09", title: L10n("onboarding.09.title"),
+                subtitle: L10n("onboarding.09.subtitle"),
                 category: .shortcut,
                 body: AnyView(keyboardBody)
             ),
             // 09b — Confidential mode (NEW, shortcut)
             OnboardingStep(
-                badge: "09b", title: "Confidential モード — ⌃⌥⇧P",
-                subtitle: "押した瞬間から 60 秒間、クリップボードの履歴を記録しません。パスワードや個人情報を扱うときに。",
+                badge: "09b", title: L10n("onboarding.09b.title"),
+                subtitle: L10n("onboarding.09b.subtitle"),
                 category: .shortcut,
                 body: AnyView(confidentialBody)
             ),
             // 10b — Quick-paste (NEW, shortcut)
             OnboardingStep(
-                badge: "10b", title: "Quick Paste — ⌃⌥1〜5",
-                subtitle: "直近 5 件のクリップに番号を割り当て。Pasty を開かなくても、修飾キーと数字キーひとつで即貼付。",
+                badge: "10b", title: L10n("onboarding.10b.title"),
+                subtitle: L10n("onboarding.10b.subtitle"),
                 category: .shortcut,
                 body: AnyView(quickPasteBody)
             ),
             // 11 — Complete
             OnboardingStep(
-                badge: "11", title: "準備完了。",
-                subtitle: "あとは ⇧⌘V でいつでも Pasty を呼んでください。",
+                badge: "11", title: L10n("onboarding.11.title"),
+                subtitle: L10n("onboarding.11.subtitle"),
                 category: .basic,
                 body: AnyView(completeBody)
             )
@@ -230,6 +230,7 @@ struct OnboardingView: View {
             HStack(spacing: 5) {
                 Image(systemName: category.systemImage)
                     .font(.system(size: 10, weight: .semibold))
+                    .accessibilityHidden(true)
                 Text(category.label)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
             }
@@ -248,6 +249,8 @@ struct OnboardingView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(category.label) セクション")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     // MARK: - Background
@@ -354,6 +357,7 @@ struct OnboardingView: View {
                 .shadow(color: Color.accentColor.opacity(0.4), radius: 18, x: 0, y: 8)
         }
         .frame(height: 220)
+        .accessibilityHidden(true)
     }
 
     private var hotkeyBody: some View {
@@ -370,11 +374,11 @@ struct OnboardingView: View {
                 KeyCap(label: "V", size: 72, animatePressed: true)
             }
             if triggeredHotkey {
-                Label("ナイス! ストリップが立ち上がりました", systemImage: "checkmark.circle.fill")
+                Label(L10n("onboarding.cta.success"), systemImage: "checkmark.circle.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.green)
             } else {
-                Text("今すぐ試してみよう")
+                Text(L10n("onboarding.cta.tryNow"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.tertiary)
             }
@@ -403,7 +407,7 @@ struct OnboardingView: View {
             Image(systemName: "arrow.down")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Color.accentColor)
-            Text("マウスを乗せると、ここから降りてきます")
+            Text(L10n("onboarding.notch.hint"))
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -424,7 +428,7 @@ struct OnboardingView: View {
             Button {
                 _ = PasteAutomator.shared.ensureAccessibilityPermission(prompt: true)
             } label: {
-                Label("システム設定を開く", systemImage: "arrow.up.right.square")
+                Label(L10n("action.openSystemSettings"), systemImage: "arrow.up.right.square")
                     .font(.system(size: 13, weight: .semibold))
                     .padding(.horizontal, 14).padding(.vertical, 8)
             }
@@ -460,7 +464,7 @@ struct OnboardingView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("新しいフォルダ")
+                    Text(L10n("onboarding.folder.newFolder"))
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
@@ -494,7 +498,7 @@ struct OnboardingView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
                 kbInlineCap("⇧Tab")
-                Text("でフォルダを順に切り替え")
+                Text(L10n("onboarding.folder.tabHint"))
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -926,6 +930,7 @@ struct OnboardingView: View {
                 .shadow(color: Color.green.opacity(0.4), radius: 18, x: 0, y: 8)
         }
         .frame(height: 220)
+        .accessibilityHidden(true)
     }
 
     private func kbRow(_ key: String, _ label: String) -> some View {
@@ -963,6 +968,8 @@ struct OnboardingView: View {
                     .animation(.spring(response: 0.32, dampingFraction: 0.8), value: stepIndex)
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("ステップ \(stepIndex + 1)、全 \(steps.count) ステップ")
     }
 
     // MARK: - Bottom bar
@@ -1148,6 +1155,7 @@ private struct ConfidentialModeBadge: View {
                     .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(Color.accentColor)
                     .pulseEffectIfAvailable()
+                    .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Confidential モード ON")
@@ -1168,6 +1176,8 @@ private struct ConfidentialModeBadge: View {
                 .stroke(Color.accentColor.opacity(0.4), lineWidth: 1)
         )
         .shadow(color: Color.accentColor.opacity(0.18), radius: 10, x: 0, y: 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Confidential モード オン、残り \(remaining) 秒")
         .onAppear {
             remaining = 60
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
@@ -1442,7 +1452,7 @@ private struct MiniWhatsNewOnboardingView: View {
                         Image(systemName: "sparkles")
                             .foregroundStyle(Color.accentColor)
                             .pulseEffectIfAvailable()
-                        Text("Pasty \(version) の新機能")
+                        Text(String(format: L10n("whatsNew.title.versioned"), version))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
@@ -1495,14 +1505,14 @@ private struct MiniWhatsNewOnboardingView: View {
 
                 HStack {
                     if index > 0 {
-                        Button("戻る") { index -= 1 }
+                        Button(L10n("common.back")) { index -= 1 }
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
                     } else {
                         Color.clear.frame(width: 80, height: 1)
                     }
                     Spacer()
-                    Button(index == headings.count - 1 ? "閉じる" : "次へ") {
+                    Button(index == headings.count - 1 ? L10n("common.close") : L10n("common.next")) {
                         if index == headings.count - 1 {
                             onClose()
                         } else {

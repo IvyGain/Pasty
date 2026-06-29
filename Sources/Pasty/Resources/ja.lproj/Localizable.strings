@@ -30,3 +30,80 @@
 "privacy.note" = "Pastyはすべてのデータをこのマシン内に保持します。クラウドアカウント・テレメトリ・解析は一切ありません。";
 "privacy.openFolder" = "アプリケーションサポートを開く";
 "privacy.wipe" = "全クリップを削除";
+
+/* MARK: - Onboarding (v0.10.0-beta) */
+"onboarding.01.title" = "ようこそ、Pasty へ";
+"onboarding.01.subtitle" = "あなたのコピー履歴を、思考のスピードで取り出せるようにします。";
+"onboarding.02.title" = "⇧⌘V でいつでも呼び出す";
+"onboarding.02.subtitle" = "どんなアプリでも、ストリップが下から立ち上がります。";
+"onboarding.03.title" = "ノッチに乗せれば、降りてくる";
+"onboarding.03.subtitle" = "M1/M2/M3 のノッチ (なくても画面上端) にカーソルを置くだけ。";
+"onboarding.03b.title" = "ノッチ内をホイールで横スクロール";
+"onboarding.03b.subtitle" = "ノッチ風枠の上でマウスホイールを回すと、クリップ履歴が左右に流れます。指1本でブラウズ。";
+"onboarding.04.title" = "アクセシビリティ権限を許可";
+"onboarding.04.subtitle" = "選択したクリップを自動で ⌘V するために必要です。Pasty は履歴を外部に送りません。";
+"onboarding.05.title" = "フォルダで分類する";
+"onboarding.05.subtitle" = "ヘッダー右の「+」ボタンで新しいフォルダを作成。Tab / ⇧Tab でフォルダを順に切り替えられます。";
+"onboarding.06.title" = "クリップをフォルダに入れる 3 つの方法";
+"onboarding.06.subtitle" = "履歴のクリップは、ドラッグ・右クリック・複数選択 → 一括移動 のいずれかでフォルダに振り分けられます。";
+"onboarding.06b.title" = "フォルダの順番をドラッグで入れ替え";
+"onboarding.06b.subtitle" = "フォルダタブを掴んで左右にドラッグ。隙間に細い線が現れて、ドロップ位置を教えてくれます。";
+"onboarding.07.title" = "Stack — 下書きに積んでまとめて貼る";
+"onboarding.07.subtitle" = "気になるクリップを Stack に積んでおいて、画面右下の Pill から好きな順で貼り付けたり、まとめて結合貼付したり。長い文章を組み立てる時に便利。";
+"onboarding.08.title" = "複数選択 — Esc 2 段階・順番貼付";
+"onboarding.08.subtitle" = "Space で複数選択 → Enter で選んだ順に貼付。ドラッグでまとめて貼付・まとめてピン留めも。Esc は 1 回目で選択解除、2 回目で閉じる。";
+"onboarding.08b.title" = "AI マクロで一発整形";
+"onboarding.08b.subtitle" = "右クリックから AI アクションを実行。完了するとサウンドと画面端の縁取りでさりげなく通知します。";
+"onboarding.09.title" = "キーボードだけで完結する";
+"onboarding.09.subtitle" = "マウスを使わずに探す、選ぶ、貼る。生産性は手元から逃げない。";
+"onboarding.09b.title" = "Confidential モード — ⌃⌥⇧P";
+"onboarding.09b.subtitle" = "押した瞬間から 60 秒間、クリップボードの履歴を記録しません。パスワードや個人情報を扱うときに。";
+"onboarding.10b.title" = "Quick Paste — ⌃⌥1〜5";
+"onboarding.10b.subtitle" = "直近 5 件のクリップに番号を割り当て。Pasty を開かなくても、修飾キーと数字キーひとつで即貼付。";
+"onboarding.11.title" = "準備完了。";
+"onboarding.11.subtitle" = "あとは ⇧⌘V でいつでも Pasty を呼んでください。";
+
+"onboarding.cta.success" = "ナイス! ストリップが立ち上がりました";
+"onboarding.cta.tryNow" = "今すぐ試してみよう";
+"onboarding.notch.hint" = "マウスを乗せると、ここから降りてきます";
+"onboarding.folder.newFolder" = "新しいフォルダ";
+"onboarding.folder.tabHint" = "でフォルダを順に切り替え";
+"action.openSystemSettings" = "システム設定を開く";
+"whatsNew.title.versioned" = "Pasty %@ の新機能";
+
+/* MARK: - Settings General (v0.10.0-beta) */
+"settings.section.invocation" = "呼び出し方";
+"settings.section.retention" = "履歴保持期間";
+"settings.section.maxClips" = "クリップ上限";
+"settings.section.language" = "言語";
+"settings.section.accessibility" = "アクセシビリティ権限";
+"settings.surfaces.strip" = "下部ストリップ";
+"settings.surfaces.stripDesc" = "⇧⌘V / ⌥⇧V でいつでも呼び出せるメインサーフェス";
+"settings.retention.custom" = "カスタム:";
+"settings.retention.daysFormat" = "%lld 日";
+"settings.retention.unlimited" = "無期限保持 — クリップは自動削除されません";
+"settings.maxClips.countFormat" = "%lld 件";
+"settings.maxClips.unlimited" = "無制限";
+"settings.language.japanese" = "日本語";
+"settings.language.auto" = "自動";
+"settings.action.resetPermissions" = "Pasty の権限をリセット";
+"settings.accessibility.granted" = "許可されています";
+"settings.accessibility.denied" = "許可されていません";
+"settings.dialog.resetSuccess" = "権限をリセットしました";
+"settings.dialog.resetFailed" = "リセットに失敗しました";
+"settings.capture.paused" = "キャプチャは一時停止中";
+
+/* MARK: - What's New + Help (v0.10.0-beta) */
+"whatsNew.title" = "Pasty の新機能";
+"common.close" = "閉じる";
+"common.back" = "戻る";
+"common.next" = "次へ";
+"help.title" = "Pasty キーボードショートカット";
+"help.subtitle" = "どこからでも素早く呼び出せる主要アクション一覧";
+"help.closeHint" = "で閉じる";
+"help.section.invoke" = "呼び出し";
+"help.section.navigation" = "ナビゲーション";
+"help.section.selectPaste" = "選択 & 貼付";
+"help.section.preview" = "プレビュー & 編集";
+"help.section.ai" = "AI アクション";
+"help.section.other" = "その他";

@@ -67,6 +67,7 @@ struct StripView: View {
     @ObservedObject private var settings = SettingsStore.shared
     var mode: CarouselMode = .strip
     @State private var query: String = ""
+    @State private var searchTask: Task<Void, Never>?
     @State private var items: [ClipItem] = []
     @State private var filterKind: ClipKind? = nil
     @State private var folderID: Int64? = nil
@@ -198,7 +199,14 @@ struct StripView: View {
             if SettingsStore.shared.stripRememberFilters {
                 SettingsStore.shared.lastStripQuery = newValue
             }
-            reload()
+            searchTask?.cancel()
+            searchTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                if Task.isCancelled { return }
+                PerfLog.timing("strip.search.reload") {
+                    reload()
+                }
+            }
         }
         .onChange(of: filterKind) { _, newValue in
             if SettingsStore.shared.stripRememberFilters {
@@ -268,6 +276,8 @@ struct StripView: View {
                 // v0.8.9: 検索バー内で Enter → 動的 Enter ロジックに橋渡し
                 onReturn(plain: false)
             })
+            .accessibilityLabel("クリップを検索")
+            .accessibilityIdentifier("strip.search-field")
 
             // 履歴タブ + フォルダタブを同じ行に統合 (横スクロール可能)
             // 右側の他要素を押し出さないよう layoutPriority 0 + frame(minWidth) で柔軟に縮める。
@@ -382,6 +392,8 @@ struct StripView: View {
                 .padding(.leading, 5)
                 .buttonStyle(.plain)
                 .help("新しいフォルダ")
+                .accessibilityLabel("新しいフォルダを作成")
+                .accessibilityIdentifier("strip.new-folder-button")
             }
             .padding(.horizontal, 2)
         }
@@ -724,6 +736,7 @@ struct StripView: View {
                 .font(.callout)
                 .foregroundStyle(.tint)
                 .frame(width: 18)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(clip.preview)
                     .font(.callout)
@@ -764,6 +777,10 @@ struct StripView: View {
                 )
         )
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(clip.preview)
+        .accessibilityHint("\(clip.kind.rawValue)\(clip.sourceAppName.map { ", " + $0 } ?? "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func rowBackground(isCursor: Bool, isSelected: Bool) -> Color {
@@ -807,7 +824,9 @@ struct StripView: View {
 
     private var multiSelectBar: some View {
         HStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
             Text("\(selection.count) 件 選択中").font(.callout.weight(.medium))
             Spacer()
             // 選択中のクリップを現フォルダに移動
@@ -871,8 +890,12 @@ struct StripView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("色 \(hex)")
+                    .accessibilityAddTraits(newFolderColor == hex ? .isSelected : [])
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("フォルダの色を選択")
             HStack {
                 Spacer()
                 Button("キャンセル") { showingNewFolder = false }

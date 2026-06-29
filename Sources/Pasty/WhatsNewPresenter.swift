@@ -42,7 +42,7 @@ final class WhatsNewPresenter {
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
-        p.title = "Pasty の新機能"
+        p.title = L10n("whatsNew.title")
         p.titlebarAppearsTransparent = true
         p.titleVisibility = .hidden
         p.isMovableByWindowBackground = true
@@ -119,7 +119,7 @@ private struct WhatsNewView: View {
                 .frame(height: 0.5)
             HStack {
                 Spacer()
-                Button("閉じる", action: onDismiss)
+                Button(L10n("common.close"), action: onDismiss)
                     .keyboardShortcut(.defaultAction)
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
@@ -146,8 +146,9 @@ private struct WhatsNewView: View {
                     .font(.system(size: 36, weight: .regular))
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: PastyDesign.Spacing.xs) {
-                    Text("Pasty の新機能")
+                    Text(L10n("whatsNew.title"))
                         .font(PastyDesign.TypeRamp.hero)
                         .foregroundStyle(.white)
                     // Version pill — luxury accent
@@ -171,6 +172,9 @@ private struct WhatsNewView: View {
         }
         .frame(height: 110)
         .pastyShadow(PastyDesign.Shadow.subtle)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(L10n("whatsNew.title")) バージョン \(version)")
+        .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder

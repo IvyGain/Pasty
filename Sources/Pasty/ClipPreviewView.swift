@@ -316,6 +316,7 @@ struct ClipPreviewView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipShape(RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous))
+                        .accessibilityLabel("画像プレビュー \(Int(img.size.width))×\(Int(img.size.height))")
                 }
                 if !isCompact {
                     HStack(spacing: 6) {
@@ -402,6 +403,7 @@ struct ClipPreviewView: View {
                         RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                     )
+                    .accessibilityLabel("PDF プレビュー \(name)")
                 // PDF バッジ
                 Text("PDF")
                     .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -413,6 +415,7 @@ struct ClipPreviewView: View {
                     )
                     .foregroundStyle(.white)
                     .padding(6)
+                    .accessibilityHidden(true)
             }
             HStack(spacing: 6) {
                 Text(name)
@@ -485,11 +488,13 @@ struct ClipPreviewView: View {
                         RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
                     )
+                    .accessibilityLabel("動画プレビュー \(name)")
                 // 中央の再生アイコン
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: isCompact ? 38 : 56, weight: .regular))
                     .foregroundStyle(.white.opacity(0.92))
                     .shadow(color: .black.opacity(0.45), radius: 6, x: 0, y: 2)
+                    .accessibilityHidden(true)
             }
             HStack(spacing: 6) {
                 Image(systemName: "play.rectangle")
@@ -565,6 +570,7 @@ struct ClipPreviewView: View {
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
+                .accessibilityLabel("ブラウザで \(url.host ?? raw) を開く")
             }
             Spacer(minLength: 0)
         }
@@ -583,6 +589,7 @@ struct ClipPreviewView: View {
                     RoundedRectangle(cornerRadius: PastyTheme.rowCornerRadius, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                 )
+                .accessibilityLabel("色見本 \(hex)")
             Text(hex.uppercased())
                 .font(PastyTheme.monoFont)
                 .foregroundStyle(.secondary)

@@ -1,6 +1,9 @@
 import SwiftUI
 import AppKit
-import LinkPresentation
+// Swift 6 strict concurrency: `LPLinkMetadata` / `LPMetadataProvider` predate
+// Sendable annotation. We hop their results back to MainActor immediately and
+// treat them as effectively immutable, hence `@preconcurrency`.
+@preconcurrency import LinkPresentation
 import CryptoKit
 
 /// v0.9.0 (塊 Z / D): LINK kind のクリップカードに「タイトル + ファビコン」の
@@ -20,13 +23,21 @@ import CryptoKit
 /// v0.9.5-beta (塊 P1): `URLLinkPreviewItem` で metadata と favicon NSImage を束ね、
 /// `iconProvider` (NSItemProvider) を async で NSImage に解決するように拡張。
 /// `LPLinkMetadata.iconImage` は macOS に存在しない (UIKit-only) ため。
-public struct URLLinkPreviewItem {
+// Swift 6 strict concurrency: `LPLinkMetadata` (`NSSecureCoding`-archivable) and
+// `NSImage` are not formally `Sendable`, but Apple's documented usage from
+// async/await contexts (e.g. `LPMetadataProvider.startFetchingMetadata`) treats
+// them as effectively immutable after fetch. We only ever read them after the
+// initial publish, hence `@unchecked Sendable`.
+public struct URLLinkPreviewItem: @unchecked Sendable {
     public let metadata: LPLinkMetadata
     public let favicon: NSImage?
 }
 
+// Swift 6 strict concurrency: NSCache is internally thread-safe; `inflight`
+// dict mutations are gated by `@MainActor` isolation. The class never escapes
+// its MainActor contract.
 @MainActor
-final class URLLinkPreviewCache {
+final class URLLinkPreviewCache: @unchecked Sendable {
     static let shared = URLLinkPreviewCache()
 
     private let memCache = NSCache<NSString, LPLinkMetadata>()
@@ -186,14 +197,11 @@ final class URLLinkPreviewCache {
         let task = Task<URLLinkPreviewItem?, Never> { [weak self] in
             let provider = LPMetadataProvider()
             provider.timeout = 5
-            // LPMetadataProvider は async 版が macOS 12+ で利用可能。
-            // ない環境向けに completion handler を `withCheckedContinuation` で
-            // 包む安全側のラッパを使う。
-            let md: LPLinkMetadata? = await withCheckedContinuation { cont in
-                provider.startFetchingMetadata(for: url) { metadata, _ in
-                    cont.resume(returning: metadata)
-                }
-            }
+            // macOS 14+ ターゲットなので async API を直接利用する。
+            // 旧来の completion handler 版を `withCheckedContinuation` で包むと
+            // strict concurrency 下で `LPLinkMetadata` の sending 警告が出るが、
+            // async 版は SDK 側で適切に Sendable 境界を扱ってくれる。
+            let md: LPLinkMetadata? = try? await provider.startFetchingMetadata(for: url)
 
             // favicon を async に解決 (任意).
             var favicon: NSImage? = nil

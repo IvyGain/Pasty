@@ -28,8 +28,13 @@ struct PinboardItem: Codable, FetchableRecord, MutablePersistableRecord, Equatab
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
+// Swift 6 strict concurrency: `@MainActor` + `ObservableObject` + `@Published`
+// canonical SwiftUI store pattern. All mutation funnels through MainActor;
+// `dbWriter` (GRDB DatabaseWriter) is itself thread-safe by design.
+// `@unchecked` because the compiler can't see the MainActor guarantee on stored
+// `@Published` properties.
 @MainActor
-final class PinboardStore: ObservableObject {
+final class PinboardStore: ObservableObject, @unchecked Sendable {
     @Published private(set) var boards: [Pinboard] = []
     @Published var selectedID: Int64? = nil
     private let dbWriter: any DatabaseWriter

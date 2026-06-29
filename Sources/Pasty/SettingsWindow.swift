@@ -103,15 +103,15 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("呼び出し方") {
+            Section(L10n("settings.section.invocation")) {
                 HStack(spacing: 12) {
                     Image(systemName: "rectangle.bottomthird.inset.filled")
                         .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(.tint)
                         .frame(width: 32)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("下部ストリップ").font(.system(size: 13, weight: .semibold))
-                        Text("⇧⌘V / ⌥⇧V でいつでも呼び出せるメインサーフェス")
+                        Text(L10n("settings.surfaces.strip")).font(.system(size: 13, weight: .semibold))
+                        Text(L10n("settings.surfaces.stripDesc"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -139,13 +139,13 @@ struct SettingsView: View {
                 Toggle("クリップボードを自動キャプチャ", isOn: $settings.capturingEnabled)
                 Toggle("アイテム選択後に自動で貼付", isOn: $settings.autoPaste)
             }
-            Section("履歴保持期間") {
+            Section(L10n("settings.section.retention")) {
                 let presets: [(label: String, value: Int)] = [
-                    ("7 日", 7),
-                    ("30 日", 30),
-                    ("90 日", 90),
-                    ("365 日", 365),
-                    ("無期限", -1)
+                    (L10nFormat.string("settings.retention.daysFormat", 7), 7),
+                    (L10nFormat.string("settings.retention.daysFormat", 30), 30),
+                    (L10nFormat.string("settings.retention.daysFormat", 90), 90),
+                    (L10nFormat.string("settings.retention.daysFormat", 365), 365),
+                    (L10n("settings.maxClips.unlimited"), -1)
                 ]
                 HStack(spacing: 8) {
                     ForEach(presets, id: \.value) { preset in
@@ -178,15 +178,15 @@ struct SettingsView: View {
                 if settings.maxRetentionDays != -1 {
                     Stepper(value: $settings.maxRetentionDays, in: 1...3650, step: 1) {
                         HStack(spacing: 6) {
-                            Text("カスタム:")
+                            Text(L10n("settings.retention.custom"))
                                 .foregroundStyle(.secondary)
-                            Text("\(settings.maxRetentionDays) 日")
+                            Text(L10nFormat.string("settings.retention.daysFormat", settings.maxRetentionDays))
                                 .font(.system(.body, design: .monospaced))
                                 .frame(minWidth: 60, alignment: .leading)
                         }
                     }
                 } else {
-                    Label("無期限保持 — クリップは自動削除されません", systemImage: "infinity")
+                    Label(L10n("settings.retention.unlimited"), systemImage: "infinity")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 }
@@ -195,30 +195,30 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("クリップ上限") {
+            Section(L10n("settings.section.maxClips")) {
                 Toggle("自動 trim を有効にする", isOn: $settings.autoTrimEnabled)
-                Picker("クリップ上限", selection: $settings.autoTrimMaxClips) {
-                    Text("500 件").tag(500)
-                    Text("1000 件").tag(1000)
-                    Text("5000 件").tag(5000)
-                    Text("10000 件").tag(10000)
-                    Text("無制限").tag(0)
+                Picker(L10n("settings.section.maxClips"), selection: $settings.autoTrimMaxClips) {
+                    Text(L10nFormat.string("settings.maxClips.countFormat", 500)).tag(500)
+                    Text(L10nFormat.string("settings.maxClips.countFormat", 1000)).tag(1000)
+                    Text(L10nFormat.string("settings.maxClips.countFormat", 5000)).tag(5000)
+                    Text(L10nFormat.string("settings.maxClips.countFormat", 10000)).tag(10000)
+                    Text(L10n("settings.maxClips.unlimited")).tag(0)
                 }
                 .disabled(!settings.autoTrimEnabled)
                 Text("ピン留めしたクリップは保護されます。トーストは表示されません。")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            Section("言語") {
+            Section(L10n("settings.section.language")) {
                 Picker("", selection: $settings.locale) {
-                    Text("日本語").tag("ja")
+                    Text(L10n("settings.language.japanese")).tag("ja")
                     Text("English").tag("en")
-                    Text("自動").tag("auto")
+                    Text(L10n("settings.language.auto")).tag("auto")
                 }
                 .pickerStyle(.segmented)
             }
 
-            Section("アクセシビリティ権限") {
+            Section(L10n("settings.section.accessibility")) {
                 accessibilityStatusRow
                 Text("Pasty は ⌘V を送出するためにアクセシビリティ権限が必要です。アプリを再ビルドすると古い権限が無効になる場合があります。その時は「リスト削除→再追加」を行ってください。")
                     .font(.caption)
@@ -227,12 +227,12 @@ struct SettingsView: View {
                     Button {
                         openAccessibilitySettings()
                     } label: {
-                        Label("システム設定を開く", systemImage: "arrow.up.right.square")
+                        Label(L10n("action.openSystemSettings"), systemImage: "arrow.up.right.square")
                     }
                     Button {
                         resetAccessibilityPermission()
                     } label: {
-                        Label("Pasty の権限をリセット", systemImage: "arrow.counterclockwise")
+                        Label(L10n("settings.action.resetPermissions"), systemImage: "arrow.counterclockwise")
                     }
                     .help("ターミナルで `tccutil reset Accessibility io.pasty.app` を実行します (管理者パスワードが必要な場合あり)")
                 }
@@ -249,7 +249,7 @@ struct SettingsView: View {
         HStack {
             Image(systemName: trusted ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
                 .foregroundStyle(trusted ? .green : .red)
-            Text(trusted ? "許可されています" : "許可されていません")
+            Text(trusted ? L10n("settings.accessibility.granted") : L10n("settings.accessibility.denied"))
                 .font(.system(size: 12, weight: .medium))
         }
     }
@@ -273,13 +273,13 @@ struct SettingsView: View {
             task.waitUntilExit()
             // 念のため再起動を促す
             let alert = NSAlert()
-            alert.messageText = "権限をリセットしました"
+            alert.messageText = L10n("settings.dialog.resetSuccess")
             alert.informativeText = "Pasty を再起動すると次回ペースト時にダイアログが再表示されます。"
             alert.addButton(withTitle: "OK")
             alert.runModal()
         } catch {
             let alert = NSAlert()
-            alert.messageText = "リセットに失敗しました"
+            alert.messageText = L10n("settings.dialog.resetFailed")
             alert.informativeText = "ターミナルで以下を実行してください:\ntccutil reset Accessibility io.pasty.app"
             alert.addButton(withTitle: "OK")
             alert.runModal()
@@ -289,7 +289,7 @@ struct SettingsView: View {
     private var captureTab: some View {
         Form {
             if settings.isPaused {
-                Label("キャプチャは一時停止中", systemImage: "pause.circle.fill")
+                Label(L10n("settings.capture.paused"), systemImage: "pause.circle.fill")
                     .foregroundStyle(.orange)
                 Button("すぐに再開") { settings.resume() }
             } else {
@@ -838,6 +838,7 @@ private struct SettingsTabButton: View {
                     .font(.system(size: 18, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
                     .frame(height: 22)
+                    .accessibilityHidden(true)
                 Text(label)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
                     .tracking(-0.05)
@@ -865,6 +866,8 @@ private struct SettingsTabButton: View {
         .onHover { hovering = $0 }
         .animation(PastyDesign.Animation.snappy, value: isSelected)
         .animation(PastyDesign.Animation.snappy, value: hovering)
+        .accessibilityLabel("\(label) タブ")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -954,6 +957,7 @@ private struct CustomRulesEditor: View {
             }
             .buttonStyle(.borderless)
             .help("このルールを削除")
+            .accessibilityLabel("ルール「\(rule.wrappedValue.label)」を削除")
         }
         .padding(.vertical, 2)
     }
@@ -1099,6 +1103,7 @@ private struct PerAppRetentionEditor: View {
             }
             .buttonStyle(.borderless)
             .help("このルールを削除")
+            .accessibilityLabel("\(rule.displayName ?? rule.bundleId) の保持期間ルールを削除")
         }
         .padding(.vertical, 2)
     }
@@ -1274,6 +1279,7 @@ private struct FlowChipsView: View {
             }
             .buttonStyle(.plain)
             .help("\(tag) を削除")
+            .accessibilityLabel("言語 \(tag) を削除")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
@@ -1369,6 +1375,7 @@ private struct SnippetCounterEditor: View {
             }
             .buttonStyle(.borderless)
             .help("\(name) を削除")
+            .accessibilityLabel("カウンタ \(name) を削除")
         }
         .padding(.vertical, 1)
     }

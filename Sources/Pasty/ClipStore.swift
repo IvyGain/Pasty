@@ -19,8 +19,13 @@ private let clipStoreLogger = Logger(subsystem: "io.pasty.app", category: "ClipS
 
 /// SQLite-backed persistence for clipboard items. Local-first by design:
 /// the database lives under `~/Library/Application Support/Pasty/`.
+// Swift 6 strict concurrency: `@MainActor` + `ObservableObject` + `@Published`
+// canonical SwiftUI store pattern. `dbWriter` is GRDB's `DatabaseWriter`,
+// which is internally thread-safe (a SerializedDatabase under the hood).
+// `@unchecked` because the compiler can't see the MainActor guarantee on
+// `@Published` storage, and `DatabaseWriter` is `any` existential.
 @MainActor
-final class ClipStore: ObservableObject {
+final class ClipStore: ObservableObject, @unchecked Sendable {
     @Published private(set) var recent: [ClipItem] = []
     @Published private(set) var totalCount: Int = 0
 
@@ -663,7 +668,7 @@ final class ClipStore: ObservableObject {
                     .fetchAll(db)
             }
         }
-        let pattern = FTS5Pattern(matchingAllPrefixesIn: trimmed) ?? FTS5Pattern(matchingAnyTokenIn: trimmed)
+        let pattern = FTS5PatternCache.pattern(for: trimmed)
         return try await dbWriter.read { db in
             // v0.9.6-beta (P0 #1): the FTS5 join doesn't know about
             // `deleted_at`, so AND it on the clips side. The FTS5 backfill
@@ -717,7 +722,7 @@ final class ClipStore: ObservableObject {
                         .fetchAll(db)
                 }
             }
-            guard let pattern = FTS5Pattern(matchingAllPrefixesIn: trimmed) ?? FTS5Pattern(matchingAnyTokenIn: trimmed) else { return [] }
+            guard let pattern = FTS5PatternCache.pattern(for: trimmed) else { return [] }
             if let after = afterID {
                 return try ClipItem.fetchAll(db, sql: """
                     SELECT clips.* FROM clips

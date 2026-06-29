@@ -30,3 +30,80 @@
 "privacy.note" = "Pasty keeps everything on this Mac. There is no cloud account, no telemetry, and no analytics by default.";
 "privacy.openFolder" = "Open Application Support folder";
 "privacy.wipe" = "Wipe all clips";
+
+/* MARK: - Onboarding (v0.10.0-beta) */
+"onboarding.01.title" = "Welcome to Pasty";
+"onboarding.01.subtitle" = "Instant access to your copy history at the speed of thought.";
+"onboarding.02.title" = "Summon anytime with ⇧⌘V";
+"onboarding.02.subtitle" = "The strip appears from the bottom in any app.";
+"onboarding.03.title" = "Hover the notch to reveal clips";
+"onboarding.03.subtitle" = "Move cursor to the notch (or top of screen on non-notch Macs).";
+"onboarding.03b.title" = "Scroll horizontally in the notch";
+"onboarding.03b.subtitle" = "Spin the mouse wheel over the notch frame to scroll clips left and right with one finger.";
+"onboarding.04.title" = "Grant Accessibility permission";
+"onboarding.04.subtitle" = "Required to auto-paste. Pasty never sends history outside this Mac.";
+"onboarding.05.title" = "Organize with folders";
+"onboarding.05.subtitle" = "Click + in header to create folders. Tab/⇧Tab to switch.";
+"onboarding.06.title" = "Three ways to file clips";
+"onboarding.06.subtitle" = "Drag, right-click, or multi-select then bulk move clips into folders.";
+"onboarding.06b.title" = "Reorder folders by dragging";
+"onboarding.06b.subtitle" = "Grab a folder tab and drag horizontally; a thin line shows where it will land.";
+"onboarding.07.title" = "Stack — Compose & paste together";
+"onboarding.07.subtitle" = "Stack clips you want, then paste them in any order — or all at once — from the bottom-right pill. Great for long replies.";
+"onboarding.08.title" = "Multi-select — Esc 2-stage, sequential paste";
+"onboarding.08.subtitle" = "Space to multi-select, Enter to paste in order. Drag to paste or pin them together. Esc deselects first, closes second.";
+"onboarding.08b.title" = "One-shot AI macros";
+"onboarding.08b.subtitle" = "Run AI actions from the right-click menu. A sound and screen-edge glow gently confirm completion.";
+"onboarding.09.title" = "Master keyboard-only workflow";
+"onboarding.09.subtitle" = "Search, pick, paste — without ever touching the mouse.";
+"onboarding.09b.title" = "Confidential Mode — ⌃⌥⇧P";
+"onboarding.09b.subtitle" = "Pauses clipboard history for 60 seconds. Use it for passwords and personal info.";
+"onboarding.10b.title" = "Quick Paste — ⌃⌥1–5";
+"onboarding.10b.subtitle" = "Assigns numbers to your 5 most recent clips. Paste any with the modifier and a digit, no panel needed.";
+"onboarding.11.title" = "All set.";
+"onboarding.11.subtitle" = "Press ⇧⌘V anytime to call Pasty.";
+
+"onboarding.cta.success" = "Nice! The strip appeared.";
+"onboarding.cta.tryNow" = "Try it now";
+"onboarding.notch.hint" = "Hover here to reveal the panel.";
+"onboarding.folder.newFolder" = "New folder";
+"onboarding.folder.tabHint" = "to switch between folders";
+"action.openSystemSettings" = "Open System Settings";
+"whatsNew.title.versioned" = "What's New in Pasty %@";
+
+/* MARK: - Settings General (v0.10.0-beta) */
+"settings.section.invocation" = "How to call";
+"settings.section.retention" = "Retention";
+"settings.section.maxClips" = "Maximum Clips";
+"settings.section.language" = "Language";
+"settings.section.accessibility" = "Accessibility Permission";
+"settings.surfaces.strip" = "Bottom Strip";
+"settings.surfaces.stripDesc" = "Main surface, callable anytime with ⇧⌘V or ⌥⇧V";
+"settings.retention.custom" = "Custom:";
+"settings.retention.daysFormat" = "%lld days";
+"settings.retention.unlimited" = "Unlimited — clips never auto-delete";
+"settings.maxClips.countFormat" = "%lld clips";
+"settings.maxClips.unlimited" = "Unlimited";
+"settings.language.japanese" = "Japanese";
+"settings.language.auto" = "Auto";
+"settings.action.resetPermissions" = "Reset Permissions";
+"settings.accessibility.granted" = "Permitted";
+"settings.accessibility.denied" = "Not permitted";
+"settings.dialog.resetSuccess" = "Permissions reset.";
+"settings.dialog.resetFailed" = "Reset failed.";
+"settings.capture.paused" = "Capture is paused.";
+
+/* MARK: - What's New + Help (v0.10.0-beta) */
+"whatsNew.title" = "What's New in Pasty";
+"common.close" = "Close";
+"common.back" = "Back";
+"common.next" = "Next";
+"help.title" = "Pasty Keyboard Shortcuts";
+"help.subtitle" = "Quick-reference for key actions.";
+"help.closeHint" = "to close";
+"help.section.invoke" = "Invoke";
+"help.section.navigation" = "Navigation";
+"help.section.selectPaste" = "Select & Paste";
+"help.section.preview" = "Preview & Edit";
+"help.section.ai" = "AI Actions";
+"help.section.other" = "Other";

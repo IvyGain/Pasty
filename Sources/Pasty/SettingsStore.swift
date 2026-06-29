@@ -4,8 +4,13 @@ import Combine
 
 /// Lightweight, user-defaults-backed preferences. Anything heavier (rule
 /// engines, per-app blacklists with patterns) lives in SQLite.
+// Swift 6 strict concurrency:
+// `@MainActor` + `ObservableObject` + `@Published` is the canonical SwiftUI
+// store pattern. All mutation goes through the main actor, but Swift can't
+// statically prove `@Published` storage is safe to share, hence
+// `@unchecked Sendable`. Treat all accessors as MainActor-isolated.
 @MainActor
-final class SettingsStore: ObservableObject {
+final class SettingsStore: ObservableObject, @unchecked Sendable {
     static let shared = SettingsStore()
 
     private let defaults = UserDefaults.standard
@@ -492,7 +497,7 @@ final class SettingsStore: ObservableObject {
 
 /// B3: アプリごとの保持期間ルール。`days == -1` は無期限。
 /// 後続 codegen (B3) が `ClipStore` の cleanup タスクから参照する。
-public struct PerAppRetentionRule: Codable, Hashable, Identifiable {
+public struct PerAppRetentionRule: Codable, Hashable, Identifiable, Sendable {
     public var id: String { bundleId }
     public var bundleId: String
     public var displayName: String?

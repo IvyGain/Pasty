@@ -169,6 +169,28 @@ struct PastyApp: App {
                     pastyAppLogger.error("BlobGC sweep failed: \(String(describing: error), privacy: .public)")
                 }
 
+                // v0.10.0-beta (Axis 5): hard-delete tombstoned rows aged past
+                // the 90-day grace window. Runs after BlobGC so any blobs that
+                // belonged to those rows have already been reclaimed.
+                do {
+                    let result = try await RetentionSweeper.sweep(store: store2)
+                    pastyAppLogger.info("RetentionSweeper hardDeleted=\(result.hardDeleted, privacy: .public) kept=\(result.keptRows, privacy: .public)")
+                } catch {
+                    pastyAppLogger.error("RetentionSweeper failed: \(String(describing: error), privacy: .public)")
+                }
+
+                // v0.10.0-beta: Disk thumbnail LRU sweep. Defers ~5 s after
+                // launch so the cold-start path is untouched, then evicts
+                // expired (>90 d) and oversize entries from both buckets
+                // using file mtime as the LRU signal. Runs off-MainActor
+                // inside `DiskThumbnailStore` (actor) — the outer Task
+                // here just kicks it off and returns.
+                Task.detached(priority: .background) {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    await VideoThumbnailCache.diskStore.evictExpiredAndOversize()
+                    await PDFThumbnailCache.diskStore.evictExpiredAndOversize()
+                }
+
                 // v0.9.8-beta Wave 1A: startup auto-trim. After BlobGC has had
                 // a chance to reclaim orphan blobs, enforce the clip-count
                 // ceiling. Pinned clips are protected by trimToMaxClips itself
